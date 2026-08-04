@@ -239,11 +239,35 @@ UDynamicMesh* UMoonToonSmoothNormalTool::ToDynamicMesh(UObject* Mesh, int32 LODI
 	return nullptr;
 }
 
+bool UMoonToonSmoothNormalTool::FixBuildSettingsForMesh(UObject* Mesh)
+{
+	bool bChanged = false;
+	const int32 NumLODs = MoonToonMesh::GetNumLODs(Mesh);
+	for (int32 LODIndex = 0; LODIndex < NumLODs; ++LODIndex)
+	{
+		bChanged |= FixBuildSettingsForLOD(Mesh, LODIndex);
+	}
+	if (bChanged)
+	{
+		UE_LOG(LogMoonToonSmoothNormal, Warning,
+			TEXT("[MoonToon] %s had bad build settings; corrected and reimporting."), *Mesh->GetName());
+		UMoonToonEditorBPLibrary::MoonReimportObjectAsset(Mesh);
+	}
+	return bChanged;
+}
+
 void UMoonToonSmoothNormalTool::BakeSmoothedNormalAndCurvature()
 {
 	FixBuildSettings();
 
 	ForEachSelectedMeshLOD([](UObject* Mesh, int32 LODIndex)
+	{
+		BakeSmoothedNormalForLOD(Mesh, LODIndex, FMoonToonWedgeMask());
+	});
+}
+
+void UMoonToonSmoothNormalTool::BakeSmoothedNormalForLOD(UObject* Mesh, int32 LODIndex, const FMoonToonWedgeMask& Mask)
+{
 	{
 		TArray<FVector3f> Positions, Normals, Tangents, Binormals;
 		TArray<int32> VertexIndices;
@@ -288,6 +312,11 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalAndCurvature()
 
 		for (int32 WedgeIndex = 0; WedgeIndex < VertexIndices.Num(); ++WedgeIndex)
 		{
+			if (!Mask.Contains(WedgeIndex))
+			{
+				continue;
+			}
+
 			const int32 VertexIndex = VertexIndices[WedgeIndex];
 			if (!NearestResult.IsValidIndex(VertexIndex) || !Positions.IsValidIndex(VertexIndex))
 			{
@@ -338,7 +367,7 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalAndCurvature()
 
 		UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LODIndex, Positions, VertexIndices, Normals,
 			Tangents, Binormals, Colors, UV0s, UV1s, UV2s, UV3s);
-	});
+	}
 }
 
 void UMoonToonSmoothNormalTool::BakeFaceForwardDirection(FVector FaceForwardDirWS)
@@ -346,6 +375,14 @@ void UMoonToonSmoothNormalTool::BakeFaceForwardDirection(FVector FaceForwardDirW
 	FixBuildSettings();
 
 	ForEachSelectedMeshLOD([FaceForwardDirWS](UObject* Mesh, int32 LODIndex)
+	{
+		BakeFaceForwardForLOD(Mesh, LODIndex, FaceForwardDirWS, FMoonToonWedgeMask());
+	});
+}
+
+void UMoonToonSmoothNormalTool::BakeFaceForwardForLOD(
+	UObject* Mesh, int32 LODIndex, FVector FaceForwardDirWS, const FMoonToonWedgeMask& Mask)
+{
 	{
 		TArray<FVector3f> Positions, Normals, Tangents, Binormals;
 		TArray<int32> VertexIndices;
@@ -358,6 +395,11 @@ void UMoonToonSmoothNormalTool::BakeFaceForwardDirection(FVector FaceForwardDirW
 
 		for (int32 WedgeIndex = 0; WedgeIndex < VertexIndices.Num(); ++WedgeIndex)
 		{
+			if (!Mask.Contains(WedgeIndex))
+			{
+				continue;
+			}
+
 			const FMatrix TangentToLocal = BuildTangentToLocal(WedgeIndex, Mesh, Normals, Tangents, Binormals);
 			const FVector TangentSpaceDir = TangentToLocal.InverseTransformVector(FaceForwardDirWS).GetSafeNormal();
 			const FVector Encoded = TangentSpaceDir * 0.5 + FVector(0.5);
@@ -381,5 +423,5 @@ void UMoonToonSmoothNormalTool::BakeFaceForwardDirection(FVector FaceForwardDirW
 
 		UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LODIndex, Positions, VertexIndices, Normals,
 			Tangents, Binormals, Colors, UV0s, UV1s, UV2s, UV3s);
-	});
+	}
 }

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AssetActionUtility.h"
+#include "MoonToonMeshTargets.h"
 #include "MoonToonSmoothNormalTool.generated.h"
 
 class UDynamicMesh;
@@ -52,6 +53,20 @@ public:
 	 */
 	UFUNCTION(CallInEditor, Category = "MoonToon")
 	void FixBuildSettings();
+
+	// --- Explicit-target entry points -------------------------------------------------------------
+	// The UFUNCTIONs above read the content browser selection, which is what the right-click menu
+	// needs. The tools panel has its own target and section selection, so it calls these instead.
+	// Both routes end up in the same implementation; there is no second copy of the bake.
+
+	/** Bakes one LOD. Wedges the mask excludes keep whatever they already had. */
+	static void BakeSmoothedNormalForLOD(UObject* Mesh, int32 LODIndex, const FMoonToonWedgeMask& Mask);
+
+	/** Bakes one LOD. Wedges the mask excludes keep whatever they already had. */
+	static void BakeFaceForwardForLOD(UObject* Mesh, int32 LODIndex, FVector FaceForwardDirWS, const FMoonToonWedgeMask& Mask);
+
+	/** Applies the required build settings to every LOD of one mesh; true if anything had to change. */
+	static bool FixBuildSettingsForMesh(UObject* Mesh);
 
 private:
 	/** Runs Body once per (selected mesh, LOD) pair. Mirrors the ForEachSelectedMeshesLOD macro. */
