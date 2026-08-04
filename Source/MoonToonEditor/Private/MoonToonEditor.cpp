@@ -3,12 +3,68 @@
 #include "MoonToonEditor.h"
 
 #include "MoonToonSmoothNormalTool.h"
+#include "SMoonToonToolsPanel.h"
 #include "ToolMenus.h"
+#include "WorkspaceMenuStructure.h"
+#include "WorkspaceMenuStructureModule.h"
+#include "Framework/Docking/TabManager.h"
+#include "Styling/AppStyle.h"
+#include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "FMoonToonEditorModule"
 
 namespace
 {
+	const FName MoonToonToolsTabName(TEXT("MoonToonTools"));
+
+	TSharedRef<SDockTab> SpawnToolsTab(const FSpawnTabArgs& Args)
+	{
+		return SNew(SDockTab)
+			.TabRole(ETabRole::NomadTab)
+			[
+				SNew(SMoonToonToolsPanel)
+			];
+	}
+
+	/**
+	 * A nomad tab rather than an asset editor: the tools act on whatever is selected and write back to
+	 * assets, so there is nothing per-asset to keep open, and the level viewport is already the best
+	 * preview for vertex colour and outline changes.
+	 */
+	void RegisterToolsTab()
+	{
+		FGlobalTabmanager::Get()
+			->RegisterNomadTabSpawner(MoonToonToolsTabName, FOnSpawnTab::CreateStatic(&SpawnToolsTab))
+			.SetDisplayName(LOCTEXT("ToolsTabTitle", "MoonToon Tools"))
+			.SetTooltipText(LOCTEXT("ToolsTabTooltip",
+				"Mesh inspection and the MoonToon vertex bakes, in one panel."))
+			.SetGroup(WorkspaceMenu::GetMenuStructure().GetToolsCategory())
+			.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"));
+	}
+
+	void AddToolsMenuEntry()
+	{
+		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu(TEXT("LevelEditor.MainMenu.Tools"));
+		if (!Menu)
+		{
+			return;
+		}
+
+		FToolMenuSection& Section = Menu->FindOrAddSection(
+			TEXT("MoonToon"), LOCTEXT("MoonToonSection", "MoonToon"));
+
+		Section.AddMenuEntry(
+			TEXT("MoonToonToolsPanel"),
+			LOCTEXT("OpenToolsPanel", "MoonToon Tools"),
+			LOCTEXT("OpenToolsPanelTooltip",
+				"Mesh inspection and the MoonToon vertex bakes, in one panel."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"),
+			FUIAction(FExecuteAction::CreateLambda([]
+			{
+				FGlobalTabmanager::Get()->TryInvokeTab(MoonToonToolsTabName);
+			})));
+	}
+
 	/**
 	 * Runs one of the tool entry points on a throwaway instance. The tool keeps no state between
 	 * calls -- it reads the content browser selection itself -- so there is nothing to preserve.
@@ -74,6 +130,7 @@ namespace
 		FToolMenuOwnerScoped OwnerScoped(TEXT("MoonToonEditor"));
 		AddMoonToonSection(TEXT("ContentBrowser.AssetContextMenu.StaticMesh"));
 		AddMoonToonSection(TEXT("ContentBrowser.AssetContextMenu.SkeletalMesh"));
+		AddToolsMenuEntry();
 	}
 }
 
@@ -83,10 +140,13 @@ void FMoonToonEditorModule::StartupModule()
 	// when an Editor-phase module loads.
 	UToolMenus::RegisterStartupCallback(
 		FSimpleMulticastDelegate::FDelegate::CreateStatic(&RegisterMoonToonMenus));
+
+	RegisterToolsTab();
 }
 
 void FMoonToonEditorModule::ShutdownModule()
 {
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(MoonToonToolsTabName);
 	UToolMenus::UnRegisterStartupCallback(this);
 	UToolMenus::UnregisterOwner(TEXT("MoonToonEditor"));
 }
