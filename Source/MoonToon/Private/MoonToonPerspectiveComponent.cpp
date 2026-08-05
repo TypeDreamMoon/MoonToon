@@ -4,6 +4,7 @@
 
 #include "Components/MeshComponent.h"
 #include "Components/SkinnedMeshComponent.h"
+#include "Components/ToonActorComponent.h"
 #include "GameFramework/Actor.h"
 
 namespace
@@ -12,6 +13,14 @@ namespace
 	// (MOONTOON_PERSPECTIVE_CPD_PIVOT / _TUNING are the same values divided by four).
 	constexpr int32 PivotAmountFloatIndex = 28;
 	constexpr int32 TuningFloatIndex = 32;
+
+	// The tuning slot's last float is NOT ours: it is the toon actor id, and CPD is full (9 float4s
+	// total, so slot 8 is the last one). Writing a float4 there zeroes the id, and zero is the
+	// "no actor data" sentinel -- the per-actor light direction override and exposure multiplier
+	// then silently stop working for any character that also carries a UToonActorComponent.
+	// Only floats 32..34 may be written.
+	static_assert(TuningFloatIndex + 3 == UToonActorComponent::CustomPrimitiveDataIndex,
+		"MoonToon perspective tuning slot must sit immediately below the toon actor id float.");
 }
 
 UMoonToonPerspectiveComponent::UMoonToonPerspectiveComponent()
@@ -82,7 +91,8 @@ void UMoonToonPerspectiveComponent::PushParameters(bool bDisable)
 
 		Mesh->SetCustomPrimitiveDataVector4(PivotAmountFloatIndex,
 			FVector4(PivotLocal.X, PivotLocal.Y, PivotLocal.Z, EffectiveAmount));
-		Mesh->SetCustomPrimitiveDataVector4(TuningFloatIndex,
-			FVector4(FadeNearDistance, FadeFarDistance, NormalFlatten, 0.0f));
+		// Vector3, not Vector4 -- see the static_assert above: float 35 belongs to the toon actor id.
+		Mesh->SetCustomPrimitiveDataVector3(TuningFloatIndex,
+			FVector(FadeNearDistance, FadeFarDistance, NormalFlatten));
 	}
 }
