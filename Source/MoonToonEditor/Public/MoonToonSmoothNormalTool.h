@@ -68,15 +68,8 @@ public:
 	/** Applies the required build settings to every LOD of one mesh; true if anything had to change. */
 	static bool FixBuildSettingsForMesh(UObject* Mesh);
 
-private:
-	/** Runs Body once per (selected mesh, LOD) pair. Mirrors the ForEachSelectedMeshesLOD macro. */
-	static void ForEachSelectedMeshLOD(TFunctionRef<void(UObject* Mesh, int32 LODIndex)> Body);
-
-	/** Applies the required build settings to one LOD; returns true if anything had to change. */
-	static bool FixBuildSettingsForLOD(UObject* Mesh, int32 LODIndex);
-
-	/** True when tangents/binormals are missing, mismatched in count, or contain zero vectors. */
-	static bool HasBadTangentOrBinormal(const TArray<FVector3f>& Tangents, const TArray<FVector3f>& Binormals);
+	// Shared with the other bake tools (the strand-tangent bake goes through the same TBN and the
+	// same MikkTSpace repair), so these two live here as the single implementation.
 
 	/** Regenerates tangents/binormals via MikkTSpace, but only when HasBadTangentOrBinormal says so. */
 	static void RecomputeMissingTangentAndBinormal(
@@ -97,6 +90,16 @@ private:
 		const TArray<FVector3f>& Normals,
 		const TArray<FVector3f>& Tangents,
 		const TArray<FVector3f>& Binormals);
+
+private:
+	/** Runs Body once per (selected mesh, LOD) pair. Mirrors the ForEachSelectedMeshesLOD macro. */
+	static void ForEachSelectedMeshLOD(TFunctionRef<void(UObject* Mesh, int32 LODIndex)> Body);
+
+	/** Applies the required build settings to one LOD; returns true if anything had to change. */
+	static bool FixBuildSettingsForLOD(UObject* Mesh, int32 LODIndex);
+
+	/** True when tangents/binormals are missing, mismatched in count, or contain zero vectors. */
+	static bool HasBadTangentOrBinormal(const TArray<FVector3f>& Tangents, const TArray<FVector3f>& Binormals);
 
 	/** Copies a mesh LOD into a UDynamicMesh, applying build settings and requesting tangents. */
 	static UDynamicMesh* ToDynamicMesh(UObject* Mesh, int32 LODIndex);
