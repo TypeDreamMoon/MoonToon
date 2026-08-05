@@ -1,0 +1,244 @@
+// MoonToon back-face outline.
+//
+// Re-authored from MooaToon's M_Outline. Same technique -- inverted-hull outline extruded along the
+// baked smoothed normal, width ramped by camera distance -- with three deliberate differences:
+//
+//   1. The smoothed normal is read from UV2.y + UV3.xy, which is the layout MoonToon's own bake tool
+//      (UMoonToonSmoothNormalTool) writes. MooaToon read TexCoord2/TexCoord3 wholesale.
+//   2. Toon attributes go through the native MoonDecodeToonAttributes / MoonSetToonAttributes
+//      expressions instead of MF_MooaDecodeAttributes / MF_MooaSetAttributes. The decode function
+//      instantiated the *same* 14-output Custom node 14 times (once per output); the node does it in
+//      one ComponentMask each. The set function compared every field against a -999 sentinel because
+//      a material function cannot see whether a pin is connected; the node checks IsConnected() at
+//      compile time, so untouched fields cost nothing and -999 is a legal value again.
+//   3. The debug-visualisation Custom node is dropped. It was a dozen static branches over
+//      Show* switches; keep the shipping path clean and debug in the base material instead.
+
+VirtualFunction(Name="MF_MoonToonBaseInput")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonBaseInput");
+		Description = "Generated from /MoonToon/MaterialFunctions/MF_MoonToonBaseInput.MF_MoonToonBaseInput";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		MaterialAttributes Output;
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+}
+
+Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Backend      = "Graph";
+		Domain       = "Surface";
+		ShadingModel = "Toon";
+		BlendMode    = "Opaque";
+
+		bOutputTranslucentVelocity = true;
+		bUsedWithSkeletalMesh      = true;
+		bUsedWithMorphTargets      = true;
+
+		// The hull is the inverted back faces of the mesh; it must never cast shadows of its own.
+		bCastRayTracedShadows = false;
+	}
+
+	Properties = {
+		ScalarParameter Outline_Width = 1.0 [
+			ParameterName="Outline Width";
+			Group="00 - Outline";
+			SortPriority=10;
+			Description="Multiplier on the width ramp, in world units at the ramp's reference distance.";
+		];
+		ScalarParameter Max_Distance = 1000.0 [
+			ParameterName="Max Distance";
+			Group="00 - Outline";
+			SortPriority=15;
+			Description="Camera distance that maps to the right-hand end of the width ramp.";
+		];
+		ScalarParameter Use_Smooth_Normal = 1.0 [
+			ParameterName="Use Smooth Normal Baked In TexCoord23";
+			Group="00 - Outline";
+			SortPriority=20;
+			Description="0 = extrude along the raw vertex normal (splits at hard edges), 1 = along the baked smoothed normal.";
+		];
+		VectorParameter Outline_Color = float4(0.0, 0.0, 0.0, 1.0) [
+			ParameterName="Outline Color";
+			Group="00 - Outline";
+			SortPriority=30;
+		];
+		ScalarParameter Outline_Color_From_Base = 0.0 [
+			ParameterName="Blend Outline Color From Surface";
+			Group="00 - Outline";
+			SortPriority=40;
+			Description="0 = flat Outline Color everywhere, 1 = derive the outline colour from the surface so skin outlines read as skin, hair as hair.";
+		];
+		ScalarParameter Outline_Use_Shadow_Tint = 1.0 [
+			ParameterName="Derive From Shadow Color";
+			Group="00 - Outline";
+			SortPriority=41;
+			Description="Source for the per-region colour. 1 = the material's authored MainLightShadowColor (already art-directed and palette-consistent -- an outline is just the darkest shadow band). 0 = raw albedo.";
+		];
+		ScalarParameter Outline_Gamma = 1.8 [
+			ParameterName="Outline Darken Gamma";
+			Group="00 - Outline";
+			SortPriority=42;
+			Description="Darkens via pow(), which raises saturation and keeps hue -- unlike a flat multiply, which only dims and reads muddy. 1 = no change, 1.5-2.5 typical.";
+		];
+		VectorParameter Outline_Tint = float4(1.0, 1.0, 1.0, 1.0) [
+			ParameterName="Outline Tint";
+			Group="00 - Outline";
+			SortPriority=43;
+			Description="Multiplies the region-derived colour. Keep near white: darkening is Gamma's job, and a dark multiplier would crush every region back to black.";
+		];
+	}
+
+	Outputs = {
+		MaterialAttributes MaterialAttributes;
+
+		Base.MaterialAttributes = MaterialAttributes;
+	}
+
+	Graph = {
+		MaterialAttributes Base = MF_MoonToonBaseInput(OutputIndex=0);
+		MaterialAttributes Attributes = Base;
+
+		#Region "Smoothed normal"
+		// The bake stores tangent-space smoothed normal * curvature, remapped to [0,1], across
+		// UV2.y | UV3.x | UV3.y -- see UMoonToonSmoothNormalTool::BakeSmoothedNormalAndCurvature.
+		float2 UV2 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		float2 UV3 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=3);
+		float3 SmoothNormalTS = normalize(float3(UV2.g, UV3.r, UV3.g) * 2.0 - 1.0);
+		float3 SmoothNormalWS = normalize(UE.Expression(Class="Transform", OutputType="float3", Input=SmoothNormalTS));
+
+		float3 VertexNormalWS = UE.Expression(Class="VertexNormalWS", OutputType="float3");
+		float3 OffsetDir = lerp(VertexNormalWS, SmoothNormalWS, Use_Smooth_Normal);
+		#EndRegion
+
+		#Region "Width"
+		// Per-vertex width mask. Vertex colour alpha scales the outline, so the same material can
+		// carry a heavy silhouette and a thin line around the eyes, nose and inner mouth -- the
+		// places a uniform hull always reads too fat -- with the weighting painted on the mesh
+		// rather than split across extra materials.
+		//
+		// Static switch, not a lerp: switched off the VertexColor fetch compiles out entirely and
+		// the mesh needs no colour stream at all. Two things to know when it is ON: a mesh with no
+		// vertex colours reads white, so alpha is 1 and the width is unchanged (safe), but a mesh
+		// whose colours were authored for something else and left black reads alpha 0 and the
+		// outline disappears. And alpha 0 collapses the hull exactly onto the surface, which
+		// z-fights rather than cleanly vanishing -- paint a small floor instead of true black
+		// anywhere the outline is meant to be absent.
+		float WidthMask =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(UE.Expression(Class="VertexColor", OutputType="float4")).a,
+				False=1.0,
+				ParameterName="Use Vertex Color A as Outline Width",
+				Group="00 - Outline",
+				SortPriority=12
+			);
+
+		// Ramp the width by camera distance so the outline keeps a roughly constant screen weight.
+		float PixelDepth = UE.Expression(Class="PixelDepth", OutputType="float");
+		float4 Width_Ramp =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				ParameterName="Outline Width Ramp Map",
+				Group="00 - Outline",
+				SortPriority=25,
+				Desc="X axis: camera distance to the character. Y axis: outline width. Generate with a Curve Atlas.",
+				Coordinates=float2(saturate(PixelDepth / Max_Distance), 0.5),
+				Texture=Path(Plugins.MooaToon, "Assets/OutlineWidthRamps/CA_OutlineWidthRamp"),
+				SamplerType="SAMPLERTYPE_LinearColor"
+			);
+		float Width = (Width_Ramp.r * Outline_Width * WidthMask);
+		#EndRegion
+
+		Attributes.WorldPositionOffset = (OffsetDir * Width);
+
+		#Region "Outline colour"
+		// Read the surface's own main-light shadow tint so the outline sits in the same palette,
+		// then write the outline colour back over it -- the outline hull is lit by the toon model,
+		// so its shadow tint is what actually reaches the screen.
+		float3 SurfaceShadowColor =
+			UE.Expression(
+				Class="MoonDecodeToonAttributes",
+				OutputType="float3",
+				OutputIndex=1,
+				MoonEncodedAttribute0=Base.MoonEncodedAttribute0,
+				MoonEncodedAttribute1=Base.MoonEncodedAttribute1,
+				MoonEncodedAttribute2=Base.MoonEncodedAttribute2,
+				MoonEncodedAttribute3=Base.MoonEncodedAttribute3,
+				MoonEncodedAttribute4=Base.MoonEncodedAttribute4
+			);
+
+		// Per-region outline colour. Two things matter here:
+		//   * The source is the authored shadow tint, not raw albedo. The artist already decided what
+		//     skin/hair look like in shadow, and an outline is the darkest shadow band -- so this comes
+		//     out palette-consistent for free, per material, with nothing extra to author.
+		//   * Darkening is pow(), not a multiply by a dark colour. pow widens the ratios between
+		//     channels, so it darkens AND saturates while preserving hue; multiplying by a near-black
+		//     tint would collapse skin and hair to the same black and throw away the very distinction
+		//     we want. The tint stays near white and only nudges temperature.
+		float3 RegionColor = lerp(Base.BaseColor, (Base.BaseColor * SurfaceShadowColor), Outline_Use_Shadow_Tint);
+		float3 FromSurface = (pow(max(RegionColor, 0.0), Outline_Gamma) * Outline_Tint.rgb);
+
+		// Per-vertex outline tint. Painted RGB multiplies the finished outline colour, so a region can
+		// be pushed warmer or darker straight on the mesh -- the per-vertex counterpart to Outline Tint
+		// above, and they compose by multiplying. Identity is white, which is exactly the False branch.
+		//
+		// De-gamma'd on the way in: vertex colours are picked against an sRGB display in the DCC but
+		// reach the shader as raw normalised bytes, so a swatch the artist read as mid-grey would
+		// otherwise land at 0.5 linear -- far brighter than intended. pow 2.2 is what MooaToon's own
+		// Safe_sRGBToLinear does; inlined rather than calling MF_sRGBToLinear so MoonToon does not
+		// take an asset dependency on MooaToon for it.
+		float3 VertexTint =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=pow(max((UE.Expression(Class="VertexColor", OutputType="float4")).rgb, 0.0), 2.2),
+				False=float3(1.0, 1.0, 1.0),
+				ParameterName="Use Vertex Color RGB as Outline Color",
+				Group="00 - Outline",
+				SortPriority=35
+			);
+
+		// Tint applied after the flat/derived lerp so it modulates whichever source is active, and
+		// applied once -- OutlineShadowColor is derived from OutlineColor, so it inherits it. (The
+		// original multiplied the tint into base and shadow colour separately, which is the same
+		// result by a longer route.)
+		float3 OutlineColor = (lerp(Outline_Color.rgb, FromSurface, Outline_Color_From_Base) * VertexTint);
+		float3 OutlineShadowColor = (OutlineColor * SurfaceShadowColor);
+
+		Attributes.BaseColor = OutlineColor;
+		#EndRegion
+
+		#Region "Toon attributes"
+		// Only MainLightShadowColor is overridden; every other toon field passes through untouched
+		// because its pin is left unconnected.
+		Attributes.MoonEncodedAttribute0 =
+			UE.Expression(
+				Class="MoonSetToonAttributes", OutputType="float4", OutputIndex=0,
+				MoonEncodedAttribute0=Base.MoonEncodedAttribute0,
+				MoonEncodedAttribute1=Base.MoonEncodedAttribute1,
+				MoonEncodedAttribute2=Base.MoonEncodedAttribute2,
+				MoonEncodedAttribute3=Base.MoonEncodedAttribute3,
+				MoonEncodedAttribute4=Base.MoonEncodedAttribute4,
+				MainLightShadowColor=OutlineShadowColor
+			);
+		Attributes.MoonEncodedAttribute1 = Base.MoonEncodedAttribute1;
+		Attributes.MoonEncodedAttribute2 = Base.MoonEncodedAttribute2;
+		Attributes.MoonEncodedAttribute3 = Base.MoonEncodedAttribute3;
+		Attributes.MoonEncodedAttribute4 = Base.MoonEncodedAttribute4;
+		#EndRegion
+
+		MaterialAttributes = Attributes;
+	}
+}

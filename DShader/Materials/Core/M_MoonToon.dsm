@@ -1,0 +1,98 @@
+// MoonToon base material.
+//
+// Everything authorable lives in MF_MoonToonBaseInput; this material only routes that function's
+// four outputs to where the renderer expects them:
+//
+//   Output      -> Base.MaterialAttributes   (the standard GBuffer surface)
+//   ToonBufferA -> ToonMaterialOutput.Pin[0] |
+//   ToonBufferB -> ToonMaterialOutput.Pin[1] | the toon buffer the Toon shading model reads
+//   ToonBufferC -> ToonMaterialOutput.Pin[2] |
+//
+// ToonMaterialOutput is a UMaterialExpressionCustomOutput: it has no output pins, so it can only be
+// reached through an Outputs expression binding, never from the Graph body.
+
+VirtualFunction(Name="MF_MoonToonBaseInput")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonBaseInput");
+		Description = "Generated from /MoonToon/MaterialFunctions/MF_MoonToonBaseInput.MF_MoonToonBaseInput";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		MaterialAttributes Output;
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+}
+
+VirtualFunction(Name="MF_MoonToonTranslucencyShadow")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonTranslucencyShadow");
+		Description = "Generated from /MoonToon/MaterialFunctions/MF_MoonToonTranslucencyShadow.MF_MoonToonTranslucencyShadow";
+	}
+
+	Inputs = {
+		MaterialAttributes In;
+	}
+
+	Outputs = {
+		MaterialAttributes Result;
+	}
+}
+
+Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
+{
+	Settings = {
+		// A real node graph rather than the default thin-custom material, so the base stays
+		// openable in the Material Editor.
+		Backend      = "Graph";
+		Domain       = "Surface";
+		ShadingModel = "Toon";
+		BlendMode    = "Opaque";
+
+		// Masked translucency is done with dither, which keeps the toon buffers sort-free.
+		DitherOpacityMask          = true;
+		bOutputTranslucentVelocity = true;
+
+		bUsedWithSkeletalMesh = true;
+		bUsedWithMorphTargets = true;
+		bUsedWithNanite       = true;
+	}
+
+	Outputs = {
+		MaterialAttributes Attributes;
+		float4 ToonDataA;
+		float4 ToonDataB;
+		float4 ToonDataC;
+
+		Base.MaterialAttributes = Attributes;
+
+		Expression(Class="ToonMaterialOutput").Pin[0] = ToonDataA;
+		Expression(Class="ToonMaterialOutput").Pin[1] = ToonDataB;
+		Expression(Class="ToonMaterialOutput").Pin[2] = ToonDataC;
+	}
+
+	Graph = {
+		MaterialAttributes Surface = MF_MoonToonBaseInput(OutputIndex=0);
+
+		// Dithered translucent shadow, so a masked material fakes translucency without sorting.
+		Attributes = MF_MoonToonTranslucencyShadow(Surface);
+
+		ToonDataA = MF_MoonToonBaseInput(OutputIndex=1);
+		ToonDataB = MF_MoonToonBaseInput(OutputIndex=2);
+		ToonDataC = MF_MoonToonBaseInput(OutputIndex=3);
+	}
+
+	Layout = {
+		Node(Var="Surface", X=544, Y=-48);
+		Node(Var="Attributes", X=992, Y=-48);
+		Node(Var="ToonDataA", X=544, Y=272);
+		Node(Var="ToonDataB", X=544, Y=352);
+		Node(Var="ToonDataC", X=544, Y=432);
+	}
+}

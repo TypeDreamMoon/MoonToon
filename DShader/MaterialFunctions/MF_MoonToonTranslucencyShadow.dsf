@@ -1,0 +1,137 @@
+// MoonToon translucency shadow -> opacity mask.
+//
+// Ported from MooaToon's MF_TranslucencyShadowToOpacityMask. The material's translucent shadow
+// is turned into a dithered opacity mask, so a masked material can fake translucency without
+// paying the sort cost of real translucency.
+//
+// MooaToon's MF_BlendModeSwitch is reimplemented below rather than referenced, so this function
+// carries no MooaToon dependency.
+
+// Selects one of seven values according to the consuming material's blend mode. The engine
+// exposes this only as preprocessor defines, so it has to be a Custom node.
+Function MoonToonBlendModeSwitch(
+	in float3 Opaque,
+	in float3 Masked,
+	in float3 Translucent,
+	in float3 Additive,
+	in float3 Modulate,
+	in float3 AlphaComposite,
+	in float3 AlphaHoldout,
+	out float3 Result)
+{
+#if MATERIALBLENDING_SOLID
+	Result = Opaque;
+#elif MATERIALBLENDING_MASKED
+	Result = Masked;
+#elif MATERIALBLENDING_TRANSLUCENT
+	Result = Translucent;
+#elif MATERIALBLENDING_ADDITIVE
+	Result = Additive;
+#elif MATERIALBLENDING_MODULATE
+	Result = Modulate;
+#elif MATERIALBLENDING_ALPHACOMPOSITE
+	Result = AlphaComposite;
+#elif MATERIALBLENDING_ALPHAHOLDOUT
+	Result = AlphaHoldout;
+#else
+	Result = 0;
+#endif
+}
+
+// 5-step ordered dither, offset per TAA sample so the steps resolve over time.
+Function float DitherStep(in float2 ScreenPos, in float TemporalSampleIndex)
+{
+	uint2 p = (uint2)(abs(ScreenPos) + TemporalSampleIndex);
+	return (float)((p.x + 2 * p.y) % 5);
+}
+
+ShaderFunction(Name="MaterialFunctions/MF_MoonToonTranslucencyShadow", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Converts the translucent shadow into a dithered opacity mask.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon";
+	}
+
+	Properties = {
+		ScalarParameter Dither_Noise_Strength = 1.0 [
+			ParameterName="Dither Noise Strength";
+			Group="MT >> 00 << Global";
+			Description="Scales the high-frequency noise that breaks up the 5 dither steps. 1.0 matches MooaToon.";
+		];
+	}
+
+	Inputs = {
+		MaterialAttributes In;
+	}
+
+	Outputs = {
+		MaterialAttributes Result;
+	}
+
+	Graph = {
+		MaterialAttributes Attributes = In;
+
+		float2 ScreenPos = UE.Expression(Class="ScreenPosition", OutputType="float2", OutputIndex=1);
+
+		#Region "random noise to break up the 5 steps"
+		float4 Noise =
+			UE.Expression(
+				Class="TextureSample",
+				OutputType="float4",
+				OutputIndex=5,
+				Coordinates=(abs(ScreenPos) / float2(64.0, 64.0)),
+				Texture=Path(Engine, "EngineMaterials/Good64x64TilingNoiseHighFreq"),
+				SamplerType="SAMPLERTYPE_LinearGrayscale"
+			);
+		float NoiseAmount = Noise.r * Dither_Noise_Strength;
+		#EndRegion
+
+		#Region "5 translucency steps, high frequency regular pattern"
+		float TemporalSampleIndex = UE.Expression(Class="ViewProperty", OutputType="float", Property="MEVP_TemporalSampleIndex");
+		float Step = DitherStep(ScreenPos, TemporalSampleIndex);
+		#EndRegion
+
+		#Region "TAA Dither"
+		float DitherOffset = (Step + NoiseAmount) * 0.16665;
+		#EndRegion
+
+		#Region "Translucency Shadow"
+		float Luminance = UE.Expression(Class="MaterialXLuminance", OutputType="float", Input=In.BaseColor);
+
+		// Only the additive slot is luminance-driven; every other blend mode passes 1.0 through.
+		float3 BlendModeScale;
+		MoonToonBlendModeSwitch(
+			float3(1.0, 1.0, 1.0),
+			float3(1.0, 1.0, 1.0),
+			float3(1.0, 1.0, 1.0),
+			float3(Luminance, Luminance, Luminance),
+			float3(1.0, 1.0, 1.0),
+			float3(1.0, 1.0, 1.0),
+			float3(1.0, 1.0, 1.0),
+			BlendModeScale);
+
+		float ShadowMask = BlendModeScale.r * In.OpacityMask + DitherOffset - 0.5;
+
+		float ShadowReplace =
+			UE.Expression(
+				Class="ShadowReplace",
+				OutputType="float",
+				Default=In.Opacity,
+				Shadow=ShadowMask
+			);
+
+		float MaskedOpacity =
+			UE.Expression(
+				Class="RayTracingQualitySwitch",
+				OutputType="float",
+				Normal=ShadowReplace,
+				RayTraced=ShadowMask
+			);
+		#EndRegion
+
+		Attributes.OpacityMask = MaskedOpacity;
+
+		Result = Attributes;
+	}
+}

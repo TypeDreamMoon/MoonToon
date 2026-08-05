@@ -1,0 +1,444 @@
+// MoonToon toon-buffer writer.
+//
+// Re-authored from MF_MoonToonBufferInput. Two things change from that asset:
+//   * ShadingFeatureID is a real function input instead of a material parameter that
+//     always read 0 (MOON_SHADING_FEATURE_ID_DEFAULT), which is why no feature branch
+//     ever ran. ToonBufferA.x is the live 8-bit field; the GBuffer copy is deprecated.
+//   * The pin/parameter name mismatch is now visible. The HLSL still calls its Kajiya
+//     inputs In_Kajiya_*, while the material parameters keep their In_Hair_* names so
+//     existing material instances still bind; which parameter feeds which pin is spelled
+//     out in the Graph call below instead of being hidden in node connections.
+
+Function MoonToonBufferWrite(
+	in float DMask,
+	in float ShadingFeatureID,
+	in float SecondaryShadingFeatureID,
+	in float In_HairMask_Mask,
+	in float In_HairMask_Intensity,
+	in float In_HairMask_ShadowIntensity,
+	in float In_Kajiya_TangentRotate,
+	in float In_Kajiya_SecondaryShift,
+	in float In_Kajiya_SecondaryMask,
+	in float In_Kajiya_PrimaryShift,
+	in float In_Kajiya_PrimaryExpScale,
+	in float In_Kajiya_SecondaryExpScale,
+	in float In_Kajiya_OverallIntensity,
+	in float In_Kajiya_PrimaryIntensity,
+	in float In_Kajiya_SecondaryIntensity,
+	in float In_Kajiya_SecondaryShiftScale,
+	in float In_Kajiya_ShadowStrength,
+	in float In_ToonKajiya_TangentRotate,
+	in float In_ToonKajiya_SecondaryStrandShift,
+	in float In_ToonKajiya_SecondaryMask,
+	in float In_ToonKajiya_PrimaryStrandShift,
+	in float In_ToonKajiya_PrimaryExpScale,
+	in float In_ToonKajiya_SecondaryExpScale,
+	in float In_ToonKajiya_OverallIntensity,
+	in float In_ToonKajiya_PrimaryIntensity,
+	in float In_ToonKajiya_SecondaryIntensity,
+	in float In_ToonKajiya_SecondaryShiftScale,
+	in float In_ToonKajiya_ShadowStrength,
+	in float In_Skin_ScatterStrength,
+	in float In_Skin_TransStrength,
+	in float In_Skin_TransPower,
+	in float In_Skin_PrimaryRoughnessScale,
+	in float In_Skin_SecondaryRoughnessScale,
+	in float In_Skin_SecondaryRampOffset,
+	in float In_Skin_OverallSpecIntensity,
+	in float In_Skin_PrimaryLobeIntensity,
+	in float In_Skin_SecondaryLobeIntensity,
+	in float In_Skin_SpecShadowStrength,
+	in float In_Skin_WarmTintStrength,
+	in float3 In_Stockings_BodyColor,
+	in float In_Stockings_Density,
+	in float In_Stockings_FresnelPower,
+	in float In_Stockings_TransStrength,
+	in float In_Stockings_RoughnessScale,
+	in float In_Stockings_SpecIntensity,
+	in float In_Stockings_ShadowStrength,
+	in float In_Stockings_GrazingDarken,
+	in float In_Stockings_GrazingSpecBoost,
+	in float In_Eye_DiffuseWrapStrength,
+	in float In_Eye_LimbalDarkenStrength,
+	in float In_Eye_PrimaryIntensity,
+	in float In_Eye_PrimaryRoughnessScale,
+	in float In_Eye_SecondaryIntensity,
+	in float In_Eye_SecondaryRampOffset,
+	in float In_Eye_SecondaryRoughnessScale,
+	in float In_Eye_SpecularShadowStrength,
+	in float3 In_Eye_EyeTintRGB,
+	in float In_ClothVelvet_DiffuseWrapStrength,
+	in float In_ClothVelvet_GrazingDarkenStrength,
+	in float In_ClothVelvet_RetroDiffuseStrength,
+	in float In_ClothVelvet_RimBias,
+	in float In_ClothVelvet_RoughnessScale,
+	in float In_ClothVelvet_SheenIntensity,
+	in float In_ClothVelvet_SheenPower,
+	in float In_ClothVelvet_SheenShadowStrength,
+	in float3 In_ClothVelvet_SheenTintRGB,
+	in float In_ToonMetal_DiffuseIntensity,
+	in float In_ToonMetal_EdgeBoost,
+	in float In_ToonMetal_RampOffset,
+	in float In_ToonMetal_Reserved,
+	in float In_ToonMetal_RoughnessScale,
+	in float In_ToonMetal_ShadowSpecularFloor,
+	in float In_ToonMetal_SpecularContrast,
+	in float In_ToonMetal_SpecularIntensity,
+	in float3 In_ToonMetal_MetalTintRGB,
+	in float In_ToonEmissiveInk_EdgeBoost,
+	in float In_ToonEmissiveInk_InkBlend,
+	in float In_ToonEmissiveInk_InkDarkenStrength,
+	in float In_ToonEmissiveInk_LightInfluence,
+	in float In_ToonEmissiveInk_RimBias,
+	in float In_ToonEmissiveInk_RoughnessScale,
+	in float In_ToonEmissiveInk_ShadowLift,
+	in float In_ToonEmissiveInk_SpecularIntensity,
+	in float3 In_ToonEmissiveInk_InkTintRGB,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC, out float4 DebugColor)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	DebugColor = float4(0, 0, 0, 1);
+	TBuffer.ShadingFeatureID = ShadingFeatureID;
+
+	if (ShadingFeatureID == MOON_SHADING_FEATURE_ID_SKIN)
+	{
+		if (DMask >= 0.5)
+		{
+			TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_SKIN;
+		}
+		else
+		{
+			TBuffer.ShadingFeatureID = SecondaryShadingFeatureID;
+		}
+	}
+
+	if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_HAIR_HIGHLIGHT_MASK)
+	{
+		TBuffer.FeatureInputScalarA = In_HairMask_Mask;
+		TBuffer.FeatureInputScalarB = In_HairMask_Intensity;
+		TBuffer.FeatureInputScalarC = In_HairMask_ShadowIntensity;
+		DebugColor = float4(In_HairMask_Mask, 0, 0, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_KAJIYA_HAIR_SPECULAR)
+	{
+		TBuffer.FeatureInputScalarA = In_Kajiya_TangentRotate;
+		TBuffer.FeatureInputScalarB = In_Kajiya_SecondaryShift;
+		TBuffer.FeatureInputScalarC = In_Kajiya_SecondaryMask;
+		TBuffer.FeatureInputScalarD = In_Kajiya_PrimaryShift;
+		TBuffer.FeatureInputScalarE = In_Kajiya_PrimaryExpScale;
+		TBuffer.FeatureInputScalarF = In_Kajiya_SecondaryExpScale;
+		TBuffer.FeatureInputScalarG = In_Kajiya_OverallIntensity;
+		TBuffer.FeatureInputVector.x = In_Kajiya_PrimaryIntensity;
+		TBuffer.FeatureInputVector.y = In_Kajiya_SecondaryIntensity;
+		TBuffer.FeatureInputVector.z = In_Kajiya_SecondaryShiftScale;
+		TBuffer.FeatureInputVector.w = In_Kajiya_ShadowStrength;
+		DebugColor = float4(0.f, 1, 0, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_TOON_KAJIYA_HAIR_SPECULAR)
+	{
+		TBuffer.FeatureInputScalarA = In_ToonKajiya_TangentRotate;
+		TBuffer.FeatureInputScalarB = In_ToonKajiya_SecondaryStrandShift;
+		TBuffer.FeatureInputScalarC = In_ToonKajiya_SecondaryMask;
+		TBuffer.FeatureInputScalarD = In_ToonKajiya_PrimaryStrandShift;
+		TBuffer.FeatureInputScalarE = In_ToonKajiya_PrimaryExpScale;
+		TBuffer.FeatureInputScalarF = In_ToonKajiya_SecondaryExpScale;
+		TBuffer.FeatureInputScalarG = In_ToonKajiya_OverallIntensity;
+		TBuffer.FeatureInputVector.x = In_ToonKajiya_PrimaryIntensity;
+		TBuffer.FeatureInputVector.y = In_ToonKajiya_SecondaryIntensity;
+		TBuffer.FeatureInputVector.z = In_ToonKajiya_SecondaryShiftScale;
+		TBuffer.FeatureInputVector.w = In_ToonKajiya_ShadowStrength;
+		DebugColor = float4(0.f, 0, 1, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_SKIN)
+	{
+		TBuffer.FeatureInputScalarA = In_Skin_ScatterStrength;
+		TBuffer.FeatureInputScalarB = In_Skin_TransStrength;
+		TBuffer.FeatureInputScalarC = In_Skin_TransPower;
+		TBuffer.FeatureInputScalarD = In_Skin_PrimaryRoughnessScale;
+		TBuffer.FeatureInputScalarE = In_Skin_SecondaryRoughnessScale;
+		TBuffer.FeatureInputScalarF = In_Skin_SecondaryRampOffset;
+		TBuffer.FeatureInputScalarG = In_Skin_OverallSpecIntensity;
+		TBuffer.FeatureInputVector.x = In_Skin_PrimaryLobeIntensity;
+		TBuffer.FeatureInputVector.y = In_Skin_SecondaryLobeIntensity;
+		TBuffer.FeatureInputVector.z = In_Skin_SpecShadowStrength;
+		TBuffer.FeatureInputVector.w = In_Skin_WarmTintStrength;
+		DebugColor = float4(1.f, 1, 0, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_PBR_STOCKINGS)
+	{
+		TBuffer.FeatureInputScalarA = In_Stockings_Density;
+		TBuffer.FeatureInputScalarB = In_Stockings_FresnelPower;
+		TBuffer.FeatureInputScalarC = In_Stockings_TransStrength;
+		TBuffer.FeatureInputScalarD = In_Stockings_RoughnessScale;
+		TBuffer.FeatureInputScalarE = In_Stockings_SpecIntensity;
+		TBuffer.FeatureInputScalarF = In_Stockings_ShadowStrength;
+		TBuffer.FeatureInputScalarG = In_Stockings_GrazingDarken;
+		TBuffer.FeatureInputVector.xyz = In_Stockings_BodyColor;
+		TBuffer.FeatureInputVector.w = In_Stockings_GrazingSpecBoost;
+		DebugColor = float4(1.f, 0, 1, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_EYE)
+	{
+		TBuffer.FeatureInputScalarA = In_Eye_DiffuseWrapStrength;
+		TBuffer.FeatureInputScalarB = In_Eye_LimbalDarkenStrength;
+		TBuffer.FeatureInputScalarC = In_Eye_SpecularShadowStrength;
+		TBuffer.FeatureInputScalarD = In_Eye_PrimaryRoughnessScale;
+		TBuffer.FeatureInputScalarE = In_Eye_SecondaryRoughnessScale;
+		TBuffer.FeatureInputScalarF = In_Eye_PrimaryIntensity;
+		TBuffer.FeatureInputScalarG = In_Eye_SecondaryIntensity;
+		TBuffer.FeatureInputVector.xyz = In_Eye_EyeTintRGB;
+		TBuffer.FeatureInputVector.w = In_Eye_SecondaryRampOffset;
+		DebugColor = float4(0.f, 1, 1, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_CLOTH_VELVET)
+	{
+		TBuffer.FeatureInputScalarA = In_ClothVelvet_DiffuseWrapStrength;
+		TBuffer.FeatureInputScalarB = In_ClothVelvet_SheenPower;
+		TBuffer.FeatureInputScalarC = In_ClothVelvet_SheenShadowStrength;
+		TBuffer.FeatureInputScalarD = In_ClothVelvet_RoughnessScale;
+		TBuffer.FeatureInputScalarE = In_ClothVelvet_SheenIntensity;
+		TBuffer.FeatureInputScalarF = In_ClothVelvet_RetroDiffuseStrength;
+		TBuffer.FeatureInputScalarG = In_ClothVelvet_GrazingDarkenStrength;
+		TBuffer.FeatureInputVector.xyz = In_ClothVelvet_SheenTintRGB;
+		TBuffer.FeatureInputVector.w = In_ClothVelvet_RimBias;
+		DebugColor = float4(.5f, 1, .5, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_TOON_METAL)
+	{
+		TBuffer.FeatureInputScalarA = In_ToonMetal_DiffuseIntensity;
+		TBuffer.FeatureInputScalarB = In_ToonMetal_ShadowSpecularFloor;
+		TBuffer.FeatureInputScalarC = In_ToonMetal_RampOffset;
+		TBuffer.FeatureInputScalarD = In_ToonMetal_RoughnessScale;
+		TBuffer.FeatureInputScalarE = In_ToonMetal_SpecularIntensity;
+		TBuffer.FeatureInputScalarF = In_ToonMetal_EdgeBoost;
+		TBuffer.FeatureInputScalarG = In_ToonMetal_SpecularContrast;
+		TBuffer.FeatureInputVector.xyz = In_ToonMetal_MetalTintRGB;
+		TBuffer.FeatureInputVector.w = In_ToonMetal_Reserved;
+		DebugColor = float4(1.f, 0.5, 0.5, 1.f);
+	}
+	else if (TBuffer.ShadingFeatureID == MOON_SHADING_FEATURE_ID_TOON_EMISSIVE_INK)
+	{
+		TBuffer.FeatureInputScalarA = In_ToonEmissiveInk_LightInfluence;
+		TBuffer.FeatureInputScalarB = In_ToonEmissiveInk_ShadowLift;
+		TBuffer.FeatureInputScalarC = In_ToonEmissiveInk_InkDarkenStrength;
+		TBuffer.FeatureInputScalarD = In_ToonEmissiveInk_RoughnessScale;
+		TBuffer.FeatureInputScalarE = In_ToonEmissiveInk_SpecularIntensity;
+		TBuffer.FeatureInputScalarF = In_ToonEmissiveInk_EdgeBoost;
+		TBuffer.FeatureInputScalarG = In_ToonEmissiveInk_InkBlend;
+		TBuffer.FeatureInputVector.xyz = In_ToonEmissiveInk_InkTintRGB;
+		TBuffer.FeatureInputVector.w = In_ToonEmissiveInk_RimBias;
+		DebugColor = float4(.5f, .5, 1, 1.f);
+	}
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/MF_MoonToonBuffer", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the MoonToon shading inputs into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon";
+	}
+
+	Inputs = {
+		opt float ShadingFeatureID = 0.0 [Description="MOON_SHADING_FEATURE_ID_*. Selects the toon feature branch."];
+		opt float SecondaryShadingFeatureID = 0.0 [Description="Feature used when DMask < 0.5 on the Skin branch."];
+		opt float DMask = 1.0 [Description="Skin dual-feature mask. >= 0.5 keeps ShadingFeatureID. Defaults to 1.0 to match the old white-texture default."];
+		opt float InHighlightMask = 0.0 [Description="Hair highlight mask."];
+		opt float InToonKajiyaKay_PrimaryStrandShift = 0.0 [Description="Toon Kajiya primary strand shift."];
+		opt float InToonKajiyaKay_SecondaryStrandShift = 0.0 [Description="Toon Kajiya secondary strand shift."];
+		opt float3 InToonStockings_BodyColor = float3(0.0, 0.0, 0.0) [Description="Stockings body colour."];
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+		float4 ResultShadingFeatureColor;
+	}
+
+	Properties = {
+
+		ScalarParameter In_ClothVelvet_DiffuseWrapStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"];
+		ScalarParameter In_ClothVelvet_GrazingDarkenStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"];
+		ScalarParameter In_ClothVelvet_RetroDiffuseStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"];
+		ScalarParameter In_ClothVelvet_RimBias = 0.0 [Group="MT >> 07 << Cloth Velvet"];
+		ScalarParameter In_ClothVelvet_RoughnessScale = 1.0 [Group="MT >> 07 << Cloth Velvet"];
+		ScalarParameter In_ClothVelvet_SheenIntensity = 0.0 [Group="MT >> 07 << Cloth Velvet"];
+		ScalarParameter In_ClothVelvet_SheenPower = 0.0 [Group="MT >> 07 << Cloth Velvet"];
+		ScalarParameter In_ClothVelvet_SheenShadowStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"];
+
+		ScalarParameter In_Eye_DiffuseWrapStrength = 0.0 [Group="MT >> 06 << Eye"];
+		ScalarParameter In_Eye_LimbalDarkenStrength = 0.0 [Group="MT >> 06 << Eye"];
+		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="MT >> 06 << Eye"];
+		ScalarParameter In_Eye_PrimaryRoughnessScale = 1.0 [Group="MT >> 06 << Eye"];
+		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="MT >> 06 << Eye"];
+		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="MT >> 06 << Eye"];
+		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="MT >> 06 << Eye"];
+		ScalarParameter In_Eye_SpecularShadowStrength = 0.0 [Group="MT >> 06 << Eye"];
+
+		ScalarParameter In_Hair_HighlightMask = 0.0 [Group="MT >> 01 << Hair Highlight Mask"];
+		ScalarParameter In_Hair_HighlightMaskIntensity = 0.0 [Group="MT >> 01 << Hair Highlight Mask"];
+		ScalarParameter In_Hair_HighlightMaskShadowIntensity = 0.0 [Group="MT >> 01 << Hair Highlight Mask"];
+
+		ScalarParameter In_Hair_OverallSpecIntensity = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_PrimaryExpScale = 1.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_PrimaryIntensity = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_PrimaryShift = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_SecondaryExpScale = 1.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_SecondaryIntensity = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_SecondaryMask = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_SecondaryShift = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_SecondaryShiftScale = 1.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_ShadowStrength = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+		ScalarParameter In_Hair_TangentRotate = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"];
+
+		ScalarParameter In_Skin_OverallSpecIntensity = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_PrimaryLobeIntensity = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_PrimaryRoughnessScale = 1.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_ScatterStrength = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_SecondaryLobeIntensity = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_SecondaryRampOffset = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_SecondaryRoughnessScale = 1.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_SpecShadowStrength = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_TransPower = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_TransStrength = 0.0 [Group="MT >> 04 << Skin"];
+		ScalarParameter In_Skin_WarmTintStrength = 0.0 [Group="MT >> 04 << Skin"];
+
+		ScalarParameter In_Stockings_Density = 0.0 [Group="MT >> 05 << Stockings"];
+		ScalarParameter In_Stockings_FresnelPower = 0.0 [Group="MT >> 05 << Stockings"];
+		ScalarParameter In_Stockings_GrazingDarken = 0.0 [Group="MT >> 05 << Stockings"];
+		ScalarParameter In_Stockings_GrazingSpecBoost = 0.0 [Group="MT >> 05 << Stockings"];
+		ScalarParameter In_Stockings_RoughnessScale = 1.0 [Group="MT >> 05 << Stockings"];
+		ScalarParameter In_Stockings_ShadowStrength = 0.0 [Group="MT >> 05 << Stockings"];
+		ScalarParameter In_Stockings_SpecIntensity = 0.0 [Group="MT >> 05 << Stockings"];
+		ScalarParameter In_Stockings_TransStrength = 0.0 [Group="MT >> 05 << Stockings"];
+
+		ScalarParameter In_ToonEmissiveInk_EdgeBoost = 0.0 [Group="MT >> 09 << Emissive Ink"];
+		ScalarParameter In_ToonEmissiveInk_InkBlend = 0.0 [Group="MT >> 09 << Emissive Ink"];
+		ScalarParameter In_ToonEmissiveInk_InkDarkenStrength = 0.0 [Group="MT >> 09 << Emissive Ink"];
+		ScalarParameter In_ToonEmissiveInk_LightInfluence = 0.0 [Group="MT >> 09 << Emissive Ink"];
+		ScalarParameter In_ToonEmissiveInk_RimBias = 0.0 [Group="MT >> 09 << Emissive Ink"];
+		ScalarParameter In_ToonEmissiveInk_RoughnessScale = 1.0 [Group="MT >> 09 << Emissive Ink"];
+		ScalarParameter In_ToonEmissiveInk_ShadowLift = 0.0 [Group="MT >> 09 << Emissive Ink"];
+		ScalarParameter In_ToonEmissiveInk_SpecularIntensity = 0.0 [Group="MT >> 09 << Emissive Ink"];
+
+		ScalarParameter In_ToonHair_OverallSpecIntensity = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_PrimaryExpScale = 1.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_PrimaryIntensity = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_PrimaryStrandShift = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_SecondaryExpScale = 1.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_SecondaryIntensity = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_SecondaryMask = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_SecondaryShift = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_SecondaryShiftScale = 1.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_ShadowStrength = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+		ScalarParameter In_ToonHair_TangentRotate = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"];
+
+		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [Group="MT >> 08 << Metal"];
+		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [Group="MT >> 08 << Metal"];
+		ScalarParameter In_ToonMetal_RampOffset = 0.0 [Group="MT >> 08 << Metal"];
+		ScalarParameter In_ToonMetal_Reserved = 0.0 [Group="MT >> 08 << Metal"];
+		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [Group="MT >> 08 << Metal"];
+		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [Group="MT >> 08 << Metal"];
+		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [Group="MT >> 08 << Metal"];
+		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [Group="MT >> 08 << Metal"];
+
+		VectorParameter In_ClothVelvet_SheenTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="MT >> 07 << Cloth Velvet"];
+		VectorParameter In_Eye_EyeTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 06 << Eye"];
+		VectorParameter In_ToonEmissiveInk_InkTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 09 << Emissive Ink"];
+		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="MT >> 08 << Metal"];
+	}
+
+	Graph = {
+		MoonToonBufferWrite(
+			DMask,
+			ShadingFeatureID,
+			SecondaryShadingFeatureID,
+			InHighlightMask,   // pin In_HairMask_Mask
+			In_Hair_HighlightMaskIntensity,   // pin In_HairMask_Intensity
+			In_Hair_HighlightMaskShadowIntensity,   // pin In_HairMask_ShadowIntensity
+			In_Hair_TangentRotate,   // pin In_Kajiya_TangentRotate
+			In_Hair_SecondaryShift,   // pin In_Kajiya_SecondaryShift
+			In_Hair_SecondaryMask,   // pin In_Kajiya_SecondaryMask
+			In_Hair_PrimaryShift,   // pin In_Kajiya_PrimaryShift
+			In_Hair_PrimaryExpScale,   // pin In_Kajiya_PrimaryExpScale
+			In_Hair_SecondaryExpScale,   // pin In_Kajiya_SecondaryExpScale
+			In_Hair_OverallSpecIntensity,   // pin In_Kajiya_OverallIntensity
+			In_Hair_PrimaryIntensity,   // pin In_Kajiya_PrimaryIntensity
+			In_Hair_SecondaryIntensity,   // pin In_Kajiya_SecondaryIntensity
+			In_Hair_SecondaryShiftScale,   // pin In_Kajiya_SecondaryShiftScale
+			In_Hair_ShadowStrength,   // pin In_Kajiya_ShadowStrength
+			In_ToonHair_TangentRotate,   // pin In_ToonKajiya_TangentRotate
+			InToonKajiyaKay_SecondaryStrandShift + In_ToonHair_SecondaryShift,   // pin In_ToonKajiya_SecondaryStrandShift
+			In_ToonHair_SecondaryMask,   // pin In_ToonKajiya_SecondaryMask
+			InToonKajiyaKay_PrimaryStrandShift + In_ToonHair_PrimaryStrandShift,   // pin In_ToonKajiya_PrimaryStrandShift
+			In_ToonHair_PrimaryExpScale,   // pin In_ToonKajiya_PrimaryExpScale
+			In_ToonHair_SecondaryExpScale,   // pin In_ToonKajiya_SecondaryExpScale
+			In_ToonHair_OverallSpecIntensity,   // pin In_ToonKajiya_OverallIntensity
+			In_ToonHair_PrimaryIntensity,   // pin In_ToonKajiya_PrimaryIntensity
+			In_ToonHair_SecondaryIntensity,   // pin In_ToonKajiya_SecondaryIntensity
+			In_ToonHair_SecondaryShiftScale,   // pin In_ToonKajiya_SecondaryShiftScale
+			In_ToonHair_ShadowStrength,   // pin In_ToonKajiya_ShadowStrength
+			In_Skin_ScatterStrength,
+			In_Skin_TransStrength,
+			In_Skin_TransPower,
+			In_Skin_PrimaryRoughnessScale,
+			In_Skin_SecondaryRoughnessScale,
+			In_Skin_SecondaryRampOffset,
+			In_Skin_OverallSpecIntensity,
+			In_Skin_PrimaryLobeIntensity,
+			In_Skin_SecondaryLobeIntensity,
+			In_Skin_SpecShadowStrength,
+			In_Skin_WarmTintStrength,
+			InToonStockings_BodyColor,   // pin In_Stockings_BodyColor
+			In_Stockings_Density,
+			In_Stockings_FresnelPower,
+			In_Stockings_TransStrength,
+			In_Stockings_RoughnessScale,
+			In_Stockings_SpecIntensity,
+			In_Stockings_ShadowStrength,
+			In_Stockings_GrazingDarken,
+			In_Stockings_GrazingSpecBoost,
+			In_Eye_DiffuseWrapStrength,
+			In_Eye_LimbalDarkenStrength,
+			In_Eye_PrimaryIntensity,
+			In_Eye_PrimaryRoughnessScale,
+			In_Eye_SecondaryIntensity,
+			In_Eye_SecondaryRampOffset,
+			In_Eye_SecondaryRoughnessScale,
+			In_Eye_SpecularShadowStrength,
+			In_Eye_EyeTintRGB,
+			In_ClothVelvet_DiffuseWrapStrength,
+			In_ClothVelvet_GrazingDarkenStrength,
+			In_ClothVelvet_RetroDiffuseStrength,
+			In_ClothVelvet_RimBias,
+			In_ClothVelvet_RoughnessScale,
+			In_ClothVelvet_SheenIntensity,
+			In_ClothVelvet_SheenPower,
+			In_ClothVelvet_SheenShadowStrength,
+			In_ClothVelvet_SheenTintRGB,
+			In_ToonMetal_DiffuseIntensity,
+			In_ToonMetal_EdgeBoost,
+			In_ToonMetal_RampOffset,
+			In_ToonMetal_Reserved,
+			In_ToonMetal_RoughnessScale,
+			In_ToonMetal_ShadowSpecularFloor,
+			In_ToonMetal_SpecularContrast,
+			In_ToonMetal_SpecularIntensity,
+			In_ToonMetal_MetalTintRGB,
+			In_ToonEmissiveInk_EdgeBoost,
+			In_ToonEmissiveInk_InkBlend,
+			In_ToonEmissiveInk_InkDarkenStrength,
+			In_ToonEmissiveInk_LightInfluence,
+			In_ToonEmissiveInk_RimBias,
+			In_ToonEmissiveInk_RoughnessScale,
+			In_ToonEmissiveInk_ShadowLift,
+			In_ToonEmissiveInk_SpecularIntensity,
+			In_ToonEmissiveInk_InkTintRGB,
+			ToonBufferA, ToonBufferB, ToonBufferC, ResultShadingFeatureColor);
+	}
+}

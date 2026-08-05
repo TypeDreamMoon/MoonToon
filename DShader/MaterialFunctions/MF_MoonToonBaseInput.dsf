@@ -1,0 +1,2215 @@
+// MoonToon base input.
+//
+// Rebased onto a faithful decompile of /MooaToon/MaterialFunctions/MF_MooaToonBaseInput
+// (after the ChannelMaskParameter decompiler fix). Intended deltas from the original:
+//   * lives in the MoonToon plugin
+//   * calls MF_MoonToonBuffer with ShadingFeatureID actually wired (the original calls
+//     MF_MoonToonBufferInput whose internal ShadingFeatureID parameter is stuck at 0)
+//   * UVChannelSwitch + default textures point at MoonToon's own copies
+// Regenerate the baseline with: dsc.ps1 decompile /MooaToon/MaterialFunctions/MF_MooaToonBaseInput
+// Warning: Exported 'MaterialExpressionVertexTangentWS' as UE.Expression; review reflected literal properties if the node has editor-only state.
+// Warning: Exported 'MaterialExpressionTransform' as UE.Expression; review reflected literal properties if the node has editor-only state.
+// Warning: Exported 'MaterialExpressionMoonEncodeToonAttributes' as UE.Expression; review reflected literal properties if the node has editor-only state.
+// Warning: Exported 'MaterialExpressionIf' as UE.Expression; review reflected literal properties if the node has editor-only state.
+
+VirtualFunction(Name="MF_MoonToonBuffer")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonBuffer");
+		Description = "Generated from /MoonToon/MaterialFunctions/MF_MoonToonBuffer.MF_MoonToonBuffer";
+	}
+
+	Inputs = {
+		opt float ShadingFeatureID = 0.0 [
+			Description="MOON_SHADING_FEATURE_ID_*. Selects the toon feature branch.";
+		];
+		opt float SecondaryShadingFeatureID = 0.0 [
+			Description="Feature used when DMask < 0.5 on the Skin branch.";
+		];
+		opt float DMask = 1.0 [
+			Description="Skin dual-feature mask. >= 0.5 keeps ShadingFeatureID. Defaults to 1.0 to match the old white-texture default.";
+		];
+		opt float InHighlightMask = 0.0 [
+			Description="Hair highlight mask.";
+		];
+		opt float InToonKajiyaKay_PrimaryStrandShift = 0.0 [
+			Description="Toon Kajiya primary strand shift.";
+		];
+		opt float InToonKajiyaKay_SecondaryStrandShift = 0.0 [
+			Description="Toon Kajiya secondary strand shift.";
+		];
+		opt float3 InToonStockings_BodyColor = float3(0, 0, 0) [
+			Description="Stockings body colour.";
+		];
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+		float4 ResultShadingFeatureColor;
+	}
+}
+VirtualFunction(Name="AppendMany")
+{
+	Options = {
+		Asset = Path(Engine, "Functions/Engine_MaterialFunctions02/Utility/AppendMany");
+		Description = "Generated from /Engine/Functions/Engine_MaterialFunctions02/Utility/AppendMany.AppendMany";
+	}
+
+	Inputs = {
+		opt float R = 0.0;
+		opt float G = 0.0;
+		opt float B = 0.0;
+		opt float A = 0.0;
+	}
+
+	Outputs = {
+		float2 RG;
+		float3 RGB;
+		float4 RGBA;
+	}
+}
+VirtualFunction(Name="MF_UVChannelSwitch")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Utils/MF_UVChannelSwitch");
+		Description = "Generated from /MoonToon/MaterialFunctions/Utils/MF_UVChannelSwitch.MF_UVChannelSwitch";
+	}
+
+	Inputs = {
+		float UVChannelIndex [
+			Description="The UV channel index to output.";
+			SortPriority=100;
+		];
+	}
+
+	Outputs = {
+		float2 Result;
+	}
+}
+VirtualFunction(Name="MF_MooaMainLightDirection")
+{
+	Options = {
+		Asset = Path(Plugins.MooaToon, "MaterialFunctions/MF_MooaMainLightDirection");
+		Description = "Generated from /MooaToon/MaterialFunctions/MF_MooaMainLightDirection.MF_MooaMainLightDirection";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float3 Result;
+	}
+}
+VirtualFunction(Name="FlattenNormal")
+{
+	Options = {
+		Asset = Path(Engine, "Functions/Engine_MaterialFunctions01/Texturing/FlattenNormal");
+		Description = "Generated from /Engine/Functions/Engine_MaterialFunctions01/Texturing/FlattenNormal.FlattenNormal";
+	}
+
+	Inputs = {
+		opt float3 Normal = float3(0, 0, 1);
+		opt float Flatness = 0.0;
+	}
+
+	Outputs = {
+		float3 Result;
+	}
+}
+ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "MoonToon base input. Packs the toon shading inputs into MaterialAttributes plus the three toon buffers.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon";
+	}
+
+	Properties = {
+		// Toon feature selection. These replace the old chain of "Enable Feature X"
+		// StaticSwitchParameters, which could only ever reach IDs 0-6 -- every feature the engine
+		// added past that (PBR Stockings, Eye, Cloth Velvet, Toon Metal, Toon Emissive Ink, Eyebrow,
+		// Matcap) was unreachable from the material. One enum dropdown covers all of them, and the
+		// dropdown is the C++ UENUM EMoonToonShadingFeature, which static_asserts against the
+		// MOON_SHADING_FEATURE_ID_* macros the shader branches on -- one list, no drift.
+		ScalarParameter Shading_Feature_ID = 0.0 [
+			ParameterName="ShadingFeatureID";
+			Group="00 - Global Settings";
+			SortPriority=40;
+			ControlType=Enumeration;
+			Enumeration=Path("/Script/Engine.EMoonToonShadingFeature");
+			Description="Toon shading feature for this material. Values match MOON_SHADING_FEATURE_ID_*.";
+		];
+		// NOTE: the "Enable Feature Kajiya Hair Specular" / "Enable Feature Distance Field Facial
+		// Shadow" StaticSwitchParameters still exist further down. They are NOT redundant: a static
+		// switch compiles its unused side away, so they still gate the optional data those features
+		// need (Kajiya tangent basis, facial-shadow SDF sampling). A runtime scalar cannot drive a
+		// shader permutation, so picking the feature here and enabling its data there stay separate.
+		// Only consulted on the Skin branch, where DMask < 0.5 swaps to this feature instead.
+		ScalarParameter Secondary_Shading_Feature_ID = 0.0 [
+			ParameterName="SecondaryShadingFeatureID";
+			Group="00 - Global Settings";
+			SortPriority=41;
+			ControlType=Enumeration;
+			Enumeration=Path("/Script/Engine.EMoonToonShadingFeature");
+			Description="Feature used where the dual-feature mask (DMask) is below 0.5 on the Skin branch.";
+		];
+		ChannelMaskParameter KajiyaSecondaryMaskChannel = float4(1.0, 0.0, 0.0, 0.0) [
+			Group="04- Kajiya Kay";
+			MaskChannel=Red
+		];
+		ScalarParameter Global_Mask_Map_UV_Offset_X = 0.0 [
+			ParameterName="Global Mask Map UV Offset X";
+			Group="01 - Global Mask Map";
+			SortPriority=33;
+		];
+		ScalarParameter Global_Mask_Map_UV_Offset_Y = 0.0 [
+			ParameterName="Global Mask Map UV Offset Y";
+			Group="01 - Global Mask Map";
+			SortPriority=33;
+		];
+		ScalarParameter Global_Mask_Map_UV_Scale_X = 1.0 [
+			ParameterName="Global Mask Map UV Scale X";
+			Group="01 - Global Mask Map";
+		];
+		ScalarParameter Global_Mask_Map_UV_Scale_Y = 1.0 [
+			ParameterName="Global Mask Map UV Scale Y";
+			Group="01 - Global Mask Map";
+		];
+		ScalarParameter Global_Mask_Map_UV_Channel = 0.0 [
+			ParameterName="Global Mask Map UV Channel";
+			Group="01 - Global Mask Map";
+		];
+		TextureSampleParameter2D BodyBaseColor = Path(Engine, "EngineResources/DefaultTexture") [
+			SamplerType="SAMPLERTYPE_Color";
+		];
+		ChannelMaskParameter Hair_Highlight_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Hair Highlight Mask Channel";
+			Group="02 - Distance Field Facial Shadow";
+			MaskChannel=Red
+		];
+		ScalarParameter AddOffset = 0.0;
+		ScalarParameter DynMin = -0.01;
+		ScalarParameter DynMax = 0.01;
+		ScalarParameter ElevMin = -0.6;
+		ScalarParameter ElevMax = 0.6;
+		ScalarParameter Curve = 1.2;
+		ScalarParameter ClampMin = -0.03;
+		ScalarParameter ClampMax = 0.03;
+		ScalarParameter VSign = 1.0;
+		VectorParameter Inner_Outline_Color = float4(0.0, 0.0, 0.0, 1.0) [
+			ParameterName="Inner Outline Color";
+			Group="22 - Inner Outline";
+			SortPriority=40;
+		];
+		ChannelMaskParameter Inner_Outline_Channel = float4(0.0, 1.0, 0.0, 0.0) [
+			ParameterName="Inner Outline Channel";
+			Group="22 - Inner Outline";
+			SortPriority=34;
+			MaskChannel=Green
+		];
+		ScalarParameter Inner_Outline_Map_UV_Channel = 0.0 [
+			ParameterName="Inner Outline Map UV Channel";
+			Group="22 - Inner Outline";
+			SortPriority=33;
+		];
+		ScalarParameter Global_UV_Offset_X = 0.0 [
+			ParameterName="Global UV Offset X";
+			Group="00 - Global Settings";
+			SortPriority=102;
+		];
+		ScalarParameter Global_UV_Offset_Y = 0.0 [
+			ParameterName="Global UV Offset Y";
+			Group="00 - Global Settings";
+			SortPriority=102;
+		];
+		ScalarParameter Global_UV_Scale_X = 1.0 [
+			ParameterName="Global UV Scale X";
+			Group="00 - Global Settings";
+			SortPriority=101;
+		];
+		ScalarParameter Global_UV_Scale_Y = 1.0 [
+			ParameterName="Global UV Scale Y";
+			Group="00 - Global Settings";
+			SortPriority=101;
+		];
+		ScalarParameter Global_UV_Channel = 0.0 [
+			ParameterName="Global UV Channel";
+			Group="00 - Global Settings";
+			SortPriority=100;
+		];
+		VectorParameter Base_Color = float4(1.0, 1.0, 1.0, 1.0) [
+			ParameterName="Base Color";
+			Group="10 - Diffuse";
+			SortPriority=4;
+		];
+		ScalarParameter Metallic = 0.0 [
+			Group="11 - Specular";
+			SortPriority=53;
+		];
+		ChannelMaskParameter Metallic_Channel = float4(0.0, 1.0, 0.0, 0.0) [
+			ParameterName="Metallic Channel";
+			Group="11 - Specular";
+			SortPriority=52;
+			MaskChannel=Green
+		];
+		ScalarParameter Specular = 0.0 [
+			Group="11 - Specular";
+			SortPriority=1;
+		];
+		ScalarParameter Roughness = 1.0 [
+			Group="11 - Specular";
+			SortPriority=44;
+		];
+		ChannelMaskParameter Roughness_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Roughness Channel";
+			Group="11 - Specular";
+			SortPriority=42;
+			MaskChannel=Red
+		];
+		ScalarParameter Anisotropy = 0.0 [
+			Group="11 - Specular";
+			SortPriority=3;
+		];
+		ScalarParameter Emissive_Intensity = 1.0 [
+			ParameterName="Emissive Intensity";
+			Group="23 - Emissive";
+			SortPriority=40;
+		];
+		ChannelMaskParameter Opacity_Channel = float4(0.0, 0.0, 0.0, 1.0) [
+			ParameterName="Opacity Channel";
+			Group="21 - Translucency";
+			SortPriority=33;
+			MaskChannel=Alpha
+		];
+		ScalarParameter Opacity = 1.0 [
+			Group="21 - Translucency";
+			SortPriority=40;
+			Description="不透明度\r\n当材质混合模式为已遮罩时, 使用Dither模拟半透明, 不会有排序问题.\r\n当材质混合模式为半透明时, 使用透明度混合半透明, 可能出现排序问题.\r\n\r\nOpacity\r\nWhen the material Blend Mode is Masked, Dither is used to simulate translucency, and there will be no ordering problems.\r\nWhen the material Blend Mode is Translucent, use Alpha Blend transparency, and there may be ordering problems.";
+		];
+		ScalarParameter Shadow_Opacity = 1.0 [
+			ParameterName="Shadow Opacity";
+			Group="21 - Translucency";
+			SortPriority=41;
+		];
+		ScalarParameter Apply_Opacity_to_Shadow = 1.0 [
+			ParameterName="Apply Opacity to Shadow";
+			Group="21 - Translucency";
+			SortPriority=42;
+		];
+		ChannelMaskParameter AO_Channel = float4(0.0, 0.0, 0.0, 1.0) [
+			ParameterName="AO Channel";
+			Group="10 - Diffuse";
+			SortPriority=34;
+			MaskChannel=Alpha
+		];
+		ScalarParameter AO_Intensity = 1.0 [
+			ParameterName="AO Intensity";
+			Group="10 - Diffuse";
+			SortPriority=35;
+			Description="通过AO可以使某些区域始终处于阴影中.\r\n\r\nAO Map: 0为被遮挡, 1为被照亮. 默认为1.\r\n颜色空间: 线性.\r\n\r\n\r\nAO allows certain areas to be always in shadow.\r\n\r\nAO Map: 0 means occluded, 1 means illuminated. Default is 1.\r\nColor space: linear.";
+		];
+		ScalarParameter Normal_Map_UV_Offset_X = 0.0 [
+			ParameterName="Normal Map UV Offset X";
+			Group="20 - Normal";
+			SortPriority=102;
+		];
+		ScalarParameter Normal_Map_UV_Offset_Y = 0.0 [
+			ParameterName="Normal Map UV Offset Y";
+			Group="20 - Normal";
+			SortPriority=102;
+		];
+		ScalarParameter Normal_Map_UV_Scale_X = 1.0 [
+			ParameterName="Normal Map UV Scale X";
+			Group="20 - Normal";
+			SortPriority=101;
+		];
+		ScalarParameter Normal_Map_UV_Scale_Y = 1.0 [
+			ParameterName="Normal Map UV Scale Y";
+			Group="20 - Normal";
+			SortPriority=101;
+		];
+		ScalarParameter Normal_Map_UV_Channel = 0.0 [
+			ParameterName="Normal Map UV Channel";
+			Group="20 - Normal";
+			SortPriority=100;
+		];
+		ScalarParameter Normal_Scale = 1.0 [
+			ParameterName="Normal Scale";
+			Group="20 - Normal";
+		];
+		ScalarParameter ID_Offset = 0.0 [
+			ParameterName="ID Offset";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=50;
+			Description="可以在没有ID Map或顶点色输入的情况下使用ID偏移来指定整个材质的ID.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID offsets can be used to specify IDs for the entire material without ID Map or vertex color input.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.";
+		];
+		ChannelMaskParameter ID_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="ID Channel";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=34;
+			MaskChannel=Red
+		];
+		ScalarParameter ID_Map_UV_Channel = 0.0 [
+			ParameterName="ID Map UV Channel";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=33;
+		];
+		VectorParameter Shadow_Color = float4(0.5, 0.5, 0.5, 1.0) [
+			ParameterName="Shadow Color";
+			Group="10 - Diffuse";
+			SortPriority=10;
+		];
+		ScalarParameter Diffuse_Color_Ramp_Index = 1.0 [
+			ParameterName="Diffuse Color Ramp Index";
+			Group="10 - Diffuse";
+			SortPriority=0;
+			Description="选择使用那个Diffuse Color Ramp.\r\nRamp的横轴是光照方向和表面法线的角度(N dot L), 0为背光面, 0.5为明暗交界线, 1为正光面.\r\nRGB通道为漫反射颜色.\r\nA通道为阴影衰减, 1为被照亮, 0为被遮挡. 用于区分Base Color和Shadow Color.\r\n\r\n现在MooaToon使用Global Diffuse/Specular Color Ramps来描述表面的多光源着色结果, 这意味着使用同一套输入你既可以实现基于物理的着色, 也可以实现完全自定义的风格化着色.\r\n你可以在Project Settings > Engine > MooaToon中找到默认的Ramp Atlas, 其中存放了所有可供选择的Ramp, 要使用某个Ramp你需要在这里输入其Index.\r\n如果要添加新的Ramp, 请先将默认的Ramp Atlas复制一份, 然后在Project Settings中修改Ramp Atlas为复制的, 以避免在更新MooaToon的时候产生冲突.\r\n\r\n\r\nChoose which Diffuse Color Ramp to use.\r\nThe horizontal axis of Ramp is the angle between light direction and surface normal (N dot L), 0 is the backlight surface, 0.5 is the boundary between light and dark, and 1 is the front light surface.\r\nThe RGB channel is the diffuse color.\r\nThe A channel is shadow attenuation, 1 means illuminated, 0 means occluded. Used to distinguish Base Color and Shadow Color.\r\n\r\nMooaToon now uses Global Diffuse/Specular Color Ramps to describe the multi-light shading results of the surface, which means that using the same set of inputs you can achieve both physically based shading and completely customized stylized shading.\r\nYou can find the default Ramp Atlas in Project Settings > Engine > MooaToon, which stores all available Ramps. To use a Ramp, you need to enter its Index here.\r\nIf you want to add a new Ramp, please first copy the default Ramp Atlas, and then modify the Ramp Atlas to be copied in Project Settings to avoid conflicts when updating MooaToon.";
+		];
+		ChannelMaskParameter Diffuse_Ramp_Offset_Channel = float4(0.0, 0.0, 1.0, 0.0) [
+			ParameterName="Diffuse Ramp Offset Channel";
+			Group="10 - Diffuse";
+			SortPriority=37;
+			MaskChannel=Blue
+		];
+		ScalarParameter Diffuse_Ramp_Offset_Intensity = 0.0 [
+			ParameterName="Diffuse Ramp Offset Intensity";
+			Group="10 - Diffuse";
+			SortPriority=38;
+			Description="Diffuse Ramp Offset Map通过偏移Diffuse Ramp A通道的横轴来精细控制法线阴影的形状.\r\n贴图的值:\r\n  - 越接近0越容易进入暗面范围\r\n  - 为0.5时没有影响\r\n  - 越接近1越容易进入亮面范围\r\n颜色空间: 线性.\r\n\r\n受限于GBuffer位深, 在`Diffuse Ramp Offset Intensity`较小时阴影边缘可能出现锯齿.\r\n建议将`Diffuse Ramp Offset Intensity`设为1, 然后以下方式之一:\r\n  - 控制台变量`r.Mooa.DiffuseColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Diffuse Ramp UV Offset Max Range`\r\n调整最大偏移范围.\r\n\r\n\r\nThe Diffuse Ramp Offset Map provides fine control over the shape of the normal shadow by offsetting the horizontal axis of the Diffuse Ramp A channel.\r\nThe value of the map:\r\n  - The closer it is to 0, the easier it is to enter the dark side range\r\n  - It has no effect when it is 0.5\r\n  - The closer it is to 1, the easier it is to enter the light side range\r\nColor space: linear.\r\n\r\nLimited by the GBuffer bit depth, the shadow edges may appear jagged when `Diffuse Ramp Offset Intensity` is small.\r\nIt is recommended to set `Diffuse Ramp Offset Intensity` to 1, and then use one of the following methods:\r\n  - Console variable `r.Mooa.DiffuseColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Diffuse Ramp UV Offset Max Range`\r\nto adjust the maximum offset range.";
+		];
+		VectorParameter Specular_Color = float4(1.0, 1.0, 1.0, 1.0) [
+			ParameterName="Specular Color";
+			Group="11 - Specular";
+			SortPriority=4;
+		];
+		ScalarParameter Specular_Color_Ramp_Index = 0.0 [
+			ParameterName="Specular Color Ramp Index";
+			Group="11 - Specular";
+			SortPriority=0;
+			Description="选择使用哪个Specular Color Ramp.\r\n横坐标是根据经验归一化后的高光强度:\r\n\t- 0对应高光点边缘\r\n\t- 1对应高光点中心\r\nRGB通道的值为Specular Color.\r\n\r\n现在MooaToon使用Global Diffuse/Specular Color Ramps来描述表面的多光源着色结果, 这意味着使用同一套输入你既可以实现基于物理的着色, 也可以实现完全自定义的风格化着色.\r\n你可以在Project Settings > Engine > MooaToon中找到默认的Ramp Atlas, 其中存放了所有可供选择的Ramp, 要使用某个Ramp你需要在这里输入其Index.\r\n如果要添加新的Ramp, 请先将默认的Ramp Atlas复制一份, 然后在Project Settings中修改Ramp Atlas为复制的, 以避免在更新MooaToon的时候产生冲突.\r\n\r\n\r\nChoose which Specular Color Ramp to use.\r\nThe horizontal coordinate is the empirically normalized highlight intensity.\r\n\t- 0 is the edge of the highlight point.\r\n\t- 1 is the center of the highlight.\r\nThe value of the RGB channel is Specular Color.\r\n\r\nMooaToon now uses Global Diffuse/Specular Color Ramps to describe the multi-light shading results of the surface, which means that using the same set of inputs you can achieve both physically based shading and completely customized stylized shading.\r\nYou can find the default Ramp Atlas in Project Settings > Engine > MooaToon, which stores all available Ramps. To use a Ramp, you need to enter its Index here.\r\nIf you want to add a new Ramp, please first copy the default Ramp Atlas, and then modify the Ramp Atlas to be copied in Project Settings to avoid conflicts when updating MooaToon.";
+		];
+		ChannelMaskParameter Specular_Ramp_Offset_Channel = float4(0.0, 0.0, 1.0, 0.0) [
+			ParameterName="Specular Ramp Offset Channel";
+			Group="11 - Specular";
+			SortPriority=62;
+			MaskChannel=Blue
+		];
+		ScalarParameter Specular_Ramp_Offset_Intensity = 0.0 [
+			ParameterName="Specular Ramp Offset Intensity";
+			Group="11 - Specular";
+			SortPriority=63;
+			Description="Specular Ramp Offset Map通过偏移Specular Ramp RGB通道的横轴来精细控制Specular的形状.\r\n贴图的值:\r\n\t- 越接近0越难以进入Specular范围\r\n\t- 为0.5时没有影响\r\n\t- 越接近1越容易进入Specular范围\r\n颜色空间: 线性.\r\n\r\n受限于GBuffer位深, 在`Specular Ramp Offset Intensity`较小时Specular边缘可能出现锯齿.\r\n建议将`Specular Ramp Offset Intensity`设为1, 然后以下方式之一:\r\n  - 控制台变量`r.Mooa.SpecularColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Specular Ramp UV Offset Max Range`\r\n调整最大偏移范围.\r\n\r\n\r\nThe Specular Ramp Offset Map provides fine control over the shape of the Specular by offsetting the horizontal axis of the Specular Ramp RGB channel.\r\nTexture value:\r\n\t- The closer it is to 0, the harder it is to enter the Specular range\r\n\t- has no effect at 0.5\r\n\t- the closer to 1, the easier it is to enter the Specular range\r\nColor space: linear.\r\n\r\nLimited by the GBuffer bit depth, Specular edges may appear jagged when `Specular Ramp Offset Intensity` is small.\r\nIt is recommended to set `Specular Ramp Offset Intensity` to 1, and then use one of the following methods:\r\n  - console variable `r.Mooa.SpecularColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Specular Ramp UV Offset Max Range`\r\nto adjust the maximum offset range.";
+		];
+		ScalarParameter Reflection = 0.0 [
+			Group="11 - Specular";
+			SortPriority=2;
+		];
+		ScalarParameter Rim_Light_Intensity = 0.5 [
+			ParameterName="Rim Light Intensity";
+			Group="12 - Rim Light";
+			SortPriority=40;
+			Description="屏幕空间深度测试边缘光强度.\r\n与传统的基于法线方向与视线方向的角度(N dot V)的边缘光不同, 屏幕空间边缘光的宽度与表面曲率无关, 看起来更加扁平化.\r\n可以用控制台命令调整更多全局参数.\r\n\r\n\r\nScreen Space Depth Test Rim Light Intensity.\r\nDifferent from the traditional rim light based on the angle between the normal direction and the view direction (N dot V), the width of the screen space rim light has nothing to do with the surface curvature and looks flatter.\r\nMore global parameters can be adjusted using console variables.";
+		];
+		ChannelMaskParameter Rim_Light_Width_Channel = float4(0.0, 0.0, 1.0, 0.0) [
+			ParameterName="Rim Light Width Channel";
+			Group="12 - Rim Light";
+			SortPriority=34;
+			MaskChannel=Blue
+		];
+		ChannelMaskParameter Rim_Light_Width_Channel_1 = float4(0.0, 0.0, 1.0, 0.0) [
+			ParameterName="Rim Light Width Channel";
+			Group="12 - Rim Light";
+			SortPriority=34;
+			MaskChannel=Blue
+		];
+		ScalarParameter Rim_Light_Width = 0.5 [
+			ParameterName="Rim Light Width";
+			Group="12 - Rim Light";
+			SortPriority=35;
+			Description="屏幕空间深度测试边缘光宽度.\r\n与传统的基于法线方向与视线方向的角度(N dot V)的边缘光不同, 屏幕空间边缘光的宽度与表面曲率无关, 看起来更加扁平化.\r\n可以用控制台命令调整更多全局参数.\r\n\r\n\r\nScreen Space Depth Test Rim Light Width.\r\nDifferent from the traditional rim light based on the angle between the normal direction and the view direction (N dot V), the width of the screen space rim light has nothing to do with the surface curvature and looks flatter.\r\nMore global parameters can be adjusted using console variables.";
+		];
+		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Distance Field Facial Shadow Map Channel";
+			Group="02 - Distance Field Facial Shadow";
+			MaskChannel=Red
+		];
+		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel_1 = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Distance Field Facial Shadow Map Channel";
+			Group="02 - Distance Field Facial Shadow";
+			MaskChannel=Red
+		];
+		ScalarParameter Face_ID = 250.0 [
+			ParameterName="Face ID";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=82;
+			Description="在有ID Map或顶点色输入的情况下指定脸或头发的ID, 适用于脸和头发使用同一个材质的情况.\r\n\r\n如果要使用发影(头发在脸上的投影)功能, 则必须正确设置脸和头发的ID.\r\n\r\n\r\nSpecifying the ID of the face or hair with ID Map or vertex color input, suitable for face and hair using the same material.\r\n\r\nIf you want to use the hair shadow (shadows of hair on the face) feature, the face and hair IDs must be set correctly.";
+		];
+		ScalarParameter Hair_ID = 240.0 [
+			ParameterName="Hair ID";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=82;
+			Description="在有ID Map或顶点色输入的情况下指定脸或头发的ID, 适用于脸和头发使用同一个材质的情况.\r\n\r\n如果要使用发影(头发在脸上的投影)功能, 则必须正确设置脸和头发的ID.\r\n\r\n\r\nSpecifying the ID of the face or hair with ID Map or vertex color input, suitable for face and hair using the same material.\r\n\r\nIf you want to use the hair shadow (shadows of hair on the face) feature, the face and hair IDs must be set correctly.";
+		];
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		MaterialAttributes Output;
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Graph = {
+		MaterialAttributes Attributes;
+		float3 VertexTangentWS = UE.Expression(Class="VertexTangentWS", OutputType="float3");
+		float3 Multiply = (VertexTangentWS * 0.5);
+		float3 Add = (Multiply + 0.5);
+		float4 AppendMany = AppendMany((UE.Expression(Class="VertexColor", OutputType="float4")).r, (UE.Expression(Class="VertexColor", OutputType="float4")).g, (UE.Expression(Class="VertexColor", OutputType="float4")).b, (UE.Expression(Class="VertexColor", OutputType="float4")).a, OutputIndex=2);
+		#Region "Texture Sample"
+		float3 AppendMany_1 = AppendMany((UE.Expression(Class="VertexColor", OutputType="float4")).r, (UE.Expression(Class="VertexColor", OutputType="float4")).g, (UE.Expression(Class="VertexColor", OutputType="float4")).b, (UE.Expression(Class="VertexColor", OutputType="float4")).a, OutputIndex=1);
+		float4 StaticSwitchParameter =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=AppendMany,
+				False=float4(pow(AppendMany_1, 2.2), (UE.Expression(Class="VertexColor", OutputType="float4")).a),
+				Group="01 - Global Mask Map",
+				SortPriority=41,
+				ParameterName="Use Vertex Color In sRGB Space"
+			);
+		#EndRegion
+
+		float4 Sampled_Vertex_Color = StaticSwitchParameter;
+		#Region "UVs"
+		float2 MF_UVChannelSwitch = MF_UVChannelSwitch(Global_Mask_Map_UV_Channel);
+		float2 Multiply_1 = (MF_UVChannelSwitch * float2(Global_Mask_Map_UV_Scale_X, Global_Mask_Map_UV_Scale_Y));
+		float2 Add_1 = (Multiply_1 + float2(Global_Mask_Map_UV_Offset_X, Global_Mask_Map_UV_Offset_Y));
+		#EndRegion
+
+		float2 Global_Mask_Map_UV = Add_1;
+		#Region "Texture Sample"
+		float4 Global_Mask_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Global Mask Map",
+				Group="01 - Global Mask Map",
+				Desc="用于存放各种线性数据的贴图, 每个通道存放什么数据可以根据你的项目需求定制.\r\n颜色空间: 线性.\r\n\r\n\r\nTexture used to store various linear data. What data is stored in each channel can be customized according to your project needs.\r\nColor space: linear.",
+				Coordinates=Global_Mask_Map_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor"
+			);
+		float4 Global_Mask_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Global Mask Map",
+				Group="01 - Global Mask Map",
+				Desc="用于存放各种线性数据的贴图, 每个通道存放什么数据可以根据你的项目需求定制.\r\n颜色空间: 线性.\r\n\r\n\r\nTexture used to store various linear data. What data is stored in each channel can be customized according to your project needs.\r\nColor space: linear.",
+				Coordinates=Global_Mask_Map_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_1 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Global_Mask_Map.rgba,
+				False=Global_Mask_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_2 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Vertex_Color,
+				False=StaticSwitchParameter_1,
+				Group="01 - Global Mask Map",
+				SortPriority=40,
+				ParameterName="Use Vertex Color Instead Mask Map"
+			);
+		#EndRegion
+
+		float4 Sampled_Global_Mask_Map = StaticSwitchParameter_2;
+		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Sampled_Global_Mask_Map);
+		float2 MaterialExpressionTextureCoordinate_3 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		float3 MF_MooaMainLightDirection = MF_MooaMainLightDirection();
+		float2 Custom =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float2",
+				Code="float3 L = normalize(MainLightDirWS);\r\nfloat3 U = normalize(WorldUpWS);\r\n\r\n// 主光“上下”量（仰角）\r\nfloat elev = dot(L, U); // [-1,1]\r\n\r\n// 映射到自定义区间\r\nfloat a = min(ElevMin, ElevMax);\r\nfloat b = max(ElevMin, ElevMax);\r\nfloat t = saturate((elev - a) / max(1e-4, b - a));\r\nif (ElevMin > ElevMax) t = 1.0 - t;\r\n\r\n// 曲线\r\nt = pow(t, max(1e-3, Curve));\r\n\r\n// 动态偏移 + 手动偏移 + 总区间限制\r\nfloat dyn = lerp(DynMin, DynMax, t) * VSign;\r\nfloat offsetV = clamp(AddOffset + dyn, ClampMin, ClampMax);\r\n\r\nreturn UV + float2(0.0, offsetV);",
+				Description="Custom",
+				UV=MaterialExpressionTextureCoordinate_3,
+				MainLightDirWS=MF_MooaMainLightDirection,
+				WorldUpWS=float3(0.0, 0.0, 1.0),
+				AddOffset=AddOffset,
+				DynMin=DynMin,
+				DynMax=DynMax,
+				ElevMin=ElevMin,
+				ElevMax=ElevMax,
+				Curve=Curve,
+				ClampMin=ClampMin,
+				ClampMax=ClampMax,
+				VSign=VSign
+			);
+		#Region "Texture Sample"
+		float4 Hair_Highlight_Mask =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Hair Highlight Mask",
+				Group="03 - Hair Highlight Mask",
+				SortPriority=5,
+				Coordinates=Custom,
+				Texture=Path(Engine, "EngineResources/Black"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		#EndRegion
+
+		float Hair_Highlight_Mask_Channel_Masked = Hair_Highlight_Mask_Channel(Input = Hair_Highlight_Mask.rgb);
+		float Hair_Highlight_Mask_Texture = Hair_Highlight_Mask_Channel_Masked;
+		float4 MF_MoonToonBufferInput = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=3);
+		float4 ShadingFeatureColor = MF_MoonToonBufferInput;
+		#Region "Texture Sample"
+		float2 MF_UVChannelSwitch_1 = MF_UVChannelSwitch(Inner_Outline_Map_UV_Channel);
+		float4 Inner_Outline_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Inner Outline Map",
+				Group="22 - Inner Outline",
+				Desc="0: 无影响 1: 内描边\r\n\r\n0: No effect 1: Inner Outline",
+				Coordinates=MF_UVChannelSwitch_1,
+				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				MipValueMode="TMVM_MipLevel",
+				AutomaticViewMipBias=false,
+				ConstMipValue=0
+			);
+		float4 StaticSwitchParameter_3 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Global_Mask_Map,
+				False=Inner_Outline_Map.rgba,
+				Group="22 - Inner Outline",
+				SortPriority=32,
+				ParameterName="Inner Outline From Global Mask Map"
+			);
+		#EndRegion
+
+		float Inner_Outline_Channel_Masked = Inner_Outline_Channel(Input = StaticSwitchParameter_3);
+		float Sampled_Inner_Outline = Inner_Outline_Channel_Masked;
+		#Region "Inner Outline"
+		float3 LinearInterpolate = lerp(1.0, Inner_Outline_Color.rgb, Sampled_Inner_Outline);
+		float3 StaticSwitchParameter_4 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=LinearInterpolate,
+				False=1.0,
+				Group="22 - Inner Outline",
+				SortPriority=0,
+				ParameterName="Enable Inner Outline"
+			);
+		#EndRegion
+
+		float3 InnerOutlineColor = StaticSwitchParameter_4;
+		#Region "UVs"
+		float2 MF_UVChannelSwitch_2 = MF_UVChannelSwitch(Global_UV_Channel);
+		float2 Multiply_2 = (MF_UVChannelSwitch_2 * float2(Global_UV_Scale_X, Global_UV_Scale_Y));
+		float2 Add_2 = (Multiply_2 + float2(Global_UV_Offset_X, Global_UV_Offset_Y));
+		#EndRegion
+
+		float2 Global_UV = Add_2;
+		#Region "Texture Sample"
+		float4 Base_Color_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Base Color Map",
+				Group="10 - Diffuse",
+				SortPriority=5,
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		float4 Base_Color_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Base Color Map",
+				Group="10 - Diffuse",
+				SortPriority=5,
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_5 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Base_Color_Map.rgba,
+				False=Base_Color_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		#EndRegion
+
+		float4 Sampled_Base_Color = StaticSwitchParameter_5;
+		#Region "Diffuse"
+		float3 Multiply_3 = (Base_Color.rgb * Sampled_Base_Color.rgb);
+		float3 Multiply_4 = (Multiply_3 * InnerOutlineColor);
+		#EndRegion
+
+		float3 Base_Color_1 = Multiply_4;
+		float4 StaticSwitchParameter_6 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=ShadingFeatureColor,
+				False=Base_Color_1,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Debug Shading Feature"
+			);
+		float4 StaticSwitchParameter_7 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Add,
+				False=StaticSwitchParameter_6,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Debug Tangent"
+			);
+		Attributes.BaseColor = StaticSwitchParameter_7;
+		#Region "Texture Sample"
+		float4 Metallic_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Metallic Map",
+				Group="11 - Specular",
+				SortPriority=51,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor"
+			);
+		float4 Metallic_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Metallic Map",
+				Group="11 - Specular",
+				SortPriority=51,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_8 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Metallic_Map.rgba,
+				False=Metallic_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_9 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Global_Mask_Map,
+				False=StaticSwitchParameter_8,
+				Group="11 - Specular",
+				SortPriority=50,
+				ParameterName="Metallic From Global Mask Map",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		float Metallic_Channel_Masked = Metallic_Channel(Input = StaticSwitchParameter_9);
+		float Sampled_Metallic = Metallic_Channel_Masked;
+		#Region "Specular"
+		float Multiply_5 = (Sampled_Metallic * Metallic);
+		#EndRegion
+
+		float Metallic_1 = Multiply_5;
+		Attributes.Metallic = Metallic_1;
+		Attributes.Specular = Specular;
+		#Region "Texture Sample"
+		float4 Roughness_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Roughness Map",
+				Group="11 - Specular",
+				SortPriority=41,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor"
+			);
+		float4 Roughness_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Roughness Map",
+				Group="11 - Specular",
+				SortPriority=41,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_10 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Roughness_Map.rgba,
+				False=Roughness_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_11 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Global_Mask_Map,
+				False=StaticSwitchParameter_10,
+				Group="11 - Specular",
+				SortPriority=40,
+				ParameterName="Roughness From Global Mask Map",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		float Roughness_Channel_Masked = Roughness_Channel(Input = StaticSwitchParameter_11);
+		float Sampled_Roughness = Roughness_Channel_Masked;
+		#Region "Specular"
+		float StaticSwitchParameter_12 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(1.0 - Sampled_Roughness),
+				False=Sampled_Roughness,
+				Group="11 - Specular",
+				SortPriority=43,
+				ParameterName="Invert Roughness Channel"
+			);
+		float Multiply_6 = (StaticSwitchParameter_12 * Roughness);
+		#EndRegion
+
+		float Roughness_1 = Multiply_6;
+		Attributes.Roughness = Roughness_1;
+		#Region "Specular"
+		float StaticSwitchParameter_13 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=Anisotropy,
+				False=0.0,
+				Group="11 - Specular",
+				SortPriority=2,
+				ParameterName="Use Anisotropy"
+			);
+		#EndRegion
+
+		float Anisotropy_Output = StaticSwitchParameter_13;
+		Attributes.Anisotropy = Anisotropy_Output;
+		#Region "Texture Sample"
+		float4 Emissive_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Emissive Map",
+				Group="23 - Emissive",
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		float4 Emissive_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Emissive Map",
+				Group="23 - Emissive",
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float3 StaticSwitchParameter_14 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=Emissive_Map.rgb,
+				False=Emissive_Map_1.rgb,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		#EndRegion
+
+		float3 Sampled_Emissive = StaticSwitchParameter_14;
+		#Region "Emissive"
+		float3 Multiply_7 = (Emissive_Intensity * Sampled_Emissive);
+		float3 StaticSwitchParameter_15 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=Multiply_7,
+				False=0.0,
+				Group="23 - Emissive",
+				SortPriority=0,
+				ParameterName="Enable Emission"
+			);
+		#EndRegion
+
+		float3 Emission = StaticSwitchParameter_15;
+		Attributes.EmissiveColor = Emission;
+		#Region "Texture Sample"
+		float4 Opacity_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Opacity Map",
+				Group="21 - Translucency",
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		float4 Opacity_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Opacity Map",
+				Group="21 - Translucency",
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_16 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Opacity_Map.rgba,
+				False=Opacity_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_17 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Base_Color,
+				False=StaticSwitchParameter_16,
+				Group="21 - Translucency",
+				SortPriority=31,
+				ParameterName="Opacity From Base Color Map",
+				DefaultValue=true
+			);
+		float4 StaticSwitchParameter_18 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Vertex_Color,
+				False=StaticSwitchParameter_17,
+				Group="21 - Translucency",
+				SortPriority=31,
+				ParameterName="Opacity From Vertex Color"
+			);
+		#EndRegion
+
+		float Opacity_Channel_Masked = Opacity_Channel(Input = StaticSwitchParameter_18);
+		float Sampled_Opacity = Opacity_Channel_Masked;
+		#Region "Translucency"
+		float Multiply_8 = (Opacity * Sampled_Opacity);
+		#EndRegion
+
+		float Opacity_1 = Multiply_8;
+		Attributes.Opacity = Opacity_1;
+		#Region "Translucency"
+		float LinearInterpolate_1 = lerp(1.0, Opacity_1, Apply_Opacity_to_Shadow);
+		float Multiply_9 = (LinearInterpolate_1 * Shadow_Opacity);
+		#EndRegion
+
+		float Shadow_Opacity_1 = Multiply_9;
+		Attributes.OpacityMask = Shadow_Opacity_1;
+		#Region "Texture Sample"
+		float4 SA_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="SA Map",
+				Group="00 - Global Settings",
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/Black"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		float4 SA_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="SA Map",
+				Group="00 - Global Settings",
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/Black"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float3 StaticSwitchParameter_19 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=SA_Map.rgb,
+				False=SA_Map_1.rgb,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		#EndRegion
+
+		float3 SA_Map_2 = StaticSwitchParameter_19;
+		#Region "Texture Sample"
+		float4 AO_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="AO Map",
+				Group="10 - Diffuse",
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor"
+			);
+		float4 AO_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="AO Map",
+				Group="10 - Diffuse",
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_20 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=AO_Map.rgba,
+				False=AO_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_21 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Global_Mask_Map,
+				False=StaticSwitchParameter_20,
+				Group="10 - Diffuse",
+				SortPriority=31,
+				ParameterName="AO From Global Mask Map",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		float AO_Channel_Masked = AO_Channel(Input = StaticSwitchParameter_21);
+		#Region "Texture Sample"
+		float StaticSwitchParameter_22 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=SA_Map_2.g,
+				False=AO_Channel_Masked,
+				Group="10 - Diffuse",
+				SortPriority=31,
+				ParameterName="AO From SA Map"
+			);
+		#EndRegion
+
+		float Sampled_AO = StaticSwitchParameter_22;
+		#Region "Diffuse"
+		float LinearInterpolate_2 = lerp(1.0, Sampled_AO, AO_Intensity);
+		#EndRegion
+
+		float AO = LinearInterpolate_2;
+		Attributes.AmbientOcclusion = AO;
+		#Region "UVs"
+		float2 MF_UVChannelSwitch_3 = MF_UVChannelSwitch(Normal_Map_UV_Channel);
+		float2 Multiply_10 = (MF_UVChannelSwitch_3 * float2(Normal_Map_UV_Scale_X, Normal_Map_UV_Scale_Y));
+		float2 Add_3 = (Multiply_10 + float2(Normal_Map_UV_Offset_X, Normal_Map_UV_Offset_Y));
+		#EndRegion
+
+		float2 Normal_Map_UV = Add_3;
+		#Region "Texture Sample"
+		float4 Normal_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Normal Map",
+				Group="20 - Normal",
+				Coordinates=Normal_Map_UV,
+				Texture=Path(Engine, "EngineMaterials/BaseFlattenNormalMap"),
+				SamplerType="SAMPLERTYPE_Normal"
+			);
+		float4 Normal_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Normal Map",
+				Group="20 - Normal",
+				Coordinates=Normal_Map_UV,
+				Texture=Path(Engine, "EngineMaterials/BaseFlattenNormalMap"),
+				SamplerType="SAMPLERTYPE_Normal",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float3 StaticSwitchParameter_23 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=Normal_Map.rgb,
+				False=Normal_Map_1.rgb,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		#EndRegion
+
+		float3 Sampled_Normal = StaticSwitchParameter_23;
+		#Region "Normal"
+		float3 FlattenNormal = FlattenNormal(Sampled_Normal, (1.0 - Normal_Scale));
+		float3 StaticSwitchParameter_24 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=FlattenNormal,
+				False=float3(0.0, 0.0, 1.0),
+				Group="20 - Normal",
+				SortPriority=32,
+				ParameterName="Enable Normal Map"
+			);
+		#EndRegion
+
+		float3 NormalTS = StaticSwitchParameter_24;
+		Attributes.Normal = NormalTS;
+		float2 MaterialExpressionTextureCoordinate_4 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
+		float2 MaterialExpressionTextureCoordinate_5 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		float2 MaterialExpressionTextureCoordinate_4_2 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
+		float2 MaterialExpressionTextureCoordinate_5_2 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		#Region "Decode Hightlight Tangent or Face Forward Dir"
+		// The shared [0,1] -> tangent-space -> world decode. Both the Kajiya strand tangent (below)
+		// and the face-forward CustomizedUV path (further down) read it; it lives up here because the
+		// graph evaluates in order and the strand switch is its first consumer.
+		float3 Multiply_11 = (float3(MaterialExpressionTextureCoordinate_4_2.rg, MaterialExpressionTextureCoordinate_5_2.r) * 2.0);
+		float3 Add_4 = (Multiply_11 + -1.0);
+		float3 Transform = UE.Expression(Class="Transform", OutputType="float3", Input=Add_4);
+		#EndRegion
+
+		#Region "Decode Hightlight Tangent or Face Forward Dir"
+		// Kajiya strand tangent, decoded exactly like the face-forward bake: the UV channels hold a
+		// [0,1]-remapped TANGENT-SPACE direction (written by the MoonToon "Bake Strand Tangent" tool,
+		// which shares the face-forward encoding), so it must be expanded *2-1 and transformed
+		// tangent->world before it can feed Attributes.Tangent -- the toon engine path outputs that
+		// pin as a world-space vector as-is. The original MooaToon decode read the raw UV values as a
+		// world vector ("baked in Houdini"); that convention had no baker in this project, broke
+		// under skinning, and read VRM-import UV residue as tangents. The Transform node below is the
+		// same decode the face-forward path uses, reused rather than duplicated.
+		float3 StaticSwitchParameter_25 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=normalize(Transform),
+				False=0.0,
+				Group="00 - Global Settings",
+				SortPriority=61,
+				ParameterName="Use Highlight Tangent baked in Houdini UV23",
+				DefaultValue=true
+			);
+		float3 StaticSwitchParameter_26 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=StaticSwitchParameter_25,
+				False=0.0,
+				Group="00 - Global Settings",
+				SortPriority=60,
+				ParameterName="Enable Feature Kajiya Hair Specular"
+			);
+		float3 StaticSwitchParameter_27 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=normalize(float3(MaterialExpressionTextureCoordinate_4.rg, MaterialExpressionTextureCoordinate_5.r)),
+				False=StaticSwitchParameter_26,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Enable Feature Distance Field Facial Shadow"
+			);
+		#EndRegion
+
+		float3 TangentWS = StaticSwitchParameter_27;
+		Attributes.Tangent = TangentWS;
+		float2 MaterialExpressionTextureCoordinate_6 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
+		#Region "Decode Hightlight Tangent or Face Forward Dir"
+		float2 StaticSwitchParameter_28 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=normalize(Transform).rg,
+				False=MaterialExpressionTextureCoordinate_6,
+				Group="00 - Global Settings",
+				SortPriority=61,
+				ParameterName="Use Highlight Tangent baked in Houdini UV23",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		float2 MaterialExpressionTextureCoordinate_6_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
+		#Region "Decode Hightlight Tangent or Face Forward Dir"
+		float2 StaticSwitchParameter_29 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=StaticSwitchParameter_28,
+				False=MaterialExpressionTextureCoordinate_6_1,
+				Group="00 - Global Settings",
+				SortPriority=60,
+				ParameterName="Enable Feature Kajiya Hair Specular"
+			);
+		float2 StaticSwitchParameter_30 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=normalize(Transform).rg,
+				False=StaticSwitchParameter_29,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Enable Feature Distance Field Facial Shadow"
+			);
+		#EndRegion
+
+		float2 Custom_Vertex_UV1 = StaticSwitchParameter_30;
+		Attributes.CustomizedUV1 = Custom_Vertex_UV1;
+		float2 MaterialExpressionTextureCoordinate_5_3 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		float2 MaterialExpressionTextureCoordinate_5_4 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		float2 MaterialExpressionTextureCoordinate_7 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		#Region "Decode Hightlight Tangent or Face Forward Dir"
+		float2 StaticSwitchParameter_31 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=float2(normalize(Transform).b, MaterialExpressionTextureCoordinate_5_4.g),
+				False=MaterialExpressionTextureCoordinate_7,
+				Group="00 - Global Settings",
+				SortPriority=61,
+				ParameterName="Use Highlight Tangent baked in Houdini UV23",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		float2 MaterialExpressionTextureCoordinate_7_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		#Region "Decode Hightlight Tangent or Face Forward Dir"
+		float2 StaticSwitchParameter_32 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=StaticSwitchParameter_31,
+				False=MaterialExpressionTextureCoordinate_7_1,
+				Group="00 - Global Settings",
+				SortPriority=60,
+				ParameterName="Enable Feature Kajiya Hair Specular"
+			);
+		float2 StaticSwitchParameter_33 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=float2(normalize(Transform).b, MaterialExpressionTextureCoordinate_5_3.g),
+				False=StaticSwitchParameter_32,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Enable Feature Distance Field Facial Shadow"
+			);
+		#EndRegion
+
+		float2 Custom_Vertex_UV2 = StaticSwitchParameter_33;
+		Attributes.CustomizedUV2 = Custom_Vertex_UV2;
+		#Region "RT Shadow Flag (call in Ray Tracing Hit Shader (FMooaCustomPayload))"
+		float StaticSwitchParameter_34 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=1.0,
+				False=0.0,
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=60,
+				ParameterName="Disable Self Shadow",
+				DefaultValue=true
+			);
+		float StaticSwitchParameter_35 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=1.0,
+				False=0.0,
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=61,
+				ParameterName="Disable Cast Shadow On Toon",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		#Region "Texture Sample"
+		float2 MF_UVChannelSwitch_4 = MF_UVChannelSwitch(ID_Map_UV_Channel);
+		float4 ID_Map_R_ =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="ID Map(R)",
+				Group="13 - Ray Tracing Shadow",
+				Desc="ID Map是指将角色的不同部位填充不同的颜色, 以便在制作贴图或者后期效果时方便抠图.\r\n在影视工作流中通常是必备的贴图, 其分辨率可以很低, 只要保证不溢出UV边界即可.\r\n不同的值代表不同的ID, ID之间至少要有0.031(也就是8/255)的数值差.\r\n颜色空间: 线性.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID Map refers to filling different parts of the character with different colors to facilitate cutout when making textures or post-effects.\r\nID Map are usually necessary in film production workflows, and their resolution can be very low, as long as they do not overflow the UV boundary.\r\nDifferent values ​​represent different IDs, and there must be at least a numerical difference of 0.031 (that is, 8/255) between IDs.\r\nColor space: linear.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.",
+				Coordinates=MF_UVChannelSwitch_4,
+				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				MipValueMode="TMVM_MipLevel",
+				ConstMipValue=0
+			);
+		float4 ID_Map_R_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="ID Map(R)",
+				Group="13 - Ray Tracing Shadow",
+				Desc="ID Map是指将角色的不同部位填充不同的颜色, 以便在制作贴图或者后期效果时方便抠图.\r\n在影视工作流中通常是必备的贴图, 其分辨率可以很低, 只要保证不溢出UV边界即可.\r\n不同的值代表不同的ID, ID之间至少要有0.031(也就是8/255)的数值差.\r\n颜色空间: 线性.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID Map refers to filling different parts of the character with different colors to facilitate cutout when making textures or post-effects.\r\nID Map are usually necessary in film production workflows, and their resolution can be very low, as long as they do not overflow the UV boundary.\r\nDifferent values ​​represent different IDs, and there must be at least a numerical difference of 0.031 (that is, 8/255) between IDs.\r\nColor space: linear.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.",
+				Coordinates=MF_UVChannelSwitch_4,
+				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings",
+				MipValueMode="TMVM_MipLevel",
+				ConstMipValue=0
+			);
+		float4 StaticSwitchParameter_36 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=ID_Map_R_.rgba,
+				False=ID_Map_R_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_37 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Global_Mask_Map,
+				False=StaticSwitchParameter_36,
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=31,
+				ParameterName="ID From Global Mask Map"
+			);
+		float4 StaticSwitchParameter_38 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Vertex_Color,
+				False=StaticSwitchParameter_37,
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=30,
+				ParameterName="ID From Vertex Color"
+			);
+		#EndRegion
+
+		float ID_Channel_Masked = ID_Channel(Input = StaticSwitchParameter_38);
+		float Sampled_ID_Map = ID_Channel_Masked;
+		#Region "RayTracing Shadow"
+		float Multiply_12 = (Sampled_ID_Map * 255.0);
+		#EndRegion
+
+		float ID = floor(Multiply_12);
+		#Region "RayTracing Shadow"
+		float Add_5 = (ID + floor(ID_Offset));
+		float Divide = (Add_5 / 255.0);
+		float Multiply_13 = (saturate(Divide) * 31.0);
+		#EndRegion
+
+		float Encoded_Stencil = Multiply_13;
+		#Region "RT Shadow Flag (call in Ray Tracing Hit Shader (FMooaCustomPayload))"
+		float Encode_Mooa_Ray_Tracing_Data =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float",
+				Code="FMoonCustomPayload MoonCustomPayload = (FMoonCustomPayload)0;\r\nif (DisableSelfShadow) MoonCustomPayload.SetDisableSelfShadow();\r\nif (DisableCastShadowOnToon) MoonCustomPayload.SetDisableCastShadowOnToon();\r\nMoonCustomPayload.SetStencil(inStencil);\r\nreturn MoonCustomPayload.MoonCustomData;",
+				Description="Encode Mooa Ray Tracing Data",
+				DisableSelfShadow=StaticSwitchParameter_34,
+				DisableCastShadowOnToon=StaticSwitchParameter_35,
+				inStencil=Encoded_Stencil
+			);
+		#EndRegion
+
+		float Encoded_Ray_Tracing_Data = Encode_Mooa_Ray_Tracing_Data;
+		Attributes.CustomData0 = Encoded_Ray_Tracing_Data;
+		#Region "Texture Sample"
+		float4 Shadow_Color_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Shadow Color Map",
+				Group="10 - Diffuse",
+				SortPriority=15,
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		float4 Shadow_Color_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Shadow Color Map",
+				Group="10 - Diffuse",
+				SortPriority=15,
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float3 StaticSwitchParameter_45 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=Shadow_Color_Map.rgb,
+				False=Shadow_Color_Map_1.rgb,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		#EndRegion
+
+		float3 Sampled_Shadow_Color = StaticSwitchParameter_45;
+		#Region "Diffuse"
+		float3 Multiply_14 = (Shadow_Color.rgb * Sampled_Shadow_Color);
+		float3 Multiply_15 = (Multiply_14 * InnerOutlineColor);
+		#EndRegion
+
+		float3 Shadow_Color_1 = Multiply_15;
+		float3 StaticSwitchParameter_46 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=Add,
+				False=Shadow_Color_1,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Debug Tangent"
+			);
+		float Diffuse_Ramp_Index = Diffuse_Color_Ramp_Index;
+		#Region "Texture Sample"
+		float4 Diffuse_Ramp_Offset_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Diffuse Ramp Offset Map",
+				Group="10 - Diffuse",
+				SortPriority=36,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MooaToon, "Assets/Textures/T_Gray_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor"
+			);
+		float4 Diffuse_Ramp_Offset_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Diffuse Ramp Offset Map",
+				Group="10 - Diffuse",
+				SortPriority=36,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MooaToon, "Assets/Textures/T_Gray_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_47 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Diffuse_Ramp_Offset_Map.rgba,
+				False=Diffuse_Ramp_Offset_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_48 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Global_Mask_Map,
+				False=StaticSwitchParameter_47,
+				Group="10 - Diffuse",
+				SortPriority=35,
+				ParameterName="Diffuse Ramp Offset From Global Mask Map",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		float Diffuse_Ramp_Offset_Channel_Masked = Diffuse_Ramp_Offset_Channel(Input = StaticSwitchParameter_48);
+		float Sampled_Diffuse_Ramp_Offset = Diffuse_Ramp_Offset_Channel_Masked;
+		#Region "Diffuse"
+		float LinearInterpolate_3 = lerp(0.5, Sampled_Diffuse_Ramp_Offset, Diffuse_Ramp_Offset_Intensity);
+		#EndRegion
+
+		float Diffuse_Ramp_UV_Offset = LinearInterpolate_3;
+		#Region "Texture Sample"
+		float4 Specular_Color_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Specular Color Map",
+				Group="11 - Specular",
+				SortPriority=4,
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		float4 Specular_Color_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Specular Color Map",
+				Group="11 - Specular",
+				SortPriority=4,
+				Coordinates=Global_UV,
+				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float3 StaticSwitchParameter_49 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=Specular_Color_Map.rgb,
+				False=Specular_Color_Map_1.rgb,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		#EndRegion
+
+		float3 Sampled_Specular_Color = StaticSwitchParameter_49;
+		#Region "Specular"
+		float3 Multiply_16 = (Specular_Color.rgb * Sampled_Specular_Color);
+		#EndRegion
+
+		float3 Specular_Color_1 = Multiply_16;
+		float Specular_Ramp_Index = Specular_Color_Ramp_Index;
+		#Region "Texture Sample"
+		float4 Specular_Ramp_Offset_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Specular Ramp Offset Map",
+				Group="11 - Specular",
+				SortPriority=61,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor"
+			);
+		float4 Specular_Ramp_Offset_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Specular Ramp Offset Map",
+				Group="11 - Specular",
+				SortPriority=61,
+				Coordinates=Global_UV,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float4 StaticSwitchParameter_50 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Specular_Ramp_Offset_Map.rgba,
+				False=Specular_Ramp_Offset_Map_1.rgba,
+				Group="00 - Global Settings",
+				SortPriority=32,
+				ParameterName="Enable Per Texture Sampler"
+			);
+		float4 StaticSwitchParameter_51 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Sampled_Global_Mask_Map,
+				False=StaticSwitchParameter_50,
+				Group="11 - Specular",
+				SortPriority=60,
+				ParameterName="Specular Ramp Offset From Global Mask Map",
+				DefaultValue=true
+			);
+		#EndRegion
+
+		float Specular_Ramp_Offset_Channel_Masked = Specular_Ramp_Offset_Channel(Input = StaticSwitchParameter_51);
+		float Sampled_Specular_Ramp_Offset = Specular_Ramp_Offset_Channel_Masked;
+		#Region "Specular"
+		float Subtract = (Sampled_Specular_Ramp_Offset - 0.5);
+		float Multiply_17 = (Specular_Ramp_Offset_Intensity * Subtract);
+		float Add_6 = (Multiply_17 + 0.5);
+		#EndRegion
+
+		float Specular_Ramp_Offset = Add_6;
+		float Rim_Intensity = Rim_Light_Intensity;
+		float Rim_Light_Width_Channel_Masked = Rim_Light_Width_Channel(Input = Sampled_Global_Mask_Map);
+		float Rim_Light_Width_Channel_1_Masked = Rim_Light_Width_Channel_1(Input = Sampled_Vertex_Color);
+		#Region "Texture Sample"
+		float StaticSwitchParameter_52 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=Rim_Light_Width_Channel_1_Masked,
+				False=1.0,
+				Group="12 - Rim Light",
+				SortPriority=32,
+				ParameterName="Rim Light Width From Vertex Color"
+			);
+		float StaticSwitchParameter_53 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=Rim_Light_Width_Channel_Masked,
+				False=StaticSwitchParameter_52,
+				Group="12 - Rim Light",
+				SortPriority=33,
+				ParameterName="Rim Light Width From Global Mask Map"
+			);
+		#EndRegion
+
+		float Sampled_Rim_Width = StaticSwitchParameter_53;
+		#Region "Rim Light"
+		float Multiply_18 = (Rim_Light_Width * Sampled_Rim_Width);
+		#EndRegion
+
+		float Rim_Width = Multiply_18;
+		float2 MaterialExpressionTextureCoordinate_0 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		float4 SA_Map_3 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="SA Map",
+				Group="00 - Global Settings",
+				Coordinates=MaterialExpressionTextureCoordinate_0,
+				Texture=Path(Engine, "EngineResources/Black"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		float SA_SDF_Left = SA_Map_3.r;
+		float2 MaterialExpressionTextureCoordinate_2 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		#Region "Texture Sample"
+		float2 Multiply_19 = (float2(-1.0, 1.0) * MaterialExpressionTextureCoordinate_2);
+		float4 Distance_Field_Facial_Shadow_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Distance Field Facial Shadow Map",
+				Group="02 - Distance Field Facial Shadow",
+				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
+				Coordinates=Multiply_19,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings",
+				MipValueMode="TMVM_MipLevel",
+				ConstMipValue=0
+			);
+		#EndRegion
+
+		float Distance_Field_Facial_Shadow_Map_Channel_Masked = Distance_Field_Facial_Shadow_Map_Channel(Input = Distance_Field_Facial_Shadow_Map.rgba);
+		float SampledFacialShadowSdfRight = Distance_Field_Facial_Shadow_Map_Channel_Masked;
+		float2 MaterialExpressionTextureCoordinate_2_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		#Region "Texture Sample"
+		float4 Distance_Field_Facial_Shadow_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Distance Field Facial Shadow Map",
+				Group="02 - Distance Field Facial Shadow",
+				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
+				Coordinates=MaterialExpressionTextureCoordinate_2_1,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings",
+				MipValueMode="TMVM_MipLevel",
+				ConstMipValue=0
+			);
+		#EndRegion
+
+		float Distance_Field_Facial_Shadow_Map_Channel_1_Masked = Distance_Field_Facial_Shadow_Map_Channel_1(Input = Distance_Field_Facial_Shadow_Map_1.rgba);
+		float SampledFacialShadowSdfLeft = Distance_Field_Facial_Shadow_Map_Channel_1_Masked;
+		#Region "Distance Field Facial Shadow"
+		float StaticSwitchParameter_54 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=SampledFacialShadowSdfRight,
+				False=SampledFacialShadowSdfLeft,
+				Group="02 - Distance Field Facial Shadow",
+				SortPriority=32,
+				ParameterName="Flip Left Right"
+			);
+		float StaticSwitchParameter_55 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=StaticSwitchParameter_54,
+				False=0.0,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Enable Feature Distance Field Facial Shadow"
+			);
+		#EndRegion
+
+		float FacialShadowSdfLeft = StaticSwitchParameter_55;
+		float StaticSwitchParameter_56 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=SA_SDF_Left,
+				False=FacialShadowSdfLeft,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="SDF Face Shadow From SA Map"
+			);
+		float2 MaterialExpressionTextureCoordinate_0_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		#Region "Texture Sample"
+		float2 Multiply_20 = (float2(-1.0, 1.0) * MaterialExpressionTextureCoordinate_0_1);
+		float4 SA_Map_4 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="SA Map",
+				Group="00 - Global Settings",
+				Coordinates=Multiply_20,
+				Texture=Path(Engine, "EngineResources/Black"),
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		#EndRegion
+
+		float3 SA_SDF_Right = SA_Map_4.rgb;
+		#Region "Distance Field Facial Shadow"
+		float StaticSwitchParameter_57 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=SampledFacialShadowSdfLeft,
+				False=SampledFacialShadowSdfRight,
+				Group="02 - Distance Field Facial Shadow",
+				SortPriority=32,
+				ParameterName="Flip Left Right"
+			);
+		float StaticSwitchParameter_58 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=StaticSwitchParameter_57,
+				False=0.0,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="Enable Feature Distance Field Facial Shadow"
+			);
+		#EndRegion
+
+		float FacialShadowSdfRight = StaticSwitchParameter_58;
+		float3 StaticSwitchParameter_59 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=SA_SDF_Right,
+				False=FacialShadowSdfRight,
+				Group="00 - Global Settings",
+				SortPriority=70,
+				ParameterName="SDF Face Shadow From SA Map"
+			);
+		#Region "RayTracing Shadow"
+		float If =
+			UE.Expression(
+				Class="If",
+				OutputType="float",
+				A=ID,
+				B=floor(Face_ID),
+				AGreaterThanB=0.0,
+				AEqualsB=1.0,
+				ALessThanB=0.0
+			);
+		float StaticSwitchParameter_60 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=1.0,
+				False=If,
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=81,
+				ParameterName="Is Face"
+			);
+		#EndRegion
+
+		float Is_Face = StaticSwitchParameter_60;
+		#Region "RayTracing Shadow"
+		float StaticSwitchParameter_61 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=2.0,
+				False=1.0,
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=80,
+				ParameterName="Use Screen Space Depth Test Hair Shadow"
+			);
+		float If_1 =
+			UE.Expression(
+				Class="If",
+				OutputType="float",
+				A=ID,
+				B=floor(Hair_ID),
+				AGreaterThanB=0.0,
+				AEqualsB=1.0,
+				ALessThanB=0.0
+			);
+		float StaticSwitchParameter_62 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=1.0,
+				False=If_1,
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=81,
+				ParameterName="Is Hair"
+			);
+		#EndRegion
+
+		float Is_Hair = StaticSwitchParameter_62;
+		#Region "RayTracing Shadow"
+		float If_2 =
+			UE.Expression(
+				Class="If",
+				OutputType="float",
+				A=Is_Hair,
+				AGreaterThanB=3.0,
+				AEqualsB=0.0,
+				ALessThanB=0.0
+			);
+		float If_3 =
+			UE.Expression(
+				Class="If",
+				OutputType="float",
+				A=Is_Face,
+				AGreaterThanB=StaticSwitchParameter_61,
+				AEqualsB=If_2,
+				ALessThanB=If_2
+			);
+		#EndRegion
+
+		float Encoded_Ray_Tracing_Flags = If_3;
+		float4 MoonEncodeToonAttributes =
+			UE.Expression(
+				Class="MoonEncodeToonAttributes",
+				OutputType="float4",
+				ShadingFeatureID=Shading_Feature_ID,
+				MainLightShadowColor=StaticSwitchParameter_46,
+				DiffuseColorRampIndex=Diffuse_Ramp_Index,
+				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
+				SpecularColor=Specular_Color_1,
+				SpecularColorRampIndex=Specular_Ramp_Index,
+				SpecularColorRampUVOffset=Specular_Ramp_Offset,
+				ReflectionIntensity=Reflection,
+				RimLightIntensity=Rim_Intensity,
+				RimLightWidth=Rim_Width,
+				FacialShadowSdfLeft=StaticSwitchParameter_56,
+				FacialShadowSdfRight=StaticSwitchParameter_59,
+				Stencil=Encoded_Stencil,
+				RayTracingShadowFlag=Encoded_Ray_Tracing_Flags
+			);
+		Attributes.MoonEncodedAttribute0 = MoonEncodeToonAttributes.rgba;
+		float4 MoonEncodeToonAttributes_1 =
+			UE.Expression(
+				Class="MoonEncodeToonAttributes",
+				OutputType="float4",
+				OutputIndex=1,
+				ShadingFeatureID=Shading_Feature_ID,
+				MainLightShadowColor=StaticSwitchParameter_46,
+				DiffuseColorRampIndex=Diffuse_Ramp_Index,
+				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
+				SpecularColor=Specular_Color_1,
+				SpecularColorRampIndex=Specular_Ramp_Index,
+				SpecularColorRampUVOffset=Specular_Ramp_Offset,
+				ReflectionIntensity=Reflection,
+				RimLightIntensity=Rim_Intensity,
+				RimLightWidth=Rim_Width,
+				FacialShadowSdfLeft=StaticSwitchParameter_56,
+				FacialShadowSdfRight=StaticSwitchParameter_59,
+				Stencil=Encoded_Stencil,
+				RayTracingShadowFlag=Encoded_Ray_Tracing_Flags
+			);
+		Attributes.MoonEncodedAttribute1 = MoonEncodeToonAttributes_1.rgba;
+		float4 MoonEncodeToonAttributes_2 =
+			UE.Expression(
+				Class="MoonEncodeToonAttributes",
+				OutputType="float4",
+				OutputIndex=2,
+				ShadingFeatureID=Shading_Feature_ID,
+				MainLightShadowColor=StaticSwitchParameter_46,
+				DiffuseColorRampIndex=Diffuse_Ramp_Index,
+				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
+				SpecularColor=Specular_Color_1,
+				SpecularColorRampIndex=Specular_Ramp_Index,
+				SpecularColorRampUVOffset=Specular_Ramp_Offset,
+				ReflectionIntensity=Reflection,
+				RimLightIntensity=Rim_Intensity,
+				RimLightWidth=Rim_Width,
+				FacialShadowSdfLeft=StaticSwitchParameter_56,
+				FacialShadowSdfRight=StaticSwitchParameter_59,
+				Stencil=Encoded_Stencil,
+				RayTracingShadowFlag=Encoded_Ray_Tracing_Flags
+			);
+		Attributes.MoonEncodedAttribute2 = MoonEncodeToonAttributes_2.rgba;
+		float4 MoonEncodeToonAttributes_3 =
+			UE.Expression(
+				Class="MoonEncodeToonAttributes",
+				OutputType="float4",
+				OutputIndex=3,
+				ShadingFeatureID=Shading_Feature_ID,
+				MainLightShadowColor=StaticSwitchParameter_46,
+				DiffuseColorRampIndex=Diffuse_Ramp_Index,
+				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
+				SpecularColor=Specular_Color_1,
+				SpecularColorRampIndex=Specular_Ramp_Index,
+				SpecularColorRampUVOffset=Specular_Ramp_Offset,
+				ReflectionIntensity=Reflection,
+				RimLightIntensity=Rim_Intensity,
+				RimLightWidth=Rim_Width,
+				FacialShadowSdfLeft=StaticSwitchParameter_56,
+				FacialShadowSdfRight=StaticSwitchParameter_59,
+				Stencil=Encoded_Stencil,
+				RayTracingShadowFlag=Encoded_Ray_Tracing_Flags
+			);
+		Attributes.MoonEncodedAttribute3 = MoonEncodeToonAttributes_3.rgba;
+		float4 MoonEncodeToonAttributes_4 =
+			UE.Expression(
+				Class="MoonEncodeToonAttributes",
+				OutputType="float4",
+				OutputIndex=4,
+				ShadingFeatureID=Shading_Feature_ID,
+				MainLightShadowColor=StaticSwitchParameter_46,
+				DiffuseColorRampIndex=Diffuse_Ramp_Index,
+				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
+				SpecularColor=Specular_Color_1,
+				SpecularColorRampIndex=Specular_Ramp_Index,
+				SpecularColorRampUVOffset=Specular_Ramp_Offset,
+				ReflectionIntensity=Reflection,
+				RimLightIntensity=Rim_Intensity,
+				RimLightWidth=Rim_Width,
+				FacialShadowSdfLeft=StaticSwitchParameter_56,
+				FacialShadowSdfRight=StaticSwitchParameter_59,
+				Stencil=Encoded_Stencil,
+				RayTracingShadowFlag=Encoded_Ray_Tracing_Flags
+			);
+		Attributes.MoonEncodedAttribute4 = MoonEncodeToonAttributes_4.rgba;
+		Attributes.CustomData1 = 1.0;
+		float4 MF_MoonToonBufferInput_1 = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=0);
+		float4 ToonBufferA_1 = MF_MoonToonBufferInput_1;
+		float4 MF_MoonToonBufferInput_2 = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=1);
+		float4 ToonBufferB_1 = MF_MoonToonBufferInput_2;
+		#Region "Toon Buffer"
+		float4 MF_MoonToonBufferInput_3 = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=2);
+		#EndRegion
+
+		float4 ToonBufferC_1 = MF_MoonToonBufferInput_3;
+
+		Output = Attributes;
+		ToonBufferA = ToonBufferA_1;
+		ToonBufferB = ToonBufferB_1;
+		ToonBufferC = ToonBufferC_1;
+	}
+
+	Layout = {
+		Comment(Name="Translucency", X=-5776, Y=5472, W=1232, H=448, Color=float4(0.105208, 0.597344, 1.0, 1.0));
+		Comment(Name="Emissive", X=-5456, Y=6000, W=928, H=384, Color=float4(0.134375, 1.0, 1.0, 1.0));
+		Comment(Name="Normal", X=-6768, Y=5472, W=896, H=448, Color=float4(0.151041, 0.391579, 1.0, 1.0));
+		Comment(Name="Specular", X=-6768, Y=1376, W=1376, H=1456, Color=float4(0.734062, 1.0, 0.113542, 1.0));
+		Comment(Name="RayTracing Shadow", X=-6768, Y=3584, W=1488, H=1760, Color=float4(0.113542, 1.0, 0.512448, 1.0));
+		Comment(Name="RT Shadow Flag (call in Ray Tracing Hit Shader (FMooaCustomPayload))", X=-5120, Y=3584, W=1168, H=624, Color=float4(0.679549, 0.126042, 1.0, 1.0));
+		Comment(Name="Diffuse", X=-6768, Y=-576, W=1376, H=1872, Color=float4(1.0, 0.723958, 0.171875, 1.0));
+		Comment(Name="Inner Outline", X=-6768, Y=6000, W=1216, H=400, Color=float4(0.113542, 0.187413, 1.0, 1.0));
+		Comment(Name="// Mooa Ray Tracing Hair / Face Shadow\r\n// Ray Tracing Shadow Flag enum values\r\n#define MOOA_RAY_TRACING_SHADOW_FLAG_NONE 0\r\n#define MOOA_RAY_TRACING_SHADOW_FLAG_FACE 1\r\n#define MOOA_RAY_TRACING_SHADOW_FLAG_FACE_SCREEN_SPACE_HAIR_SHADOW 2\r\n#define MOOA_RAY_TRACING_SHADOW_FLAG_HAIR 3", X=-6400, Y=4528, W=1072, H=224, Color=float4(1.0, 1.0, 1.0, 1.0));
+		Comment(Name="Rim Light", X=-6768, Y=2976, W=688, H=464, Color=float4(0.171875, 1.0, 0.185677, 1.0));
+		Comment(Name="Decode Hightlight Tangent or Face Forward Dir", X=-5264, Y=1376, W=3216, H=976, Color=float4(0.531511, 0.196875, 1.0, 1.0));
+		Comment(Name="Texture Sample", X=-10727, Y=-2327, W=3168, H=10928, Color=float4(1.0, 1.0, 1.0, 1.0));
+		Comment(Name="Distance Field Facial Shadow", X=-5248, Y=-960, W=1520, H=416, Color=float4(1.0, 1.0, 1.0, 1.0));
+		Comment(Name="UVs", X=-10720, Y=-4096, W=1920, H=1648, Color=float4(1.0, 1.0, 1.0, 1.0));
+		Comment(Name="Toon Material should always output Tangent in World Space.\r\nMooaToon uses 0 as the default value for Tangent and converts it to World Tangent before output.\r\nNon-zero values are output as-is.", X=-4483, Y=1428, W=912, H=240, Color=float4(1.0, 1.0, 1.0, 1.0));
+		Comment(Name="Toon Buffer", X=-5008, Y=-2304, W=1673, H=663, Color=float4(0.15, 0.15, 0.15, 0.5));
+		Node(Var="AddOffset", X=-11872, Y=576);
+		Node(Var="DynMin", X=-11872, Y=672);
+		Node(Var="DynMax", X=-11872, Y=768);
+		Node(Var="ElevMin", X=-11872, Y=864);
+		Node(Var="ElevMax", X=-11872, Y=960);
+		Node(Var="Curve", X=-11872, Y=1056);
+		Node(Var="ClampMin", X=-11872, Y=1152);
+		Node(Var="ClampMax", X=-11872, Y=1248);
+		Node(Var="VSign", X=-11872, Y=1344);
+		Node(Var="MF_MooaMainLightDirection", X=-11600, Y=480);
+		Node(Var="Custom", X=-11376, Y=528);
+		Node(Var="Global_Mask_Map_UV_Channel", X=-10670, Y=-4046);
+		Node(Var="Global_Mask_Map_UV_Scale_X", X=-10670, Y=-3854);
+		Node(Var="Global_Mask_Map_UV_Scale_Y", X=-10670, Y=-3774);
+		Node(Var="Global_UV_Channel", X=-10670, Y=-3550);
+		Node(Var="Global_UV_Scale_X", X=-10670, Y=-3358);
+		Node(Var="Global_UV_Scale_Y", X=-10670, Y=-3278);
+		Node(Var="Normal_Map_UV_Channel", X=-10670, Y=-3038);
+		Node(Var="Normal_Map_UV_Scale_X", X=-10670, Y=-2846);
+		Node(Var="Normal_Map_UV_Scale_Y", X=-10670, Y=-2766);
+		Node(Var="Multiply_19", X=-10352, Y=160);
+		Node(Var="MF_UVChannelSwitch", X=-10334, Y=-4030);
+		Node(Var="MF_UVChannelSwitch_2", X=-10334, Y=-3534);
+		Node(Var="MF_UVChannelSwitch_3", X=-10334, Y=-3022);
+		Node(Var="Inner_Outline_Map_UV_Channel", X=-10158, Y=7202);
+		Node(Var="ID_Map_UV_Channel", X=-10078, Y=5458);
+		Node(Var="Multiply_2", X=-10030, Y=-3534);
+		Node(Var="Global_UV_Offset_X", X=-10030, Y=-3358);
+		Node(Var="Global_UV_Offset_Y", X=-10030, Y=-3278);
+		Node(Var="Multiply_10", X=-10030, Y=-3022);
+		Node(Var="Normal_Map_UV_Offset_X", X=-10030, Y=-2846);
+		Node(Var="Normal_Map_UV_Offset_Y", X=-10030, Y=-2766);
+		Node(Var="Multiply_1", X=-10014, Y=-4030);
+		Node(Var="Global_Mask_Map_UV_Offset_X", X=-10014, Y=-3854);
+		Node(Var="Global_Mask_Map_UV_Offset_Y", X=-10014, Y=-3774);
+		Node(Var="Rim_Light_Width_Channel_1", X=-9902, Y=4994);
+		Node(Var="MF_UVChannelSwitch_1", X=-9886, Y=7218);
+		Node(Var="MF_UVChannelSwitch_4", X=-9870, Y=5474);
+		Node(Var="Multiply_20", X=-9856, Y=8528);
+		Node(Var="Distance_Field_Facial_Shadow_Map", X=-9712, Y=144);
+		Node(Var="Distance_Field_Facial_Shadow_Map_1", X=-9712, Y=272);
+		Node(Var="Hair_Highlight_Mask", X=-9712, Y=544);
+		Node(Var="Emissive_Map_1", X=-9680, Y=7792);
+		Node(Var="SA_Map", X=-9680, Y=8128);
+		Node(Var="SA_Map_1", X=-9680, Y=8208);
+		Node(Var="Emissive_Map", X=-9678, Y=7730);
+		Node(Var="Global_Mask_Map", X=-9664, Y=-416);
+		Node(Var="Global_Mask_Map_1", X=-9664, Y=-320);
+		Node(Var="Metallic_Map", X=-9664, Y=4080);
+		Node(Var="Specular_Ramp_Offset_Map", X=-9664, Y=4480);
+		Node(Var="Inner_Outline_Map", X=-9664, Y=7200);
+		Node(Var="Metallic_Map_1", X=-9662, Y=4146);
+		Node(Var="Specular_Ramp_Offset_Map_1", X=-9662, Y=4546);
+		Node(Var="Normal_Map", X=-9662, Y=6018);
+		Node(Var="Normal_Map_1", X=-9662, Y=6114);
+		Node(Var="Opacity_Map", X=-9662, Y=6594);
+		Node(Var="Opacity_Map_1", X=-9662, Y=6674);
+		Node(Var="AO_Map", X=-9648, Y=2224);
+		Node(Var="AO_Map_1", X=-9648, Y=2306);
+		Node(Var="Diffuse_Ramp_Offset_Map", X=-9648, Y=2624);
+		Node(Var="Diffuse_Ramp_Offset_Map_1", X=-9648, Y=2704);
+		Node(Var="Roughness_Map", X=-9648, Y=3680);
+		Node(Var="Specular_Color_Map", X=-9646, Y=3202);
+		Node(Var="Specular_Color_Map_1", X=-9646, Y=3266);
+		Node(Var="Roughness_Map_1", X=-9646, Y=3746);
+		Node(Var="ID_Map_R_", X=-9646, Y=5410);
+		Node(Var="ID_Map_R_1", X=-9646, Y=5490);
+		Node(Var="Base_Color_Map", X=-9632, Y=1456);
+		Node(Var="Base_Color_Map_1", X=-9630, Y=1506);
+		Node(Var="Shadow_Color_Map", X=-9630, Y=1810);
+		Node(Var="Shadow_Color_Map_1", X=-9630, Y=1890);
+		Node(Var="SA_Map_4", X=-9568, Y=8512);
+		Node(Var="SA_Map_3", X=-9568, Y=8768);
+		Node(Var="Add_1", X=-9534, Y=-4030);
+		Node(Var="Add_2", X=-9534, Y=-3534);
+		Node(Var="Add_3", X=-9534, Y=-3022);
+		Node(Var="StaticSwitchParameter_52", X=-9486, Y=4994);
+		Node(Var="StaticSwitchParameter_14", X=-9470, Y=7730);
+		Node(Var="StaticSwitchParameter_8", X=-9454, Y=4258);
+		Node(Var="StaticSwitchParameter_23", X=-9454, Y=6018);
+		Node(Var="StaticSwitchParameter_16", X=-9454, Y=6738);
+		Node(Var="StaticSwitchParameter_20", X=-9440, Y=2418);
+		Node(Var="StaticSwitchParameter_1", X=-9438, Y=-222);
+		Node(Var="StaticSwitchParameter_49", X=-9438, Y=3202);
+		Node(Var="StaticSwitchParameter_10", X=-9438, Y=3858);
+		Node(Var="StaticSwitchParameter_50", X=-9438, Y=4658);
+		Node(Var="StaticSwitchParameter_36", X=-9438, Y=5570);
+		Node(Var="StaticSwitchParameter_47", X=-9424, Y=2816);
+		Node(Var="StaticSwitchParameter_19", X=-9424, Y=8128);
+		Node(Var="StaticSwitchParameter_5", X=-9422, Y=1602);
+		Node(Var="StaticSwitchParameter_45", X=-9422, Y=2002);
+		Node(Var="AppendMany_1", X=-8974, Y=-702);
+		Node(Var="StaticSwitchParameter_17", X=-8912, Y=6720);
+		Node(Var="StaticSwitchParameter_37", X=-8832, Y=5536);
+		Node(Var="StaticSwitchParameter_51", X=-8654, Y=4626);
+		Node(Var="Distance_Field_Facial_Shadow_Map_Channel", X=-8640, Y=304);
+		Node(Var="Distance_Field_Facial_Shadow_Map_Channel_1", X=-8640, Y=416);
+		Node(Var="Hair_Highlight_Mask_Channel", X=-8640, Y=544);
+		Node(Var="StaticSwitchParameter_48", X=-8640, Y=2784);
+		Node(Var="Rim_Light_Width_Channel", X=-8622, Y=4962);
+		Node(Var="StaticSwitchParameter_11", X=-8606, Y=3826);
+		Node(Var="StaticSwitchParameter_3", X=-8606, Y=7282);
+		Node(Var="StaticSwitchParameter_9", X=-8590, Y=4226);
+		Node(Var="StaticSwitchParameter_2", X=-8586, Y=-254);
+		Node(Var="StaticSwitchParameter", X=-8574, Y=-686);
+		Node(Var="StaticSwitchParameter_21", X=-8560, Y=2386);
+		Node(Var="StaticSwitchParameter_18", X=-8544, Y=6688);
+		Node(Var="StaticSwitchParameter_38", X=-8464, Y=5504);
+		Node(Var="StaticSwitchParameter_53", X=-8334, Y=4962);
+		Node(Var="Specular_Ramp_Offset_Channel", X=-8318, Y=4626);
+		Node(Var="Diffuse_Ramp_Offset_Channel", X=-8304, Y=2784);
+		Node(Var="Metallic_Channel", X=-8286, Y=4226);
+		Node(Var="Inner_Outline_Channel", X=-8286, Y=7282);
+		Node(Var="AO_Channel", X=-8272, Y=2386);
+		Node(Var="Roughness_Channel", X=-8270, Y=3826);
+		Node(Var="Opacity_Channel", X=-8240, Y=6704);
+		Node(Var="ID_Channel", X=-8208, Y=5504);
+		Node(Var="StaticSwitchParameter_22", X=-8064, Y=2356);
+		Node(Var="Base_Color", X=-6736, Y=544);
+		Node(Var="Shadow_Color", X=-6736, Y=944);
+		Node(Var="Normal_Scale", X=-6736, Y=5648);
+		Node(Var="Diffuse_Ramp_Offset_Intensity", X=-6720, Y=112);
+		Node(Var="AO_Intensity", X=-6704, Y=-224);
+		Node(Var="Diffuse_Color_Ramp_Index", X=-6688, Y=-480);
+		Node(Var="Rim_Light_Intensity", X=-6672, Y=3040);
+		Node(Var="Rim_Light_Width", X=-6672, Y=3184);
+		Node(Var="Multiply_12", X=-6528, Y=3712);
+		Node(Var="ID_Offset", X=-6528, Y=3872);
+		Node(Var="LinearInterpolate_2", X=-6496, Y=-288);
+		Node(Var="Specular_Ramp_Offset_Intensity", X=-6464, Y=2320);
+		Node(Var="Multiply_18", X=-6464, Y=3264);
+		Node(Var="FlattenNormal", X=-6448, Y=5568);
+		Node(Var="Inner_Outline_Color", X=-6448, Y=6112);
+		Node(Var="LinearInterpolate_3", X=-6416, Y=16);
+		Node(Var="Metallic", X=-6400, Y=2128);
+		Node(Var="Anisotropy", X=-6400, Y=2608);
+		Node(Var="Multiply_14", X=-6384, Y=960);
+		Node(Var="Specular_Color", X=-6384, Y=1456);
+		Node(Var="Hair_ID", X=-6368, Y=4304);
+		Node(Var="Subtract", X=-6352, Y=2416);
+		Node(Var="Face_ID", X=-6352, Y=4096);
+		Node(Var="StaticSwitchParameter_12", X=-6304, Y=1776);
+		Node(Var="Multiply_3", X=-6272, Y=560);
+		Node(Var="StaticSwitchParameter_61", X=-6240, Y=4864);
+		Node(Var="LinearInterpolate", X=-6224, Y=6096);
+		Node(Var="Multiply_15", X=-6208, Y=960);
+		Node(Var="StaticSwitchParameter_24", X=-6208, Y=5552);
+		Node(Var="Multiply_17", X=-6192, Y=2384);
+		Node(Var="Multiply_5", X=-6188, Y=2064);
+		Node(Var="StaticSwitchParameter_13", X=-6144, Y=2624);
+		Node(Var="Multiply_16", X=-6128, Y=1472);
+		Node(Var="Add_5", X=-6128, Y=3712);
+		Node(Var="Add_6", X=-6080, Y=2384);
+		Node(Var="Roughness", X=-6064, Y=1872);
+		Node(Var="Multiply_4", X=-6048, Y=560);
+		Node(Var="If_2", X=-6048, Y=5024);
+		Node(Var="StaticSwitchParameter_4", X=-6016, Y=6080);
+		Node(Var="Divide", X=-5984, Y=3712);
+		Node(Var="Specular_Color_Ramp_Index", X=-5968, Y=1616);
+		Node(Var="If", X=-5920, Y=4048);
+		Node(Var="If_1", X=-5920, Y=4256);
+		Node(Var="Multiply_6", X=-5840, Y=1792);
+		Node(Var="StaticSwitchParameter_60", X=-5760, Y=4048);
+		Node(Var="StaticSwitchParameter_62", X=-5760, Y=4192);
+		Node(Var="If_3", X=-5744, Y=4816);
+		Node(Var="Multiply_13", X=-5712, Y=3712);
+		Node(Var="Opacity", X=-5712, Y=5568);
+		Node(Var="Multiply_8", X=-5456, Y=5584);
+		Node(Var="Apply_Opacity_to_Shadow", X=-5408, Y=5728);
+		Node(Var="Emissive_Intensity", X=-5408, Y=6064);
+		Node(Var="Multiply_7", X=-5200, Y=6080);
+		Node(Var="LinearInterpolate_1", X=-5088, Y=5552);
+		Node(Var="Shadow_Opacity", X=-5088, Y=5744);
+		Node(Var="StaticSwitchParameter_15", X=-4976, Y=6064);
+		Node(Var="StaticSwitchParameter_34", X=-4864, Y=3648);
+		Node(Var="StaticSwitchParameter_35", X=-4864, Y=3808);
+		Node(Var="Multiply_9", X=-4864, Y=5552);
+		Node(Var="StaticSwitchParameter_57", X=-4846, Y=-910);
+		Node(Var="StaticSwitchParameter_54", X=-4846, Y=-766);
+		Node(Var="KajiyaSecondaryMaskChannel", X=-4656, Y=-2240);
+		Node(Var="Multiply_11", X=-4640, Y=1904);
+		Node(Var="Add_4", X=-4528, Y=1904);
+		Node(Var="Encode_Mooa_Ray_Tracing_Data", X=-4509, Y=3659);
+		Node(Var="Transform", X=-4400, Y=1888);
+		Node(Var="StaticSwitchParameter_58", X=-4384, Y=-912);
+		Node(Var="StaticSwitchParameter_55", X=-4384, Y=-768);
+		Node(Var="BodyBaseColor", X=-4352, Y=-1920);
+		Node(Var="MF_MoonToonBufferInput_3", X=-4112, Y=-2224);
+		Node(Var="StaticSwitchParameter_25", X=-3504, Y=1536);
+		Node(Var="StaticSwitchParameter_31", X=-3504, Y=2016);
+		Node(Var="StaticSwitchParameter_28", X=-3501, Y=1771);
+		Node(Var="StaticSwitchParameter_26", X=-3120, Y=1536);
+		Node(Var="StaticSwitchParameter_29", X=-3120, Y=1776);
+		Node(Var="StaticSwitchParameter_32", X=-3120, Y=2016);
+		Node(Var="StaticSwitchParameter_27", X=-2784, Y=1504);
+		Node(Var="StaticSwitchParameter_30", X=-2784, Y=1744);
+		Node(Var="StaticSwitchParameter_33", X=-2784, Y=1984);
+		Node(Var="Reflection", X=-2239, Y=2736);
+		Node(Var="VertexTangentWS", X=-2096, Y=864);
+		Node(Var="StaticSwitchParameter_56", X=-2000, Y=3056);
+		Node(Var="StaticSwitchParameter_59", X=-2000, Y=3216);
+		Node(Var="Multiply", X=-1904, Y=880);
+		Node(Var="Add", X=-1760, Y=880);
+		Node(Var="Specular", X=-1600, Y=1280);
+		Node(Var="StaticSwitchParameter_6", X=-1232, Y=1248);
+		Node(Var="StaticSwitchParameter_7", X=-1216, Y=864);
+		Node(Var="StaticSwitchParameter_46", X=-1216, Y=1072);
+		Node(Var="MoonEncodeToonAttributes_4", X=-976, Y=2144);
+		Node(Var="Attributes", X=-160, Y=1616);
+		Node(Var="Output", X=80, Y=1584);
+		Node(Var="ToonBufferA", X=80, Y=2480);
+		Node(Var="ToonBufferB", X=80, Y=2560);
+		Node(Var="ToonBufferC", X=80, Y=2640);
+	}
+
+}
