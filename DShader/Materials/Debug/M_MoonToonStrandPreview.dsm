@@ -1,0 +1,93 @@
+// Live preview for the strand-tangent ellipsoid: shows the Kajiya highlight band the CURRENT
+// ellipsoid would produce, computed per pixel in world space -- no bake involved, so dragging the
+// ellipsoid actor updates the band in real time, on the posed mesh, under the real camera.
+//
+// This is the in-engine equivalent of MooaToon's Houdini mooa_highlightPreview2 node: a deliberately
+// plain grey surface with just the band on top, so the band's shape is the only thing being judged.
+// The ellipsoid arrives as parameters (centre, radii, and the three world-space basis vectors of its
+// rotation), pushed every editor tick by AMoonToonStrandPreviewActor.
+
+Shader(Name="Materials/Debug/M_MoonToonStrandPreview", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Backend      = "Graph";
+		Domain       = "Surface";
+		ShadingModel = "Unlit";
+		BlendMode    = "Opaque";
+
+		bUsedWithSkeletalMesh = true;
+		bUsedWithMorphTargets = true;
+	}
+
+	Properties = {
+		VectorParameter Ellipsoid_Center = float4(0.0, 0.0, 150.0, 0.0) [
+			Group="Ellipsoid";
+			SortPriority=10;
+		];
+		VectorParameter Ellipsoid_Radii = float4(12.0, 12.0, 14.0, 0.0) [
+			Group="Ellipsoid";
+			SortPriority=20;
+		];
+		VectorParameter Ellipsoid_Basis_X = float4(1.0, 0.0, 0.0, 0.0) [
+			Group="Ellipsoid";
+			SortPriority=30;
+		];
+		VectorParameter Ellipsoid_Basis_Y = float4(0.0, 1.0, 0.0, 0.0) [
+			Group="Ellipsoid";
+			SortPriority=40;
+		];
+		VectorParameter Ellipsoid_Basis_Z = float4(0.0, 0.0, 1.0, 0.0) [
+			Group="Ellipsoid";
+			SortPriority=50;
+		];
+		VectorParameter Light_Direction = float4(0.0, 0.0, 1.0, 0.0) [
+			Group="Preview";
+			SortPriority=10;
+			Description="Direction TOWARD the light, world space. The preview actor keeps this synced to the level's directional light unless overridden there.";
+		];
+		ScalarParameter Band_Exponent = 60.0 [
+			Group="Preview";
+			SortPriority=20;
+			Description="Kajiya lobe exponent for the preview band. Higher = thinner band.";
+		];
+		VectorParameter Band_Color = float4(1.0, 0.55, 0.1, 1.0) [
+			Group="Preview";
+			SortPriority=30;
+		];
+		ScalarParameter Base_Gray = 0.32 [
+			Group="Preview";
+			SortPriority=40;
+		];
+	}
+
+	Outputs = {
+		float3 Color;
+		Base.EmissiveColor = Color;
+	}
+
+	Graph = {
+		float3 WorldPos = UE.Expression(Class="WorldPosition", OutputType="float3");
+		float3 CamVec = UE.Expression(Class="CameraVectorWS", OutputType="float3");
+
+		#Region "Kajiya band from the ellipsoid meridian field"
+		float Band =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float",
+				Code="float3 R = max(Radii, 0.1);\r\nfloat3 Rel = WorldPos - Center;\r\nfloat3 Local = float3(dot(Rel, BasisX), dot(Rel, BasisY), dot(Rel, BasisZ));\r\nfloat3 U = normalize(Local / R);\r\n\r\n// Meridian: direction toward the +Z pole in the unit sphere's tangent plane, with a pole fallback.\r\nfloat3 M = float3(0.0, 0.0, 1.0) - U * U.z;\r\nif (dot(M, M) < 1e-6) { M = float3(1.0, 0.0, 0.0) - U * U.x; }\r\nM = normalize(M) * R; // follow the ellipsoid's actual surface curve\r\nfloat3 T = normalize(BasisX * M.x + BasisY * M.y + BasisZ * M.z);\r\n\r\nfloat3 H = normalize(normalize(Cam) + normalize(LightDir));\r\nfloat D = dot(T, H);\r\nfloat SinTH = sqrt(saturate(1.0 - D * D));\r\nreturn pow(SinTH, max(1.0, Exponent));",
+				Description="Ellipsoid meridian tangent -> Kajiya sin lobe",
+				WorldPos=WorldPos,
+				Cam=CamVec,
+				Center=Ellipsoid_Center.rgb,
+				Radii=Ellipsoid_Radii.rgb,
+				BasisX=Ellipsoid_Basis_X.rgb,
+				BasisY=Ellipsoid_Basis_Y.rgb,
+				BasisZ=Ellipsoid_Basis_Z.rgb,
+				LightDir=Light_Direction.rgb,
+				Exponent=Band_Exponent
+			);
+		#EndRegion
+
+		Color = lerp(float3(Base_Gray, Base_Gray, Base_Gray), Band_Color.rgb, saturate(Band));
+	}
+}

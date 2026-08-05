@@ -1,0 +1,43 @@
+// The visible body of the strand-tangent preview ellipsoid: a barely-there translucent shell on the
+// actor's unit-sphere mesh (non-uniform actor scale turns it into the ellipsoid). Exists so the
+// ellipsoid can be seen against the hair and clicked to grab the transform gizmo; the actual field
+// math lives in M_MoonToonStrandPreview on the hair itself.
+
+Shader(Name="Materials/Debug/M_MoonToonStrandPreviewShell", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Backend      = "Graph";
+		Domain       = "Surface";
+		ShadingModel = "Unlit";
+		BlendMode    = "Translucent";
+		TwoSided     = true;
+	}
+
+	Properties = {
+		VectorParameter Shell_Color = float4(0.15, 0.8, 1.0, 1.0) [
+			Group="Preview";
+			SortPriority=10;
+		];
+		ScalarParameter Shell_Opacity = 0.10 [
+			Group="Preview";
+			SortPriority=20;
+		];
+	}
+
+	Outputs = {
+		float3 Color;
+		float Alpha;
+		Base.EmissiveColor = Color;
+		Base.Opacity = Alpha;
+	}
+
+	Graph = {
+		// A touch of fresnel so the silhouette reads as a volume instead of a flat tint.
+		float3 CamVec = UE.Expression(Class="CameraVectorWS", OutputType="float3");
+		float3 NormalWS = UE.Expression(Class="VertexNormalWS", OutputType="float3");
+		float Facing = abs(dot(normalize(CamVec), normalize(NormalWS)));
+		float Rim = (1.0 - Facing);
+		Color = Shell_Color.rgb;
+		Alpha = saturate(Shell_Opacity * (0.35 + Rim * Rim * 2.0));
+	}
+}
