@@ -18,6 +18,8 @@
 #include "MoonToonBakeTools.h"
 #include "MoonToonMeshInfoTool.h"
 #include "MoonToonOutlineAlphaTool.h"
+#include "MoonToonStrandPreviewActor.h"
+#include "MoonToonStrandTangentTool.h"
 #include "MoonToonTool.h"
 #include "PropertyEditorModule.h"
 #include "ScopedTransaction.h"
@@ -357,6 +359,7 @@ void SMoonToonToolsPanel::BuildToolList()
 	AddTool(UMoonToonOutlineAlphaTool::StaticClass());
 	AddTool(UMoonToonBakeSmoothNormalTool::StaticClass());
 	AddTool(UMoonToonBakeFaceForwardTool::StaticClass());
+	AddTool(UMoonToonStrandTangentTool::StaticClass());
 	AddTool(UMoonToonFixBuildSettingsTool::StaticClass());
 }
 
@@ -413,7 +416,15 @@ void SMoonToonToolsPanel::OnLevelSelectionChanged(UObject* NewSelection)
 	{
 		for (FSelectionIterator It(*ActorSelection); It; ++It)
 		{
-			CollectMeshesFromActor(Cast<AActor>(*It), NewTargets);
+			AActor* Actor = Cast<AActor>(*It);
+			// The strand live-preview actor gets selected on purpose (its transform is the
+			// ellipsoid gizmo), but its shell is the engine's basic sphere -- following it would
+			// retarget the panel onto /Engine/BasicShapes/Sphere and point every tool at it.
+			if (Actor && Actor->IsA<AMoonToonStrandPreviewActor>())
+			{
+				continue;
+			}
+			CollectMeshesFromActor(Actor, NewTargets);
 		}
 	}
 
@@ -706,6 +717,22 @@ void SMoonToonToolsPanel::OnToolSelectionChanged(TWeakObjectPtr<UMoonToonTool> I
 	if (DetailsView.IsValid())
 	{
 		DetailsView->SetObject(Item.Get());
+	}
+	LastSeenToolEditSerial = Item.IsValid() ? Item->ExternalEditSerial : 0;
+}
+
+void SMoonToonToolsPanel::Tick(const FGeometry& AllottedGeometry, const double CurrentTime, const float DeltaTime)
+{
+	SCompoundWidget::Tick(AllottedGeometry, CurrentTime, DeltaTime);
+
+	const UMoonToonTool* Tool = SelectedTool.Get();
+	if (Tool && Tool->ExternalEditSerial != LastSeenToolEditSerial)
+	{
+		LastSeenToolEditSerial = Tool->ExternalEditSerial;
+		if (DetailsView.IsValid())
+		{
+			DetailsView->ForceRefresh();
+		}
 	}
 }
 

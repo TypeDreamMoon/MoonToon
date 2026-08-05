@@ -28,6 +28,11 @@ public:
 	void Construct(const FArguments& InArgs);
 	virtual ~SMoonToonToolsPanel() override;
 
+	/** Repaints the settings when a tool's properties were changed from outside the panel -- the
+	 *  strand live-preview actor writes its dragged ellipsoid back into the tool, and the details
+	 *  view has no way to know that happened. */
+	virtual void Tick(const FGeometry& AllottedGeometry, const double CurrentTime, const float DeltaTime) override;
+
 private:
 	using FSectionPtr = TSharedPtr<FMoonToonSectionInfo>;
 
@@ -111,4 +116,7 @@ private:
 
 	FDelegateHandle AssetSelectionHandle;
 	FDelegateHandle LevelSelectionHandle;
+
+	/** Last external-edit serial seen on the selected tool; a change means refresh the details view. */
+	uint32 LastSeenToolEditSerial = 0;
 };

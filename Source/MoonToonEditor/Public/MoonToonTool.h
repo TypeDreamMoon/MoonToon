@@ -72,6 +72,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MoonToon")
 	FString RunOnMeshes(const TArray<UObject*>& Meshes, const TArray<int32>& SectionMaterialIndices);
 
+	/**
+	 * Bumped whenever something OUTSIDE the panel writes this tool's properties -- currently the
+	 * strand live-preview actor pushing the ellipsoid it was just dragged to. The panel polls it and
+	 * repaints the details view, which otherwise keeps showing the values from before the drag.
+	 */
+	UPROPERTY(Transient)
+	uint32 ExternalEditSerial = 0;
+
 protected:
 	/**
 	 * Shared preamble: resolves the context to live meshes and reports the ones that went away.
