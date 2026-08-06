@@ -17,6 +17,7 @@
 #include "Modules/ModuleManager.h"
 #include "MoonToonBakeTools.h"
 #include "MoonToonMeshInfoTool.h"
+#include "MoonToonNormalPreviewTool.h"
 #include "MoonToonOutlineAlphaTool.h"
 #include "MoonToonStrandPreviewActor.h"
 #include "MoonToonStrandTangentTool.h"
@@ -356,6 +357,7 @@ void SMoonToonToolsPanel::BuildToolList()
 	};
 
 	AddTool(UMoonToonMeshInfoTool::StaticClass());
+	AddTool(UMoonToonNormalPreviewTool::StaticClass());
 	AddTool(UMoonToonOutlineAlphaTool::StaticClass());
 	AddTool(UMoonToonBakeSmoothNormalTool::StaticClass());
 	AddTool(UMoonToonBakeFaceForwardTool::StaticClass());
