@@ -3,8 +3,6 @@
 #include "MoonToonStrandTangentTool.h"
 
 #include "Components/MeshComponent.h"
-#include "Components/SkinnedMeshComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Editor.h"
 #include "Engine/SkeletalMesh.h"
@@ -571,40 +569,6 @@ namespace
 
 	// --- Preview ----------------------------------------------------------------------------------
 
-	/** First level component using this mesh asset, so previews land on the placed character rather
-	 *  than at the origin -- and so the live preview knows whose materials to override. */
-	UMeshComponent* FindPlacedMeshComponent(UObject* MeshAsset)
-	{
-		UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
-		if (!World)
-		{
-			return nullptr;
-		}
-
-		for (TActorIterator<AActor> It(World); It; ++It)
-		{
-			TInlineComponentArray<UMeshComponent*> Components(*It);
-			for (UMeshComponent* Component : Components)
-			{
-				if (const USkinnedMeshComponent* Skinned = Cast<USkinnedMeshComponent>(Component))
-				{
-					if (Skinned->GetSkinnedAsset() == MeshAsset)
-					{
-						return Component;
-					}
-				}
-				else if (const UStaticMeshComponent* Static = Cast<UStaticMeshComponent>(Component))
-				{
-					if (Static->GetStaticMesh() == MeshAsset)
-					{
-						return Component;
-					}
-				}
-			}
-		}
-		return nullptr;
-	}
-
 	/** Stable island colour: spread hues with a golden-angle-ish multiplier so neighbouring island
 	 *  keys land far apart on the wheel. */
 	FColor StrandIslandColor(int32 IslandKey)
@@ -743,7 +707,7 @@ FString UMoonToonStrandTangentTool::Run(const FMoonToonToolContext& Context)
 		}
 
 		UObject* Mesh = Meshes[0];
-		UMeshComponent* Component = FindPlacedMeshComponent(Mesh);
+		UMeshComponent* Component = MoonToonMesh::FindPlacedMeshComponent(Mesh);
 		if (!Component)
 		{
 			return FString::Printf(TEXT("%s is not placed in the level. The live preview overrides a "
@@ -948,7 +912,7 @@ FString UMoonToonStrandTangentTool::Run(const FMoonToonToolContext& Context)
 					continue;
 				}
 
-				const UMeshComponent* Placed = FindPlacedMeshComponent(Mesh);
+				const UMeshComponent* Placed = MoonToonMesh::FindPlacedMeshComponent(Mesh);
 				const bool bPlaced = Placed != nullptr;
 				const FTransform MeshToWorld = bPlaced ? Placed->GetComponentTransform() : FTransform::Identity;
 

@@ -2,8 +2,15 @@
 
 #include "MoonToonMeshTargets.h"
 
+#include "Components/MeshComponent.h"
+#include "Components/SkinnedMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Editor.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
 #include "RawMesh.h"
 #include "Rendering/SkeletalMeshLODImporterData.h"
@@ -29,6 +36,38 @@ namespace MoonToonMesh
 	bool IsSupportedMesh(const UObject* Asset)
 	{
 		return Asset && (Asset->IsA<UStaticMesh>() || Asset->IsA<USkeletalMesh>());
+	}
+
+	UMeshComponent* FindPlacedMeshComponent(const UObject* MeshAsset)
+	{
+		UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+		if (!World)
+		{
+			return nullptr;
+		}
+
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			TInlineComponentArray<UMeshComponent*> Components(*It);
+			for (UMeshComponent* Component : Components)
+			{
+				if (const USkinnedMeshComponent* Skinned = Cast<USkinnedMeshComponent>(Component))
+				{
+					if (Skinned->GetSkinnedAsset() == MeshAsset)
+					{
+						return Component;
+					}
+				}
+				else if (const UStaticMeshComponent* Static = Cast<UStaticMeshComponent>(Component))
+				{
+					if (Static->GetStaticMesh() == MeshAsset)
+					{
+						return Component;
+					}
+				}
+			}
+		}
+		return nullptr;
 	}
 
 	bool PatchVertexAlphaLive(USkeletalMesh* Mesh, int32 LODIndex, const TArray<float>& PointAlpha)

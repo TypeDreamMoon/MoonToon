@@ -31,8 +31,13 @@ namespace
 	{
 		if (In.ContainsNaN() || In.IsNearlyZero())
 		{
-			UE_LOG(LogMoonToonSmoothNormal, Error, TEXT("[MoonToon] %s has Invalid %s"),
-				Mesh ? *Mesh->GetName() : TEXT("<null>"), AxisName);
+			// A null Mesh means the caller counts degenerate bases itself and reports them in one line
+			// (the normal preview decodes every wedge, so one log error per bad basis is thousands).
+			if (Mesh)
+			{
+				UE_LOG(LogMoonToonSmoothNormal, Error, TEXT("[MoonToon] %s has Invalid %s"),
+					*Mesh->GetName(), AxisName);
+			}
 			return Fallback;
 		}
 		return In;

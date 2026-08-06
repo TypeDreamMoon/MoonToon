@@ -83,6 +83,9 @@ public:
 	/**
 	 * Builds the tangent->local matrix for one wedge. Degenerate (NaN / zero) axes fall back to the
 	 * identity basis vector and log which mesh was at fault, matching the Blueprint's behaviour.
+	 *
+	 * Pass Mesh = null to suppress that per-wedge log: read-only callers that walk every wedge (the
+	 * normal preview) would otherwise emit thousands of identical errors, and report the count instead.
 	 */
 	static FMatrix BuildTangentToLocal(
 		int32 WedgeIndex,

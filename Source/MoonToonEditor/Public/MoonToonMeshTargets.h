@@ -98,6 +98,15 @@ namespace MoonToonMesh
 	MOONTOONEDITOR_API bool IsSupportedMesh(const UObject* Asset);
 
 	/**
+	 * First level component using this mesh asset.
+	 *
+	 * Every viewport preview needs it for the same reason: import data is in the mesh's local space,
+	 * so without the placed component's transform the lines land at the world origin instead of on
+	 * the character. The live preview additionally needs it to know whose materials to override.
+	 */
+	MOONTOONEDITOR_API class UMeshComponent* FindPlacedMeshComponent(const UObject* MeshAsset);
+
+	/**
 	 * Pushes per-point vertex alpha straight into a skeletal mesh's live render data and editor
 	 * source model, without triggering a rebuild.
 	 *
