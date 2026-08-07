@@ -4,7 +4,7 @@
 
 #include "Components/MeshComponent.h"
 #include "Components/SkinnedMeshComponent.h"
-#include "Components/ToonActorComponent.h"
+#include "Components/MoonToonActorComponent.h"
 #include "GameFramework/Actor.h"
 
 namespace
@@ -17,9 +17,9 @@ namespace
 	// The tuning slot's last float is NOT ours: it is the toon actor id, and CPD is full (9 float4s
 	// total, so slot 8 is the last one). Writing a float4 there zeroes the id, and zero is the
 	// "no actor data" sentinel -- the per-actor light direction override and exposure multiplier
-	// then silently stop working for any character that also carries a UToonActorComponent.
+	// then silently stop working for any character that also carries a UMoonToonActorComponent.
 	// Only floats 32..34 may be written.
-	static_assert(TuningFloatIndex + 3 == UToonActorComponent::CustomPrimitiveDataIndex,
+	static_assert(TuningFloatIndex + 3 == UMoonToonActorComponent::CustomPrimitiveDataIndex,
 		"MoonToon perspective tuning slot must sit immediately below the toon actor id float.");
 }
 
