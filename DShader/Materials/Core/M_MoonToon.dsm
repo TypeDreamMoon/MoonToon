@@ -1,15 +1,19 @@
 // MoonToon base material.
 //
 // Everything authorable lives in MF_MoonToonBaseInput; this material only routes that function's
-// four outputs to where the renderer expects them:
+// six outputs to where the renderer expects them:
 //
-//   Output      -> Base.MaterialAttributes   (the standard GBuffer surface)
-//   ToonBufferA -> ToonMaterialOutput.Pin[0] |
-//   ToonBufferB -> ToonMaterialOutput.Pin[1] | the toon buffer the Toon shading model reads
-//   ToonBufferC -> ToonMaterialOutput.Pin[2] |
+//   Output            -> Base.MaterialAttributes      (the standard GBuffer surface)
+//   ToonBufferA       -> ToonMaterialOutput.Pin[0] |
+//   ToonBufferB       -> ToonMaterialOutput.Pin[1] | the toon buffer the Toon shading model reads
+//   ToonBufferC       -> ToonMaterialOutput.Pin[2] |
+//   FaceOverlayData   -> MoonToonFaceOverlay.Pin[0]   (see-through bangs re-blend, 眉透/瞳透)
+//   FaceOverlayParams -> MoonToonFaceOverlay.Pin[1]   (per-MI depth threshold / fade / view fade)
+//   FaceOverlayStencilIDs -> MoonToonFaceOverlay.Pin[2] (extra occluder toon-stencil IDs)
 //
-// ToonMaterialOutput is a UMaterialExpressionCustomOutput: it has no output pins, so it can only be
-// reached through an Outputs expression binding, never from the Graph body.
+// ToonMaterialOutput / MoonToonFaceOverlay are UMaterialExpressionCustomOutputs: they have no
+// output pins, so they can only be reached through an Outputs expression binding, never from the
+// Graph body.
 
 VirtualFunction(Name="MF_MoonToonBaseInput")
 {
@@ -26,6 +30,9 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float4 FaceOverlayData;
+		float4 FaceOverlayParams;
+		float4 FaceOverlayStencilIDs;
 	}
 }
 
@@ -69,12 +76,19 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 ToonDataA;
 		float4 ToonDataB;
 		float4 ToonDataC;
+		float4 FaceOverlay;
+		float4 FaceOverlayTuning;
+		float4 FaceOverlayStencils;
 
 		Base.MaterialAttributes = Attributes;
 
 		Expression(Class="ToonMaterialOutput").Pin[0] = ToonDataA;
 		Expression(Class="ToonMaterialOutput").Pin[1] = ToonDataB;
 		Expression(Class="ToonMaterialOutput").Pin[2] = ToonDataC;
+
+		Expression(Class="MoonToonFaceOverlay").Pin[0] = FaceOverlay;
+		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
+		Expression(Class="MoonToonFaceOverlay").Pin[2] = FaceOverlayStencils;
 	}
 
 	Graph = {
@@ -86,6 +100,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		ToonDataA = MF_MoonToonBaseInput(OutputIndex=1);
 		ToonDataB = MF_MoonToonBaseInput(OutputIndex=2);
 		ToonDataC = MF_MoonToonBaseInput(OutputIndex=3);
+		FaceOverlay = MF_MoonToonBaseInput(OutputIndex=4);
+		FaceOverlayTuning = MF_MoonToonBaseInput(OutputIndex=5);
+		FaceOverlayStencils = MF_MoonToonBaseInput(OutputIndex=6);
 	}
 
 	Layout = {
@@ -94,5 +111,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		Node(Var="ToonDataA", X=544, Y=272);
 		Node(Var="ToonDataB", X=544, Y=352);
 		Node(Var="ToonDataC", X=544, Y=432);
+		Node(Var="FaceOverlay", X=544, Y=512);
+		Node(Var="FaceOverlayTuning", X=544, Y=592);
+		Node(Var="FaceOverlayStencils", X=544, Y=672);
 	}
 }
