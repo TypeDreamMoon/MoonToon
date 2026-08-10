@@ -1,0 +1,31 @@
+// Decompiled from /MooaToon/MaterialFunctions/MF_MooaMainLightDirection.MF_MooaMainLightDirection
+ShaderFunction(Name="MaterialFunctions/MF_MoonMainLightDirection", Root="Plugin.MoonToon")
+{
+	Properties = {
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float3 Result;
+	}
+
+	Graph = {
+		float3 Custom =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float3",
+				Code="View.AtmosphereLightDirection[0].xyz",
+				Description="Custom"
+			);
+
+		Result = Custom;
+	}
+
+	Layout = {
+		Node(Var="Custom", X=-64, Y=336);
+		Node(Var="Result", X=200, Y=300);
+	}
+
+}

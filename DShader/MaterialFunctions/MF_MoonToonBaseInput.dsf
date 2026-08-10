@@ -88,11 +88,11 @@ VirtualFunction(Name="MF_UVChannelSwitch")
 		float2 Result;
 	}
 }
-VirtualFunction(Name="MF_MooaMainLightDirection")
+VirtualFunction(Name="MF_MoonMainLightDirection")
 {
 	Options = {
-		Asset = Path(Plugins.MooaToon, "MaterialFunctions/MF_MooaMainLightDirection");
-		Description = "Generated from /MooaToon/MaterialFunctions/MF_MooaMainLightDirection.MF_MooaMainLightDirection";
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonMainLightDirection");
+		Description = "Generated from /MooaToon/MaterialFunctions/MF_MoonMainLightDirection.MF_MoonMainLightDirection";
 	}
 
 	Inputs = {
@@ -612,7 +612,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float4 Sampled_Global_Mask_Map = StaticSwitchParameter_2;
 		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Sampled_Global_Mask_Map);
 		float2 MaterialExpressionTextureCoordinate_3 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
-		float3 MF_MooaMainLightDirection = MF_MooaMainLightDirection();
+		float3 MF_MoonMainLightDirection = MF_MoonMainLightDirection();
 		float2 Custom =
 			UE.Expression(
 				Class="Custom",
@@ -620,7 +620,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				Code="float3 L = normalize(MainLightDirWS);\r\nfloat3 U = normalize(WorldUpWS);\r\n\r\n// 主光“上下”量（仰角）\r\nfloat elev = dot(L, U); // [-1,1]\r\n\r\n// 映射到自定义区间\r\nfloat a = min(ElevMin, ElevMax);\r\nfloat b = max(ElevMin, ElevMax);\r\nfloat t = saturate((elev - a) / max(1e-4, b - a));\r\nif (ElevMin > ElevMax) t = 1.0 - t;\r\n\r\n// 曲线\r\nt = pow(t, max(1e-3, Curve));\r\n\r\n// 动态偏移 + 手动偏移 + 总区间限制\r\nfloat dyn = lerp(DynMin, DynMax, t) * VSign;\r\nfloat offsetV = clamp(AddOffset + dyn, ClampMin, ClampMax);\r\n\r\nreturn UV + float2(0.0, offsetV);",
 				Description="Custom",
 				UV=MaterialExpressionTextureCoordinate_3,
-				MainLightDirWS=MF_MooaMainLightDirection,
+				MainLightDirWS=MF_MoonMainLightDirection,
 				WorldUpWS=float3(0.0, 0.0, 1.0),
 				AddOffset=AddOffset,
 				DynMin=DynMin,
@@ -1524,7 +1524,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				Group="10 - Diffuse",
 				SortPriority=36,
 				Coordinates=Global_UV,
-				Texture=Path(Plugins.MooaToon, "Assets/Textures/T_Gray_Linear"),
+				Texture=Path(Plugins.MoonToon, "Assets/Textures/T_Gray_Linear"),
 				SamplerType="SAMPLERTYPE_LinearColor"
 			);
 		float4 Diffuse_Ramp_Offset_Map_1 =
@@ -1536,7 +1536,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				Group="10 - Diffuse",
 				SortPriority=36,
 				Coordinates=Global_UV,
-				Texture=Path(Plugins.MooaToon, "Assets/Textures/T_Gray_Linear"),
+				Texture=Path(Plugins.MoonToon, "Assets/Textures/T_Gray_Linear"),
 				SamplerType="SAMPLERTYPE_LinearColor",
 				SamplerSource="SSM_Wrap_WorldGroupSettings"
 			);
