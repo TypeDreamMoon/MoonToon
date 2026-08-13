@@ -201,3 +201,25 @@ ToonBufferX 却装 TBufferX)**已经修了**。
 
 能做的验证:C++ 编译、静态一致性检查(删掉的符号无残留引用、参数个数对齐)、
 以及用引擎自己的 stb_preprocess 做预处理级检查。每一项的实际验收口径会在这里如实记录。
+
+---
+
+## 收尾轮补充(P5 / P7 / P8)
+
+**一处我之前判断错了,已更正。** 我把 `Rim_Light_Width_Channel_1` 和
+`Distance_Field_Facial_Shadow_Map_Channel_1` 说成"反编译残留的重复参数"。读代码后发现不是:
+`_1` 掩的是**另一个输入**(顶点色 / 第二张 SDF 贴图)。同一个参数名、两个使用点,就必须是两个节点 ——
+UE 里 ChannelMaskParameter 的遮罩通道共享而节点不共享。删掉会断图。**这一项作废,不做。**
+
+**P5 只做了一半。** UV 链已抽成 `MF_ToonUV`。剩下的是 14 对"双采样 + Enable Per Texture Sampler"
+静态开关的抽取 —— 需要把 17 个 `TextureSampleParameter2D` 换成 `TextureObjectParameter` +
+3 个按 SamplerType 分的共享采样函数。名字保持不变时 MI 绑定不会丢(引擎源码已确认按类型+名字查),
+但这是一次两千行文件里的十四处结构替换,留给下一轮。
+
+**P7 的验收方式。** 改名前后各抓一次全项目 MI 快照(资产注册表全量,88 个 MI、5,773 条 override),
+逐项语义对比:**0 丢失、0 改变、0 新增**。快照两份都提交在本目录,可复查。
+
+**P8 的两条都变成了可证明安全的删除**,不是"应该没问题":
+- 丝袜布局值猜测:88 个 MI 里 `In_Stockings_*` override 为零 → 没有内容依赖 legacy 布局
+- `MoonToonInput.uasset`:全项目 Content 零引用 → 删除
+- `MF_MoonToonBufferInput` / `Buffer/Writer` **保留** —— MooaToon 的 `M_Toon` 仍在引用,而它有 4 个活实例
