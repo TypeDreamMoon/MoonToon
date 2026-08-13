@@ -37,7 +37,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_PBRSpecular", Roo
 	}
 
 	Properties = {
-		ScalarParameter In_PBRSpecular_BloomWeight = 0.0 [Group="MT >> 00 << Default"; SortPriority=0];
+		ScalarParameter In_PBRSpecular_BloomWeight = 0.0 [Group="32 - Feature: PBR Specular"; SortPriority=0; Description="该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理)."];
 	}
 
 	Graph = {

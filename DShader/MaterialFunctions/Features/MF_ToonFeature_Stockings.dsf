@@ -53,15 +53,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 	}
 
 	Properties = {
-		ScalarParameter In_Stockings_Density = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=0];
-		ScalarParameter In_Stockings_FresnelPower = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=1];
-		ScalarParameter In_Stockings_TransStrength = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=2];
-		ScalarParameter In_Stockings_RoughnessScale = 1.0 [Group="MT >> 05 << Stockings"; SortPriority=3];
-		ScalarParameter In_Stockings_SpecIntensity = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=4];
-		ScalarParameter In_Stockings_ShadowStrength = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=5];
-		ScalarParameter In_Stockings_GrazingDarken = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=6];
-		VectorParameter In_Stockings_BodyColorRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 05 << Stockings"; SortPriority=7];
-		ScalarParameter In_Stockings_GrazingSpecBoost = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=8];
+		ScalarParameter In_Stockings_Density = 0.0 [Group="38 - Feature: Stockings"; SortPriority=0; Description="丝袜密度. 越大越不透, 底色与肤色的混合越偏向底色."];
+		ScalarParameter In_Stockings_FresnelPower = 0.0 [Group="38 - Feature: Stockings"; SortPriority=1; Description="掠射角衰减的幂次. 越大, 变暗只发生在更接近边缘的地方."];
+		ScalarParameter In_Stockings_TransStrength = 0.0 [Group="38 - Feature: Stockings"; SortPriority=2; Description="背光透射强度."];
+		ScalarParameter In_Stockings_RoughnessScale = 1.0 [Group="38 - Feature: Stockings"; SortPriority=3; Description="高光粗糙度倍数."];
+		ScalarParameter In_Stockings_SpecIntensity = 0.0 [Group="38 - Feature: Stockings"; SortPriority=4; Description="高光总强度."];
+		ScalarParameter In_Stockings_ShadowStrength = 0.0 [Group="38 - Feature: Stockings"; SortPriority=5; Description="漫反射受阴影影响的程度."];
+		ScalarParameter In_Stockings_GrazingDarken = 0.0 [Group="38 - Feature: Stockings"; SortPriority=6; Description="掠射角变暗强度, 做出丝袜边缘收深的效果."];
+		VectorParameter In_Stockings_BodyColorRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="38 - Feature: Stockings"; SortPriority=7; Description="丝袜自身的底色. 全黑 = 未授权, 此时回退到材质的 Base Color."];
+		ScalarParameter In_Stockings_GrazingSpecBoost = 0.0 [Group="38 - Feature: Stockings"; SortPriority=8; Description="掠射角高光增益, 做出边缘的一圈亮光."];
 	}
 
 	Graph = {

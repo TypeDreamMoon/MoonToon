@@ -43,10 +43,10 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 	}
 
 	Properties = {
-		ScalarParameter In_Hair_HighlightMask = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=0];
-		ScalarParameter In_Hair_HighlightMaskIntensity = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=1];
-		ScalarParameter In_Hair_HighlightMaskShadowIntensity = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=2];
-		ScalarParameter In_Hair_HighlightViewAnchorBlend = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=3];
+		ScalarParameter In_Hair_HighlightMask = 0.0 [Group="33 - Feature: Hair Highlight Mask"; SortPriority=0; Description="天使环遮罩, 一般由发丝高光贴图驱动. 逐像素输入会与这个常量相加."];
+		ScalarParameter In_Hair_HighlightMaskIntensity = 0.0 [Group="33 - Feature: Hair Highlight Mask"; SortPriority=1; Description="天使环强度. 0 = 关闭."];
+		ScalarParameter In_Hair_HighlightMaskShadowIntensity = 0.0 [Group="33 - Feature: Hair Highlight Mask"; SortPriority=2; Description="天使环在阴影中保留多少. 0 = 阴影里完全消失, 1 = 不受阴影影响."];
+		ScalarParameter In_Hair_HighlightViewAnchorBlend = 0.0 [Group="33 - Feature: Hair Highlight Mask"; SortPriority=3; Description="0 = 天使环锚定在光照角度(旧行为); 1 = 锚定在视角, 环会跟着相机走, 更接近手绘动画的做法."];
 	}
 
 	Graph = {

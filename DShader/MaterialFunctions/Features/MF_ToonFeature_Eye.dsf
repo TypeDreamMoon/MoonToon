@@ -53,15 +53,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 	}
 
 	Properties = {
-		ScalarParameter In_Eye_DiffuseWrapStrength = 0.0 [Group="MT >> 06 << Eye"; SortPriority=0];
-		ScalarParameter In_Eye_LimbalDarkenStrength = 0.0 [Group="MT >> 06 << Eye"; SortPriority=1];
-		ScalarParameter In_Eye_SpecularShadowStrength = 0.0 [Group="MT >> 06 << Eye"; SortPriority=2];
-		ScalarParameter In_Eye_PrimaryRoughnessScale = 1.0 [Group="MT >> 06 << Eye"; SortPriority=3];
-		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="MT >> 06 << Eye"; SortPriority=4];
-		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="MT >> 06 << Eye"; SortPriority=5];
-		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="MT >> 06 << Eye"; SortPriority=6];
-		VectorParameter In_Eye_EyeTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 06 << Eye"; SortPriority=7];
-		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="MT >> 06 << Eye"; SortPriority=8];
+		ScalarParameter In_Eye_DiffuseWrapStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=0; Description="眼球漫反射的 wrap 强度, 让受光过渡更柔和."];
+		ScalarParameter In_Eye_LimbalDarkenStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=1; Description="角膜缘变暗强度 —— 视角越偏, 眼球边缘越深."];
+		ScalarParameter In_Eye_SpecularShadowStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=2; Description="高光受阴影影响的程度."];
+		ScalarParameter In_Eye_PrimaryRoughnessScale = 1.0 [Group="39 - Feature: Eye"; SortPriority=3; Description="主高光(小而锐的那点)粗糙度倍数."];
+		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="39 - Feature: Eye"; SortPriority=4; Description="次高光(大而柔的那片)粗糙度倍数."];
+		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=5; Description="主高光强度."];
+		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=6; Description="次高光强度."];
+		VectorParameter In_Eye_EyeTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="39 - Feature: Eye"; SortPriority=7; Description="眼球染色. 全黑 = 未授权, 此时用材质的 Base Color."];
+		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="39 - Feature: Eye"; SortPriority=8; Description="次高光在 Specular Ramp 上的横向偏移."];
 	}
 
 	Graph = {

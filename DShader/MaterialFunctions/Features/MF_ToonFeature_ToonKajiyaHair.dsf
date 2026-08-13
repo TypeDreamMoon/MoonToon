@@ -58,17 +58,17 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonKajiyaHair", 
 	}
 
 	Properties = {
-		ScalarParameter In_ToonHair_TangentRotate = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=0];
-		ScalarParameter In_ToonHair_SecondaryShift = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=1];
-		ScalarParameter In_ToonHair_SecondaryMask = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=2];
-		ScalarParameter In_ToonHair_PrimaryStrandShift = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=3];
-		ScalarParameter In_ToonHair_PrimaryExpScale = 1.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=4];
-		ScalarParameter In_ToonHair_SecondaryExpScale = 1.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=5];
-		ScalarParameter In_ToonHair_OverallSpecIntensity = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=6];
-		ScalarParameter In_ToonHair_PrimaryIntensity = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=7];
-		ScalarParameter In_ToonHair_SecondaryIntensity = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=8];
-		ScalarParameter In_ToonHair_SecondaryShiftScale = 1.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=9];
-		ScalarParameter In_ToonHair_ShadowStrength = 0.0 [Group="MT >> 03 << Hair Toon Kajiya Kay"; SortPriority=10];
+		ScalarParameter In_ToonHair_TangentRotate = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=0; Description="发丝切线绕法线旋转, 单位为 PI 弧度. 仅在材质没有各向异性方向时生效."];
+		ScalarParameter In_ToonHair_SecondaryShift = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=1; Description="次高光(靠近发梢的那道)沿法线的偏移."];
+		ScalarParameter In_ToonHair_SecondaryMask = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=2; Description="次高光的遮罩, 0~1. 通常由发丝遮罩贴图驱动."];
+		ScalarParameter In_ToonHair_PrimaryStrandShift = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=3; Description="主高光(靠近发根的那道)沿法线的偏移. 正值上移, 负值下移."];
+		ScalarParameter In_ToonHair_PrimaryExpScale = 1.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=4; Description="主高光锐度倍数. 大于 1 更锐, 小于 1 更散."];
+		ScalarParameter In_ToonHair_SecondaryExpScale = 1.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=5; Description="次高光锐度倍数."];
+		ScalarParameter In_ToonHair_OverallSpecIntensity = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=6; Description="两道高光的总强度. 0 = 关闭整个 Kajiya 高光."];
+		ScalarParameter In_ToonHair_PrimaryIntensity = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=7; Description="主高光强度."];
+		ScalarParameter In_ToonHair_SecondaryIntensity = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=8; Description="次高光强度."];
+		ScalarParameter In_ToonHair_SecondaryShiftScale = 1.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=9; Description="次高光偏移的额外缩放, 用来拉开两道高光的间距."];
+		ScalarParameter In_ToonHair_ShadowStrength = 0.0 [Group="35 - Feature: Hair Toon Kajiya Kay"; SortPriority=10; Description="高光受阴影影响的程度. 0 = 阴影里也保持全亮, 1 = 完全跟随阴影."];
 	}
 
 	Graph = {
