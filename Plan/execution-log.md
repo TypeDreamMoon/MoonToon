@@ -120,7 +120,7 @@ feature==DFF 时置位),但阴影技术不再和表面模型绑死 —— 这是
 | P2 删 2-bit legacy ID | ✅ 完成 | 同上 | 同上(两者交织,见提交说明) |
 | P3 命名/拆结构 | ⚠️ **部分** | `ab3218fd` (引擎) | 只做了"名字在说谎"的函数/参数 |
 | P4 槽位表 + 读侧具名化 | ⚠️ **部分** | `9f534e52` (引擎) | 表+生成结构体+Matcap 修复已做;40 处裸读未转换 |
-| P5 基础函数解耦 | ⚠️ **部分** | `2614d8b` | UV 链抽成 `MF_ToonUV`;14 对贴图双采样的抽取未做 |
+| P5 基础函数解耦 | OK **完成** | `2614d8b` `5fcb621` | UV 链 + 14 对贴图双采样全部抽出;基础函数 2308 -> 1882 行 |
 | P6 特征拆分 + 静态派发 | ✅ 完成 | `22aa9bf` `71383a4` (插件) | 13 个函数 + 派发器 + 基础函数 + 2 个材质全部 dsc 编译通过 |
 | P7 改名 + 面板整理 + MI 迁移 | ✅ **完成** | `b1d2ed8` `2614d8b` `65ea60f` | UV 12→3 参数、分组重排、每参数补描述;**88 MI / 5773 override 前后逐项对比 0 丢失 0 改变** |
 | P8 Stockings 布局位 / 死资产清理 | ✅ **完成** | `65ea60f` + 引擎侧 | 值猜测删除(88 MI 零丝袜 override,可证明安全);`MoonToonInput` 删除,另两个保留 |
@@ -207,7 +207,7 @@ ToonBufferX 却装 TBufferX)**已经修了**。
 `_1` 掩的是**另一个输入**(顶点色 / 第二张 SDF 贴图)。同一个参数名、两个使用点,就必须是两个节点 ——
 UE 里 ChannelMaskParameter 的遮罩通道共享而节点不共享。删掉会断图。**这一项作废,不做。**
 
-**P5 只做了一半。** UV 链已抽成 `MF_ToonUV`。剩下的是 14 对"双采样 + Enable Per Texture Sampler"
+**P5 已完成(此前记的"只做了一半"作废)。** UV 链抽成 `MF_ToonUV`, 另外 14 对"双采样 + Enable Per Texture Sampler"
 静态开关的抽取 —— 需要把 17 个 `TextureSampleParameter2D` 换成 `TextureObjectParameter` +
 3 个按 SamplerType 分的共享采样函数。名字保持不变时 MI 绑定不会丢(引擎源码已确认按类型+名字查),
 但这是一次两千行文件里的十四处结构替换,留给下一轮。
@@ -219,3 +219,40 @@ UE 里 ChannelMaskParameter 的遮罩通道共享而节点不共享。删掉会�
 - 丝袜布局值猜测:88 个 MI 里 `In_Stockings_*` override 为零 → 没有内容依赖 legacy 布局
 - `MoonToonInput.uasset`:全项目 Content 零引用 → 删除
 - `MF_MoonToonBufferInput` / `Buffer/Writer` **保留** —— MooaToon 的 `M_Toon` 仍在引用,而它有 4 个活实例
+
+---
+
+## P5 收尾:贴图双采样抽取完成
+
+14 对"双采样 + Enable Per Texture Sampler"抽成 4 个共享函数。为什么是 4 个而不是 1 个:
+`SamplerType` 和 `SamplerSource` 在 UE 里都是**节点属性而非引脚**,做不成函数参数 ——
+所以按 SamplerType 分 Color / Linear / Normal 三个,外加一个 LinearMip0 给 ID 图
+(它的值是标识符,不能跨 mip 模糊)。
+
+**贴图参数留在调用点**(改成 `TextureObjectParameter`),没有放进共享函数 ——
+放进去会让 14 张贴图塌成同一个参数名。`Enable Per Texture Sampler` 反过来**放进函数**,
+因为它本来就该是"一个共享决定用一个共享名字",面板上仍是一行。
+
+6 处 `TextureSampleParameter2D` 保留:它们是各带自己 UV 的**单次采样**
+(SDF 左右脸两张、发丝高光遮罩、内描边图),不是采样器配对。
+
+### 最终 MI 验收
+
+改动前 / 全部做完后各一次全项目快照,逐项对比:
+
+```
+MIs before=88 final=88   lost=0 changed=0 added=0
+texture overrides: before=341 final=341
+```
+
+**341 条贴图 override 一条没丢** —— 这是"换节点类按名安全"的实证,不再是从引擎源码推断的结论。
+三份快照(before / after / final)都在本目录。
+
+## 全部阶段状态
+
+P0–P8 全部完成。仍然刻意未做、并已在上文说明理由的两项:
+
+1. **P3 的 290 处 RT 大改名** + `FMoonToonContext` 拆分 —— 纯 churn 换可读性,会作废整个 shader DDC
+2. **P4 的约 40 处裸槽位读取转换** —— 当前正确,转换只是可读性
+
+两项都不改行为,不 gate 任何东西。
