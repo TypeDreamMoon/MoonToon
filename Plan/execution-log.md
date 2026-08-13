@@ -111,6 +111,78 @@ feature==DFF 时置位),但阴影技术不再和表面模型绑死 —— 这是
 
 **F: 长期只有 ~20 GB 余量,对一次引擎全量编译是偏紧的**,你回来后可能要清一下。
 
+## 完成度总表
+
+| 阶段 | 状态 | 提交 | 验收到什么程度 |
+| --- | --- | --- | --- |
+| P0 X-macro spike | ✅ 完成 | `29f219d` (插件) | 用引擎自己的 stb_preprocess 实跑,0 诊断 |
+| P1 SDF 迁出 Metallic/Anisotropy | ✅ 完成 | `f17230a7` (引擎) | DevTestEditor 编译 0 错误 |
+| P2 删 2-bit legacy ID | ✅ 完成 | 同上 | 同上(两者交织,见提交说明) |
+| P3 命名/拆结构 | ⚠️ **部分** | `ab3218fd` (引擎) | 只做了"名字在说谎"的函数/参数 |
+| P4 槽位表 + 读侧具名化 | ⚠️ **部分** | `9f534e52` (引擎) | 表+生成结构体+Matcap 修复已做;40 处裸读未转换 |
+| P5 基础函数解耦 | ❌ **未做** | — | — |
+| P6 特征拆分 + 静态派发 | ✅ 完成 | `22aa9bf` `71383a4` (插件) | 13 个函数 + 派发器 + 基础函数 + 2 个材质全部 dsc 编译通过 |
+| P7 改名 + 面板整理 + MI 迁移 | ⚠️ **部分** | `b1d2ed8` (插件) | 只做了不改名的分组;改名部分**被编辑器阻塞** |
+| P8 Stockings 布局位 / 死资产清理 | ❌ **未做** | — | — |
+
+### P3 为什么只做一半
+
+剩下的是 `ToonBufferA` → `ToonSurfaceRT`、`TBufferA..D` → `ToonFeatureRT0..3` 的**290 处**重命名,
+外加 `FMoonToonContext` 拆分(约 100 处消费点)。三条理由推迟到功能阶段之后:
+
+1. 纯 churn 换可读性,不 gate 任何东西
+2. 会让这条分支的 diff 无法审阅
+3. 重命名数据驱动 GBuffer 的 target 字符串会作废整个 shader DDC
+
+真正会导致事故的那部分(`DecodeToonBufferA` 读的是 TBufferA、`EncodeToonBuffer` 的出参叫
+ToonBufferX 却装 TBufferX)**已经修了**。
+
+### P4 为什么只做一半
+
+槽位表、13 个生成结构体、Matcap 的 ScalarA 修复、两份手抄表的删除都已落地。
+剩下的是 `ToonBxDF` 里约 40 处 `TBuffer.FeatureInputScalarD` 改成 `Skin.PrimaryRoughnessScale`。
+它们**当前是正确的**,转换只是可读性,而每一处改错都会静默改变着色 —— 在无法编译 shader 的
+情况下做 40 处不可验证的改动,不划算。
+
+### P7 为什么被阻塞
+
+改名(UV 四标量合 Vector4 等)必须配 MI override 的**前后快照语义对比**,
+而快照要 unreal-bridge 连编辑器,编辑器没运行。
+没有快照就改名 = 静默丢 override,这正是计划里列为最高风险的一条。
+
+**不改名的部分已经做了**:12 个散落/错组的参数归位。
+
+---
+
+## 验收口径(如实)
+
+| 做过的验证 | 覆盖了什么 |
+| --- | --- |
+| DevTestEditor UBT 编译 0 错误 | 所有引擎 **C++** 改动 |
+| stb_preprocess 实跑 | 槽位表展开正确;生成的 Cloth 结构体与手写版逐字段一致 |
+| `dsc compile -Force` | 13 个 feature 函数、派发器、基础函数、M_MoonToon、M_MoonToonOutline **能生成** |
+| 静态一致性 grep | 删除的符号无残留引用;所有调用点参数个数对齐 |
+
+**没有做过的验证:**
+
+- **着色器 HLSL 从未被真正编译过。** `dsc` 走 `-nullrhi`,绿灯不代表 HLSL 正确
+  (这条是计划里就写明的)。引擎侧的 `.ush`/`.usf` 改动只经过静态检查。
+- **没有任何画面目检。** 按约定归你。
+- **MI override 未做快照对比**(编辑器未运行)。不过 P1–P6 **刻意没有重命名任何现存参数**,
+  所以理论上不该有 override 丢失;唯二消失的是两个死参数(`ShadingFeatureID` /
+  `SecondaryShadingFeatureID`),它们被静态开关取代。
+
+## 你回来后建议的第一件事
+
+打开编辑器,让它编译 toon 着色器。**最可能出问题的地方是引擎 `.ush` 改动**,尤其:
+
+1. `ToonMaterialCommon.ush` 的 `ComposeToonBufferD` —— 新代码,用了 `FPixelMaterialInputs`
+2. `ToonBasePassPixelShader.usf` 的 `SV_Target3/4` 重排
+3. `ShaderGenerationUtil.cpp` 生成的 `DecodeGBufferData` 签名多了 `InTBufferD`
+
+然后逐特征目检,重点看:**SDF 脸的高光**(P1+P6 后第一次可能非零)、**Matcap**(全新)、
+**发丝高光的视角锚定**。
+
 ## 环境限制(影响验收口径)
 
 **UE 编辑器没有运行**(`ue_health` → `connected:false`),而你不在电脑前,所以:
