@@ -39,8 +39,8 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Matcap", Root="Pl
 	}
 
 	Properties = {
-		ScalarParameter In_Matcap_Intensity = 0.0 [Group="MT >> 10 << Matcap"; SortPriority=0];
-		VectorParameter In_Matcap_ColorRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 10 << Matcap"; SortPriority=1];
+		ScalarParameter In_Matcap_Intensity = 0.0 [Group="43 - Feature: Matcap"; SortPriority=0; Description="Matcap 强度. 0 = 未授权(按 1.0 处理)."];
+		VectorParameter In_Matcap_ColorRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="43 - Feature: Matcap"; SortPriority=1; Description="Matcap 采样结果. 由材质图用视空间法线当 UV 采样贴图后接进来 —— Matcap 自带光照, 不再乘光源颜色."];
 	}
 
 	Graph = {

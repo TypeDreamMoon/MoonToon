@@ -51,14 +51,14 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonMetal", Root=
 	}
 
 	Properties = {
-		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [Group="MT >> 08 << Metal"; SortPriority=0];
-		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [Group="MT >> 08 << Metal"; SortPriority=1];
-		ScalarParameter In_ToonMetal_RampOffset = 0.0 [Group="MT >> 08 << Metal"; SortPriority=2];
-		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [Group="MT >> 08 << Metal"; SortPriority=3];
-		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [Group="MT >> 08 << Metal"; SortPriority=4];
-		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [Group="MT >> 08 << Metal"; SortPriority=5];
-		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [Group="MT >> 08 << Metal"; SortPriority=6];
-		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="MT >> 08 << Metal"; SortPriority=7];
+		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [Group="41 - Feature: Metal"; SortPriority=0; Description="金属漫反射强度. 金属通常很低."];
+		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [Group="41 - Feature: Metal"; SortPriority=1; Description="阴影中高光的保底值. 0 = 阴影里高光全灭."];
+		ScalarParameter In_ToonMetal_RampOffset = 0.0 [Group="41 - Feature: Metal"; SortPriority=2; Description="高光在 Specular Ramp 上的横向偏移, 用来整体调亮或调暗."];
+		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [Group="41 - Feature: Metal"; SortPriority=3; Description="高光粗糙度倍数."];
+		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [Group="41 - Feature: Metal"; SortPriority=4; Description="高光总强度."];
+		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [Group="41 - Feature: Metal"; SortPriority=5; Description="掠射角高光增益, 做出金属边缘的亮边."];
+		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [Group="41 - Feature: Metal"; SortPriority=6; Description="高光对比度(Ramp 的幂次). 越大高光越硬、越集中."];
+		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="41 - Feature: Metal"; SortPriority=7; Description="金属高光染色."];
 	}
 
 	Graph = {

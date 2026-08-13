@@ -41,9 +41,9 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Default", Root="P
 	}
 
 	Properties = {
-		ScalarParameter In_Default_MultiBandCel = 0.0 [Group="MT >> 00 << Default"; SortPriority=0];
-		ScalarParameter In_Default_TerminatorWidth = 0.0 [Group="MT >> 00 << Default"; SortPriority=1];
-		ScalarParameter In_Default_BloomWeight = 0.0 [Group="MT >> 00 << Default"; SortPriority=2];
+		ScalarParameter In_Default_MultiBandCel = 0.0 [Group="31 - Feature: Default"; SortPriority=0; Description="大于 0.5 时跳过硬明暗交界, 改由 Diffuse Ramp 贴图自己定义几阶、阶在哪. 0 = 保持原本的二值 cel."];
+		ScalarParameter In_Default_TerminatorWidth = 0.0 [Group="31 - Feature: Default"; SortPriority=1; Description="每材质的明暗交界宽度, 与逐光源的 ToonLightSmooth 解耦 —— 同一盏灯下皮肤软、布料硬. 0 = 完全交给 Ramp."];
+		ScalarParameter In_Default_BloomWeight = 0.0 [Group="31 - Feature: Default"; SortPriority=2; Description="该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理). 用来让眼睛发光而皮肤不泛光."];
 	}
 
 	Graph = {

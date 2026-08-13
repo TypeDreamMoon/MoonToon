@@ -246,18 +246,18 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 	}
 
 	Properties = {
-		StaticSwitchParameter Feature_Is_PBRSpecular = false [Group="MT >> __ << Shading Feature"; SortPriority=0];
-		StaticSwitchParameter Feature_Is_KajiyaHair = false [Group="MT >> __ << Shading Feature"; SortPriority=1];
-		StaticSwitchParameter Feature_Is_ToonKajiyaHair = false [Group="MT >> __ << Shading Feature"; SortPriority=2];
-		StaticSwitchParameter Feature_Is_DFFacialShadow = false [Group="MT >> __ << Shading Feature"; SortPriority=3];
-		StaticSwitchParameter Feature_Is_HairHighlightMask = false [Group="MT >> __ << Shading Feature"; SortPriority=4];
-		StaticSwitchParameter Feature_Is_Skin = false [Group="MT >> __ << Shading Feature"; SortPriority=5];
-		StaticSwitchParameter Feature_Is_Stockings = false [Group="MT >> __ << Shading Feature"; SortPriority=6];
-		StaticSwitchParameter Feature_Is_Eye = false [Group="MT >> __ << Shading Feature"; SortPriority=7];
-		StaticSwitchParameter Feature_Is_ClothVelvet = false [Group="MT >> __ << Shading Feature"; SortPriority=8];
-		StaticSwitchParameter Feature_Is_ToonMetal = false [Group="MT >> __ << Shading Feature"; SortPriority=9];
-		StaticSwitchParameter Feature_Is_EmissiveInk = false [Group="MT >> __ << Shading Feature"; SortPriority=10];
-		StaticSwitchParameter Feature_Is_Matcap = false [Group="MT >> __ << Shading Feature"; SortPriority=11];
+		StaticSwitchParameter Feature_Is_PBRSpecular = false [Group="30 - Shading Feature (pick one)"; SortPriority=0; Description="启用 PBR Specular 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_KajiyaHair = false [Group="30 - Shading Feature (pick one)"; SortPriority=1; Description="启用 Hair Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_ToonKajiyaHair = false [Group="30 - Shading Feature (pick one)"; SortPriority=2; Description="启用 Hair Toon Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_DFFacialShadow = false [Group="30 - Shading Feature (pick one)"; SortPriority=3; Description="启用 SDF Face 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_HairHighlightMask = false [Group="30 - Shading Feature (pick one)"; SortPriority=4; Description="启用 Hair Highlight Mask 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_Skin = false [Group="30 - Shading Feature (pick one)"; SortPriority=5; Description="启用 Skin 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_Stockings = false [Group="30 - Shading Feature (pick one)"; SortPriority=6; Description="启用 Stockings 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_Eye = false [Group="30 - Shading Feature (pick one)"; SortPriority=7; Description="启用 Eye 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_ClothVelvet = false [Group="30 - Shading Feature (pick one)"; SortPriority=8; Description="启用 Cloth Velvet 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_ToonMetal = false [Group="30 - Shading Feature (pick one)"; SortPriority=9; Description="启用 Metal 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_EmissiveInk = false [Group="30 - Shading Feature (pick one)"; SortPriority=10; Description="启用 Emissive Ink 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Feature_Is_Matcap = false [Group="30 - Shading Feature (pick one)"; SortPriority=11; Description="启用 Matcap 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 	}
 
 	Graph = {

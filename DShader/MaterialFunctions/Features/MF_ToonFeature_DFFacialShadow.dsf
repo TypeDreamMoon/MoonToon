@@ -57,17 +57,17 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_DFFacialShadow", 
 	}
 
 	Properties = {
-		ScalarParameter In_SdfFace_ScatterStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=0];
-		ScalarParameter In_SdfFace_TransStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=1];
-		ScalarParameter In_SdfFace_TransPower = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=2];
-		ScalarParameter In_SdfFace_PrimaryRoughnessScale = 1.0 [Group="MT >> 04b << SDF Face"; SortPriority=3];
-		ScalarParameter In_SdfFace_SecondaryRoughnessScale = 1.0 [Group="MT >> 04b << SDF Face"; SortPriority=4];
-		ScalarParameter In_SdfFace_SecondaryRampOffset = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=5];
-		ScalarParameter In_SdfFace_OverallSpecIntensity = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=6];
-		ScalarParameter In_SdfFace_PrimaryLobeIntensity = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=7];
-		ScalarParameter In_SdfFace_SecondaryLobeIntensity = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=8];
-		ScalarParameter In_SdfFace_SpecShadowStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=9];
-		ScalarParameter In_SdfFace_WarmTintStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=10];
+		ScalarParameter In_SdfFace_ScatterStrength = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=0; Description="次表面散射强度. 会把明暗交界线向暗部推, 让皮肤过渡更软."];
+		ScalarParameter In_SdfFace_TransStrength = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=1; Description="背光透射强度(耳朵、鼻翼的透光)."];
+		ScalarParameter In_SdfFace_TransPower = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=2; Description="背光透射的集中度. 越大越集中在正背光方向."];
+		ScalarParameter In_SdfFace_PrimaryRoughnessScale = 1.0 [Group="37 - Feature: SDF Face"; SortPriority=3; Description="主高光粗糙度倍数. 小于 1 让高光更小更锐."];
+		ScalarParameter In_SdfFace_SecondaryRoughnessScale = 1.0 [Group="37 - Feature: SDF Face"; SortPriority=4; Description="次高光粗糙度倍数, 通常比主高光大, 做出油光的外圈."];
+		ScalarParameter In_SdfFace_SecondaryRampOffset = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=5; Description="次高光在 Specular Ramp 上的横向偏移."];
+		ScalarParameter In_SdfFace_OverallSpecIntensity = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=6; Description="两道高光的总强度. 在这次重构之前这个槽位写不进去, 所以每张 SDF 脸的 toon 高光都是 0 —— 现在可以打开了."];
+		ScalarParameter In_SdfFace_PrimaryLobeIntensity = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=7; Description="主高光瓣强度."];
+		ScalarParameter In_SdfFace_SecondaryLobeIntensity = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=8; Description="次高光瓣强度."];
+		ScalarParameter In_SdfFace_SpecShadowStrength = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=9; Description="高光受阴影影响的程度."];
+		ScalarParameter In_SdfFace_WarmTintStrength = 0.0 [Group="37 - Feature: SDF Face"; SortPriority=10; Description="散射的暖色偏移强度. 越大散射越偏红."];
 	}
 
 	Graph = {

@@ -26,31 +26,31 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # feature key -> (dsf name, MOON_SHADING_FEATURE_ID_*, slot-table macro, parameter group)
 FEATURES = {
     "Default":           ("Default",           "MOON_SHADING_FEATURE_ID_DEFAULT",
-                          "MOON_TOON_SLOTS_DEFAULT",             "MT >> 00 << Default"),
+                          "MOON_TOON_SLOTS_DEFAULT",             "31 - Feature: Default"),
     "PBRSpecular":       ("PBRSpecular",       "MOON_SHADING_FEATURE_ID_PBR_SPECULAR",
-                          "MOON_TOON_SLOTS_PBR_SPECULAR",        "MT >> 00 << Default"),
+                          "MOON_TOON_SLOTS_PBR_SPECULAR",        "32 - Feature: PBR Specular"),
     "KajiyaHair":        ("KajiyaHair",        "MOON_SHADING_FEATURE_ID_KAJIYA_HAIR_SPECULAR",
-                          "MOON_TOON_SLOTS_KAJIYA_HAIR",         "MT >> 02 << Hair Kajiya Kay"),
+                          "MOON_TOON_SLOTS_KAJIYA_HAIR",         "34 - Feature: Hair Kajiya Kay"),
     "ToonKajiyaHair":    ("ToonKajiyaHair",    "MOON_SHADING_FEATURE_ID_TOON_KAJIYA_HAIR_SPECULAR",
-                          "MOON_TOON_SLOTS_KAJIYA_HAIR",         "MT >> 03 << Hair Toon Kajiya Kay"),
+                          "MOON_TOON_SLOTS_KAJIYA_HAIR",         "35 - Feature: Hair Toon Kajiya Kay"),
     "DFFacialShadow":    ("DFFacialShadow",    "MOON_SHADING_FEATURE_ID_DISTANCE_FIELD_FACIAL_SHADOW",
-                          "MOON_TOON_SLOTS_SKIN",                "MT >> 04b << SDF Face"),
+                          "MOON_TOON_SLOTS_SKIN",                "37 - Feature: SDF Face"),
     "HairHighlightMask": ("HairHighlightMask", "MOON_SHADING_FEATURE_ID_HAIR_HIGHLIGHT_MASK",
-                          "MOON_TOON_SLOTS_HAIR_HIGHLIGHT_MASK", "MT >> 01 << Hair Highlight Mask"),
+                          "MOON_TOON_SLOTS_HAIR_HIGHLIGHT_MASK", "33 - Feature: Hair Highlight Mask"),
     "Skin":              ("Skin",              "MOON_SHADING_FEATURE_ID_SKIN",
-                          "MOON_TOON_SLOTS_SKIN",                "MT >> 04 << Skin"),
+                          "MOON_TOON_SLOTS_SKIN",                "36 - Feature: Skin"),
     "Stockings":         ("Stockings",         "MOON_SHADING_FEATURE_ID_PBR_STOCKINGS",
-                          "MOON_TOON_SLOTS_PBR_STOCKINGS",       "MT >> 05 << Stockings"),
+                          "MOON_TOON_SLOTS_PBR_STOCKINGS",       "38 - Feature: Stockings"),
     "Eye":               ("Eye",               "MOON_SHADING_FEATURE_ID_EYE",
-                          "MOON_TOON_SLOTS_EYE",                 "MT >> 06 << Eye"),
+                          "MOON_TOON_SLOTS_EYE",                 "39 - Feature: Eye"),
     "ClothVelvet":       ("ClothVelvet",       "MOON_SHADING_FEATURE_ID_CLOTH_VELVET",
-                          "MOON_TOON_SLOTS_CLOTH_VELVET",        "MT >> 07 << Cloth Velvet"),
+                          "MOON_TOON_SLOTS_CLOTH_VELVET",        "40 - Feature: Cloth Velvet"),
     "ToonMetal":         ("ToonMetal",         "MOON_SHADING_FEATURE_ID_TOON_METAL",
-                          "MOON_TOON_SLOTS_TOON_METAL",          "MT >> 08 << Metal"),
+                          "MOON_TOON_SLOTS_TOON_METAL",          "41 - Feature: Metal"),
     "EmissiveInk":       ("EmissiveInk",       "MOON_SHADING_FEATURE_ID_TOON_EMISSIVE_INK",
-                          "MOON_TOON_SLOTS_TOON_EMISSIVE_INK",   "MT >> 09 << Emissive Ink"),
+                          "MOON_TOON_SLOTS_TOON_EMISSIVE_INK",   "42 - Feature: Emissive Ink"),
     "Matcap":            ("Matcap",            "MOON_SHADING_FEATURE_ID_MATCAP",
-                          "MOON_TOON_SLOTS_MATCAP",              "MT >> 10 << Matcap"),
+                          "MOON_TOON_SLOTS_MATCAP",              "43 - Feature: Matcap"),
 }
 
 # slot Name (from the engine table) -> (material parameter name, default literal).
@@ -205,6 +205,114 @@ MAP_INPUTS = {
     },
 }
 
+# Artist-facing description per slot. Keyed by slot Name, shared across features that reuse a slot
+# table (Kajiya / Toon Kajiya, Skin / SDF Face), then overridden per feature where the meaning
+# differs. Shown as the tooltip in the material instance panel.
+DESC_COMMON = {
+    # Kajiya Kay hair
+    "TangentRotate":           "发丝切线绕法线旋转, 单位为 PI 弧度. 仅在材质没有各向异性方向时生效.",
+    "PrimaryShift":            "主高光(靠近发根的那道)沿法线的偏移. 正值上移, 负值下移.",
+    "SecondaryShift":          "次高光(靠近发梢的那道)沿法线的偏移.",
+    "SecondaryMask":           "次高光的遮罩, 0~1. 通常由发丝遮罩贴图驱动.",
+    "PrimaryExpScale":         "主高光锐度倍数. 大于 1 更锐, 小于 1 更散.",
+    "SecondaryExpScale":       "次高光锐度倍数.",
+    "OverallIntensity":        "两道高光的总强度. 0 = 关闭整个 Kajiya 高光.",
+    "PrimaryIntensity":        "主高光强度.",
+    "SecondaryIntensity":      "次高光强度.",
+    "SecondaryShiftScale":     "次高光偏移的额外缩放, 用来拉开两道高光的间距.",
+    "ShadowStrength":          "高光受阴影影响的程度. 0 = 阴影里也保持全亮, 1 = 完全跟随阴影.",
+    # Skin / SDF face
+    "ScatterStrength":         "次表面散射强度. 会把明暗交界线向暗部推, 让皮肤过渡更软.",
+    "TransmissionStrength":    "背光透射强度(耳朵、鼻翼的透光).",
+    "TransmissionPower":       "背光透射的集中度. 越大越集中在正背光方向.",
+    "PrimaryRoughnessScale":   "主高光粗糙度倍数. 小于 1 让高光更小更锐.",
+    "SecondaryRoughnessScale": "次高光粗糙度倍数, 通常比主高光大, 做出油光的外圈.",
+    "SecondaryRampOffset":     "次高光在 Specular Ramp 上的横向偏移.",
+    "OverallSpecIntensity":    "两道高光的总强度. 0 = 没有高光.",
+    "PrimaryLobeIntensity":    "主高光瓣强度.",
+    "SecondaryLobeIntensity":  "次高光瓣强度.",
+    "SpecShadowStrength":      "高光受阴影影响的程度.",
+    "WarmTintStrength":        "散射的暖色偏移强度. 越大散射越偏红.",
+}
+
+DESC = {
+    "Default": {
+        "MultiBandCelEnable": "大于 0.5 时跳过硬明暗交界, 改由 Diffuse Ramp 贴图自己定义几阶、阶在哪. 0 = 保持原本的二值 cel.",
+        "TerminatorWidth":    "每材质的明暗交界宽度, 与逐光源的 ToonLightSmooth 解耦 —— 同一盏灯下皮肤软、布料硬. 0 = 完全交给 Ramp.",
+        "BloomWeight":        "该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理). 用来让眼睛发光而皮肤不泛光.",
+    },
+    "PBRSpecular": {
+        "BloomWeight":        "该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理).",
+    },
+    "HairHighlightMask": {
+        "Mask":            "天使环遮罩, 一般由发丝高光贴图驱动. 逐像素输入会与这个常量相加.",
+        "Intensity":       "天使环强度. 0 = 关闭.",
+        "ShadowIntensity": "天使环在阴影中保留多少. 0 = 阴影里完全消失, 1 = 不受阴影影响.",
+        "ViewAnchorBlend": "0 = 天使环锚定在光照角度(旧行为); 1 = 锚定在视角, 环会跟着相机走, 更接近手绘动画的做法.",
+    },
+    "Stockings": {
+        "Density":               "丝袜密度. 越大越不透, 底色与肤色的混合越偏向底色.",
+        "FresnelPower":          "掠射角衰减的幂次. 越大, 变暗只发生在更接近边缘的地方.",
+        "TransmissionStrength":  "背光透射强度.",
+        "RoughnessScale":        "高光粗糙度倍数.",
+        "SpecularIntensity":     "高光总强度.",
+        "ShadowStrength":        "漫反射受阴影影响的程度.",
+        "GrazingDarkenStrength": "掠射角变暗强度, 做出丝袜边缘收深的效果.",
+        "BaseColor":             "丝袜自身的底色. 全黑 = 未授权, 此时回退到材质的 Base Color.",
+        "GrazingSpecBoost":      "掠射角高光增益, 做出边缘的一圈亮光.",
+    },
+    "Eye": {
+        "DiffuseWrapStrength":    "眼球漫反射的 wrap 强度, 让受光过渡更柔和.",
+        "LimbalDarkenStrength":   "角膜缘变暗强度 —— 视角越偏, 眼球边缘越深.",
+        "SpecularShadowStrength": "高光受阴影影响的程度.",
+        "PrimaryRoughnessScale":  "主高光(小而锐的那点)粗糙度倍数.",
+        "SecondaryRoughnessScale":"次高光(大而柔的那片)粗糙度倍数.",
+        "PrimaryIntensity":       "主高光强度.",
+        "SecondaryIntensity":     "次高光强度.",
+        "EyeTint":                "眼球染色. 全黑 = 未授权, 此时用材质的 Base Color.",
+        "SecondaryRampOffset":    "次高光在 Specular Ramp 上的横向偏移.",
+    },
+    "ClothVelvet": {
+        "WrapStrength":          "布料漫反射的 wrap 强度.",
+        "SheenPower":            "绒光的幂次. 越大, 绒光越集中在轮廓边缘.",
+        "SheenShadowStrength":   "绒光受阴影影响的程度.",
+        "RoughnessScale":        "高光粗糙度倍数.",
+        "SheenIntensity":        "绒光强度. 0 = 没有绒感.",
+        "RetroDiffuseStrength":  "逆反射强度 —— 光从相机方向来时的额外提亮, 天鹅绒的典型特征.",
+        "GrazingDarkenStrength": "掠射角变暗强度.",
+        "SheenTint":             "绒光颜色.",
+        "RimBias":               "绒光在背光面的保底值. 0 = 背光面没有绒光.",
+    },
+    "ToonMetal": {
+        "DiffuseIntensity":    "金属漫反射强度. 金属通常很低.",
+        "ShadowSpecularFloor": "阴影中高光的保底值. 0 = 阴影里高光全灭.",
+        "RampOffset":          "高光在 Specular Ramp 上的横向偏移, 用来整体调亮或调暗.",
+        "RoughnessScale":      "高光粗糙度倍数.",
+        "SpecularIntensity":   "高光总强度.",
+        "EdgeBoost":           "掠射角高光增益, 做出金属边缘的亮边.",
+        "SpecularContrast":    "高光对比度(Ramp 的幂次). 越大高光越硬、越集中.",
+        "MetalTint":           "金属高光染色.",
+    },
+    "EmissiveInk": {
+        "LightInfluence":    "受光影响程度. 0 = 完全自发光不受光照, 1 = 正常受光.",
+        "ShadowLift":        "阴影提亮 —— 阴影中保留多少亮度. 0 = 阴影全黑.",
+        "InkDarkenStrength": "掠射角变暗强度, 做出墨色向边缘收深.",
+        "RoughnessScale":    "高光粗糙度倍数.",
+        "SpecularIntensity": "高光总强度.",
+        "EdgeBoost":         "掠射角高光增益.",
+        "InkBlend":          "墨色与材质 Base Color 的混合比. 0 = 完全用 Base Color, 1 = 完全用墨色.",
+        "InkTint":           "墨色.",
+        "RimBias":           "边缘高光的菲涅尔偏置.",
+    },
+    "Matcap": {
+        "Intensity":   "Matcap 强度. 0 = 未授权(按 1.0 处理).",
+        "MatcapColor": "Matcap 采样结果. 由材质图用视空间法线当 UV 采样贴图后接进来 —— Matcap 自带光照, 不再乘光源颜色.",
+    },
+    "DFFacialShadow": {
+        "OverallSpecIntensity": "两道高光的总强度. 在这次重构之前这个槽位写不进去, 所以每张 SDF 脸的 toon 高光都是 0 —— 现在可以打开了.",
+    },
+}
+
 # Colours for the "Debug Shading Feature" base-material view. Kept exactly as the old writer's
 # DebugColor branches so the view still reads the same.
 DEBUG_COLORS = {
@@ -271,8 +379,12 @@ def emit(feature_key, tables):
     for i, (t, _, name) in enumerate(rows):
         pname, default = params[name]
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
-        prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d];'
-                          % (kind, pname, default, group, i))
+        desc = DESC.get(feature_key, {}).get(name) or DESC_COMMON.get(name)
+        if not desc:
+            raise SystemExit("%s.%s has no description -- add one to DESC or DESC_COMMON"
+                             % (feature_key, name))
+        prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d; Description="%s"];'
+                          % (kind, pname, default, group, i, desc))
         expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")
         if name in maps:
             fn_in = maps[name][0]
@@ -385,8 +497,11 @@ def emit_selector(tables, ids):
         % (t, n, "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0") for (t, n) in sel_inputs)
 
     props = "\n".join(
-        '\t\tStaticSwitchParameter Feature_Is_%s = false [Group="MT >> __ << Shading Feature"; SortPriority=%d];'
-        % (FEATURES[k][0], i) for i, k in enumerate(picks))
+        '\t\tStaticSwitchParameter Feature_Is_%s = false '
+        '[Group="30 - Shading Feature (pick one)"; SortPriority=%d; '
+        'Description="启用 %s 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. '
+        '勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];'
+        % (FEATURES[k][0], i, FEATURES[k][3].split(": ")[-1]) for i, k in enumerate(picks))
 
     def call(k, out_index):
         args = "".join("%s, " % sel_in for (_, _, sel_in) in _feature_inputs(k, tables))

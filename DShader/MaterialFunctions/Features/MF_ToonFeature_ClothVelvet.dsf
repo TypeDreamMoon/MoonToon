@@ -53,15 +53,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ClothVelvet", Roo
 	}
 
 	Properties = {
-		ScalarParameter In_ClothVelvet_DiffuseWrapStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=0];
-		ScalarParameter In_ClothVelvet_SheenPower = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=1];
-		ScalarParameter In_ClothVelvet_SheenShadowStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=2];
-		ScalarParameter In_ClothVelvet_RoughnessScale = 1.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=3];
-		ScalarParameter In_ClothVelvet_SheenIntensity = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=4];
-		ScalarParameter In_ClothVelvet_RetroDiffuseStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=5];
-		ScalarParameter In_ClothVelvet_GrazingDarkenStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=6];
-		VectorParameter In_ClothVelvet_SheenTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="MT >> 07 << Cloth Velvet"; SortPriority=7];
-		ScalarParameter In_ClothVelvet_RimBias = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=8];
+		ScalarParameter In_ClothVelvet_DiffuseWrapStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=0; Description="布料漫反射的 wrap 强度."];
+		ScalarParameter In_ClothVelvet_SheenPower = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=1; Description="绒光的幂次. 越大, 绒光越集中在轮廓边缘."];
+		ScalarParameter In_ClothVelvet_SheenShadowStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=2; Description="绒光受阴影影响的程度."];
+		ScalarParameter In_ClothVelvet_RoughnessScale = 1.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=3; Description="高光粗糙度倍数."];
+		ScalarParameter In_ClothVelvet_SheenIntensity = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=4; Description="绒光强度. 0 = 没有绒感."];
+		ScalarParameter In_ClothVelvet_RetroDiffuseStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=5; Description="逆反射强度 —— 光从相机方向来时的额外提亮, 天鹅绒的典型特征."];
+		ScalarParameter In_ClothVelvet_GrazingDarkenStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=6; Description="掠射角变暗强度."];
+		VectorParameter In_ClothVelvet_SheenTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="40 - Feature: Cloth Velvet"; SortPriority=7; Description="绒光颜色."];
+		ScalarParameter In_ClothVelvet_RimBias = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=8; Description="绒光在背光面的保底值. 0 = 背光面没有绒光."];
 	}
 
 	Graph = {

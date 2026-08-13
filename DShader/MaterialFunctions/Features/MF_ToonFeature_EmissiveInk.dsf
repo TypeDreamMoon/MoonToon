@@ -53,15 +53,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_EmissiveInk", Roo
 	}
 
 	Properties = {
-		ScalarParameter In_ToonEmissiveInk_LightInfluence = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=0];
-		ScalarParameter In_ToonEmissiveInk_ShadowLift = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=1];
-		ScalarParameter In_ToonEmissiveInk_InkDarkenStrength = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=2];
-		ScalarParameter In_ToonEmissiveInk_RoughnessScale = 1.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=3];
-		ScalarParameter In_ToonEmissiveInk_SpecularIntensity = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=4];
-		ScalarParameter In_ToonEmissiveInk_EdgeBoost = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=5];
-		ScalarParameter In_ToonEmissiveInk_InkBlend = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=6];
-		VectorParameter In_ToonEmissiveInk_InkTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 09 << Emissive Ink"; SortPriority=7];
-		ScalarParameter In_ToonEmissiveInk_RimBias = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=8];
+		ScalarParameter In_ToonEmissiveInk_LightInfluence = 0.0 [Group="42 - Feature: Emissive Ink"; SortPriority=0; Description="受光影响程度. 0 = 完全自发光不受光照, 1 = 正常受光."];
+		ScalarParameter In_ToonEmissiveInk_ShadowLift = 0.0 [Group="42 - Feature: Emissive Ink"; SortPriority=1; Description="阴影提亮 —— 阴影中保留多少亮度. 0 = 阴影全黑."];
+		ScalarParameter In_ToonEmissiveInk_InkDarkenStrength = 0.0 [Group="42 - Feature: Emissive Ink"; SortPriority=2; Description="掠射角变暗强度, 做出墨色向边缘收深."];
+		ScalarParameter In_ToonEmissiveInk_RoughnessScale = 1.0 [Group="42 - Feature: Emissive Ink"; SortPriority=3; Description="高光粗糙度倍数."];
+		ScalarParameter In_ToonEmissiveInk_SpecularIntensity = 0.0 [Group="42 - Feature: Emissive Ink"; SortPriority=4; Description="高光总强度."];
+		ScalarParameter In_ToonEmissiveInk_EdgeBoost = 0.0 [Group="42 - Feature: Emissive Ink"; SortPriority=5; Description="掠射角高光增益."];
+		ScalarParameter In_ToonEmissiveInk_InkBlend = 0.0 [Group="42 - Feature: Emissive Ink"; SortPriority=6; Description="墨色与材质 Base Color 的混合比. 0 = 完全用 Base Color, 1 = 完全用墨色."];
+		VectorParameter In_ToonEmissiveInk_InkTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="42 - Feature: Emissive Ink"; SortPriority=7; Description="墨色."];
+		ScalarParameter In_ToonEmissiveInk_RimBias = 0.0 [Group="42 - Feature: Emissive Ink"; SortPriority=8; Description="边缘高光的菲涅尔偏置."];
 	}
 
 	Graph = {
