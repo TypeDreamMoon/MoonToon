@@ -29,6 +29,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Matcap", Root="Pl
 	}
 
 	Inputs = {
+
 	}
 
 	Outputs = {

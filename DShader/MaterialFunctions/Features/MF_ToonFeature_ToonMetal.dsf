@@ -41,6 +41,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonMetal", Root=
 	}
 
 	Inputs = {
+
 	}
 
 	Outputs = {

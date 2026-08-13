@@ -31,6 +31,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Default", Root="P
 	}
 
 	Inputs = {
+
 	}
 
 	Outputs = {

@@ -47,6 +47,8 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonKajiyaHair", 
 	}
 
 	Inputs = {
+		opt float InSecondaryStrandShift = 0.0 [Description="Per-pixel SecondaryShift from a map, added to the parameter."];
+		opt float InPrimaryStrandShift = 0.0 [Description="Per-pixel PrimaryShift from a map, added to the parameter."];
 	}
 
 	Outputs = {
@@ -72,9 +74,9 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonKajiyaHair", 
 	Graph = {
 		ToonFeatureWrite_ToonKajiyaHair(
 			In_ToonHair_TangentRotate,
-			In_ToonHair_SecondaryShift,
+			InSecondaryStrandShift + In_ToonHair_SecondaryShift,
 			In_ToonHair_SecondaryMask,
-			In_ToonHair_PrimaryStrandShift,
+			InPrimaryStrandShift + In_ToonHair_PrimaryStrandShift,
 			In_ToonHair_PrimaryExpScale,
 			In_ToonHair_SecondaryExpScale,
 			In_ToonHair_OverallSpecIntensity,

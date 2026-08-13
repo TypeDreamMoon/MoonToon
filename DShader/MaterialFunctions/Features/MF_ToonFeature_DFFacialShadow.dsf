@@ -47,6 +47,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_DFFacialShadow", 
 	}
 
 	Inputs = {
+
 	}
 
 	Outputs = {

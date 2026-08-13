@@ -19,6 +19,7 @@ import re
 import sys
 
 SLOT_TABLE = r"F:\UnrealEngine\UE_Moon\Engine\Shaders\Shared\MoonToonFeatureSlots.h"
+ID_TABLE = os.path.join(os.path.dirname(SLOT_TABLE), "MoonToonShadingFeatureDefinitions.h")
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "..", "DShader", "MaterialFunctions", "Features")
 
@@ -184,6 +185,44 @@ PARAMS = {
     },
 }
 
+# Slots that can also be driven per-pixel from a map, on top of their constant parameter.
+# feature key -> {slot Name: (function input name, selector input name)}
+#
+# The old writer took these as pins and the constant was either added to them (Toon Kajiya's strand
+# shifts) or missing entirely (the hair highlight mask, whose In_Hair_HighlightMask parameter was
+# declared and then never passed -- dead since it was written). Everything is input + parameter now,
+# which reproduces the old result whenever the parameter is at its 0 default.
+MAP_INPUTS = {
+    "HairHighlightMask": {
+        "Mask": ("InHighlightMask", "InHairHighlightMask"),
+    },
+    "ToonKajiyaHair": {
+        "PrimaryShift":   ("InPrimaryStrandShift", "InToonKajiyaPrimaryStrandShift"),
+        "SecondaryShift": ("InSecondaryStrandShift", "InToonKajiyaSecondaryStrandShift"),
+    },
+    "Stockings": {
+        "BaseColor": ("InBodyColor", "InStockingsBodyColor"),
+    },
+}
+
+# Colours for the "Debug Shading Feature" base-material view. Kept exactly as the old writer's
+# DebugColor branches so the view still reads the same.
+DEBUG_COLORS = {
+    "Default":           "float4(0.0, 0.0, 0.0, 1.0)",
+    "PBRSpecular":       "float4(0.25, 0.25, 0.25, 1.0)",
+    "KajiyaHair":        "float4(0.0, 1.0, 0.0, 1.0)",
+    "ToonKajiyaHair":    "float4(0.0, 0.0, 1.0, 1.0)",
+    "DFFacialShadow":    "float4(1.0, 1.0, 1.0, 1.0)",
+    "HairHighlightMask": "float4(1.0, 0.0, 0.0, 1.0)",
+    "Skin":              "float4(1.0, 1.0, 0.0, 1.0)",
+    "Stockings":         "float4(1.0, 0.0, 1.0, 1.0)",
+    "Eye":               "float4(0.0, 1.0, 1.0, 1.0)",
+    "ClothVelvet":       "float4(0.5, 1.0, 0.5, 1.0)",
+    "ToonMetal":         "float4(1.0, 0.5, 0.5, 1.0)",
+    "EmissiveInk":       "float4(0.5, 0.5, 1.0, 1.0)",
+    "Matcap":            "float4(1.0, 0.75, 0.0, 1.0)",
+}
+
 HEADER = """// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
 // Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
 //
@@ -226,13 +265,23 @@ def emit(feature_key, tables):
                       for (t, _, n) in rows)
     body = "\n".join("\tTBuffer.%s = %s;" % (slot, name) for (_, slot, name) in rows)
 
-    prop_lines, call_lines = [], []
+    maps = MAP_INPUTS.get(feature_key, {})
+
+    prop_lines, call_lines, input_lines = [], [], []
     for i, (t, _, name) in enumerate(rows):
         pname, default = params[name]
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
         prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d];'
                           % (kind, pname, default, group, i))
-        call_lines.append("\t\t\t%s%s," % (pname, ".rgb" if t == "float3" else ""))
+        expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")
+        if name in maps:
+            fn_in = maps[name][0]
+            input_lines.append(
+                '\t\topt %s %s = %s [Description="Per-pixel %s from a map, added to the parameter."];'
+                % ("float3" if t == "float3" else "float", fn_in,
+                   "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0", name))
+            expr = "%s + %s" % (fn_in, expr)
+        call_lines.append("\t\t\t%s," % expr)
 
     return """%s
 Function %s(
@@ -257,6 +306,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_%s", Root="Plugin
 \t}
 
 \tInputs = {
+%s
 \t}
 
 \tOutputs = {
@@ -276,7 +326,146 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_%s", Root="Plugin
 \t}
 }
 """ % (HEADER, fn, args, id_macro, body, dsf_name, dsf_name,
-       "\n".join(prop_lines), fn, "\n".join(call_lines))
+       "\n".join(input_lines), "\n".join(prop_lines), fn, "\n".join(call_lines))
+
+
+SELECT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "..", "DShader", "MaterialFunctions", "MF_MoonToonFeatureSelect.dsf")
+
+# Default is the fallback rather than a checkbox: an instance with nothing ticked shades as plain
+# toon, which is what a fresh material should do.
+FALLBACK = "Default"
+
+
+def _feature_inputs(key, tables):
+    """[(type, function input name, selector input name)] in slot-table order."""
+    maps = MAP_INPUTS.get(key, {})
+    if not maps:
+        return []
+    order = [n for (_, _, n) in tables[FEATURES[key][2]] if n in maps]
+    return [("float3" if dict((n, t) for (t, _, n) in tables[FEATURES[key][2]])[n] == "float3"
+             else "float", maps[n][0], maps[n][1]) for n in order]
+
+
+def parse_feature_ids(path):
+    """MOON_SHADING_FEATURE_ID_* -> numeric value, straight from the shared definition header."""
+    src = open(path, encoding="utf-8").read()
+    return {m.group(1): int(m.group(2))
+            for m in re.finditer(r"#define\s+(MOON_SHADING_FEATURE_ID_\w+)\s+(\d+)", src)}
+
+
+def emit_selector(tables, ids):
+    picks = [k for k in FEATURES if k != FALLBACK]
+
+    def decl(k):
+        ins = _feature_inputs(k, tables)
+        in_block = "\n".join('\t\topt %s %s = %s;'
+                             % (t, fn_in, "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0")
+                             for (t, fn_in, _) in ins)
+        return ('VirtualFunction(Name="MF_ToonFeature_%s")\n'
+                "{\n"
+                "\tOptions = {\n"
+                '\t\tAsset = Path(Plugins.MoonToon, "MaterialFunctions/Features/MF_ToonFeature_%s");\n'
+                "\t}\n\n"
+                "\tInputs = {\n%s\n\t}\n\n"
+                "\tOutputs = {\n\t\tfloat4 ToonBufferA;\n\t\tfloat4 ToonBufferB;\n\t\tfloat4 ToonBufferC;\n\t}\n"
+                "}" % (FEATURES[k][0], FEATURES[k][0], in_block))
+
+    decls = "\n".join(decl(k) for k in FEATURES)
+
+    # Selector-level inputs: the union of every feature's map-driven slots, deduplicated.
+    sel_inputs, seen = [], set()
+    for k in FEATURES:
+        for (t, _, sel_in) in _feature_inputs(k, tables):
+            if sel_in not in seen:
+                seen.add(sel_in)
+                sel_inputs.append((t, sel_in))
+    sel_in_block = "\n".join(
+        '\t\topt %s %s = %s [Description="Per-pixel value from a map; added to the matching parameter."];'
+        % (t, n, "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0") for (t, n) in sel_inputs)
+
+    props = "\n".join(
+        '\t\tStaticSwitchParameter Feature_Is_%s = false [Group="MT >> __ << Shading Feature"; SortPriority=%d];'
+        % (FEATURES[k][0], i) for i, k in enumerate(picks))
+
+    def call(k, out_index):
+        args = "".join("%s, " % sel_in for (_, _, sel_in) in _feature_inputs(k, tables))
+        return "MF_ToonFeature_%s(%sOutputIndex=%d)" % (FEATURES[k][0], args, out_index)
+
+    def chain(out_index, depth=0):
+        if depth == len(picks):
+            return call(FALLBACK, out_index)
+        k = picks[depth]
+        pad = "\t\t\t" + "\t" * depth
+        return ("Feature_Is_%s(\n%sTrue = %s,\n%sFalse = %s)"
+                % (FEATURES[k][0], pad, call(k, out_index), pad, chain(out_index, depth + 1)))
+
+    def id_chain(depth=0):
+        if depth == len(picks):
+            return "%d.0" % ids[FEATURES[FALLBACK][1]]
+        k = picks[depth]
+        pad = "\t\t\t" + "\t" * depth
+        return ("Feature_Is_%s(\n%sTrue = %d.0,\n%sFalse = %s)"
+                % (FEATURES[k][0], pad, ids[FEATURES[k][1]], pad, id_chain(depth + 1)))
+
+    body = "\n\n".join("\t\t%s = %s;" % (name, chain(i))
+                       for i, name in enumerate(["ToonBufferA", "ToonBufferB", "ToonBufferC"]))
+    def const_chain(values, depth=0):
+        if depth == len(picks):
+            return values[FALLBACK]
+        k = picks[depth]
+        pad = "\t\t\t" + "\t" * depth
+        return ("Feature_Is_%s(\n%sTrue = %s,\n%sFalse = %s)"
+                % (FEATURES[k][0], pad, values[k], pad, const_chain(values, depth + 1)))
+
+    body += "\n\n\t\tShadingFeatureID = %s;" % id_chain()
+    body += "\n\n\t\tDebugColor = %s;" % const_chain(DEBUG_COLORS)
+
+    return """// GENERATED by Tools/gen_feature_functions.py. Do not edit.
+//
+// Static feature selection. Only the selected branch survives compilation, and -- the point of
+// making the choice static -- only its parameters survive the material instance panel:
+// GetVisibleMaterialParametersFromExpression descends the taken side of a static switch and no
+// other, so an instance shows ~11 feature rows instead of all 80.
+//
+// Exactly one switch should be on. If several are, the topmost in this file wins; if none are, the
+// material shades as plain toon.
+
+%s
+
+ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.MoonToon")
+{
+\tSettings = {
+\t\tDescription       = "Selects one toon shading feature and packs its parameters into ToonBufferA/B/C.";
+\t\tExposeToLibrary   = true;
+\t\tLibraryCategories = "MoonToon";
+\t}
+
+\tInputs = {
+%s
+\t}
+
+\tOutputs = {
+\t\tfloat4 ToonBufferA;
+\t\tfloat4 ToonBufferB;
+\t\tfloat4 ToonBufferC;
+\t\t// The same static choice that picked the branch above, as a raw feature id. Feeding
+\t\t// MoonEncodeToonAttributes from here instead of from a separate scalar parameter is what stops
+\t\t// TBufferA.x and the material-attribute copy of the id from being able to disagree.
+\t\tfloat ShadingFeatureID;
+\t\t// Per-feature flat colour for the base material's "Debug Shading Feature" view.
+\t\tfloat4 DebugColor;
+\t}
+
+\tProperties = {
+%s
+\t}
+
+\tGraph = {
+%s
+\t}
+}
+""" % (decls, sel_in_block, props, body)
 
 
 def main():
@@ -289,10 +478,13 @@ def main():
     out_dir = os.path.normpath(OUT_DIR)
     os.makedirs(out_dir, exist_ok=True)
 
+    targets = [(os.path.join(out_dir, "MF_ToonFeature_%s.dsf" % FEATURES[k][0]), emit(k, tables))
+               for k in FEATURES]
+    ids = parse_feature_ids(os.path.normpath(ID_TABLE))
+    targets.append((os.path.normpath(SELECT_PATH), emit_selector(tables, ids)))
+
     stale = []
-    for key in FEATURES:
-        path = os.path.join(out_dir, "MF_ToonFeature_%s.dsf" % FEATURES[key][0])
-        text = emit(key, tables)
+    for path, text in targets:
         old = open(path, encoding="utf-8").read() if os.path.exists(path) else None
         if old == text:
             continue
@@ -300,7 +492,7 @@ def main():
             stale.append(os.path.basename(path))
         else:
             open(path, "w", encoding="utf-8", newline="\n").write(text)
-            print("wrote %s (%d slots)" % (os.path.basename(path), len(tables[FEATURES[key][2]])))
+            print("wrote %s" % os.path.basename(path))
 
     if stale:
         print("stale, re-run the generator: %s" % ", ".join(stale))
