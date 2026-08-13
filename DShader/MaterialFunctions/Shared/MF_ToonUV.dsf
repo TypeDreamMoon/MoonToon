@@ -1,0 +1,50 @@
+// Shared UV construction: pick a UV channel, scale it, offset it.
+//
+// The base input spelled this out three times -- a UVChannelSwitch, a Multiply against a float2
+// built from two scalars, and an Add against a float2 built from two more. Twelve parameters and
+// about sixty lines of graph for one idea stated three ways.
+//
+// Scale and offset are one float4 rather than four scalars (xy = scale, zw = offset). No material
+// instance in the project overrode any of the twelve scalars, so nothing had to be migrated.
+
+VirtualFunction(Name="MF_UVChannelSwitch")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Utils/MF_UVChannelSwitch");
+	}
+
+	Inputs = {
+		float UVChannelIndex;
+	}
+
+	Outputs = {
+		float2 Result;
+	}
+}
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonUV", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "UV channel select, then scale and offset. ScaleOffset is xy = scale, zw = offset.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+		opt float UVChannel = 0.0 [
+			Description="Which UV channel to read.";
+		];
+		opt float4 ScaleOffset = float4(1.0, 1.0, 0.0, 0.0) [
+			Description="xy scales the UV, zw is added afterwards.";
+		];
+	}
+
+	Outputs = {
+		float2 UV;
+	}
+
+	Graph = {
+		float2 Selected = MF_UVChannelSwitch(UVChannel);
+		UV = (Selected * ScaleOffset.rg) + ScaleOffset.ba;
+	}
+}

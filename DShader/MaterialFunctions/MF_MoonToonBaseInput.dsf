@@ -102,6 +102,21 @@ VirtualFunction(Name="FlattenNormal")
 		float3 Result;
 	}
 }
+VirtualFunction(Name="MF_ToonUV")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonUV");
+	}
+
+	Inputs = {
+		opt float UVChannel = 0.0;
+		opt float4 ScaleOffset = float4(1.0, 1.0, 0.0, 0.0);
+	}
+
+	Outputs = {
+		float2 UV;
+	}
+}
 ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonToon")
 {
 	Settings = {
@@ -128,23 +143,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Group="04 - Kajiya Kay";
 			MaskChannel=Red
 		];
-		ScalarParameter Global_Mask_Map_UV_Offset_X = 0.0 [
-			ParameterName="Global Mask Map UV Offset X";
+		VectorParameter Global_Mask_Map_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
+			ParameterName="Global Mask Map UV Scale/Offset";
 			Group="01 - Global Mask Map";
 			SortPriority=33;
-		];
-		ScalarParameter Global_Mask_Map_UV_Offset_Y = 0.0 [
-			ParameterName="Global Mask Map UV Offset Y";
-			Group="01 - Global Mask Map";
-			SortPriority=33;
-		];
-		ScalarParameter Global_Mask_Map_UV_Scale_X = 1.0 [
-			ParameterName="Global Mask Map UV Scale X";
-			Group="01 - Global Mask Map";
-		];
-		ScalarParameter Global_Mask_Map_UV_Scale_Y = 1.0 [
-			ParameterName="Global Mask Map UV Scale Y";
-			Group="01 - Global Mask Map";
+			Description="xy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
 		];
 		ScalarParameter Global_Mask_Map_UV_Channel = 0.0 [
 			ParameterName="Global Mask Map UV Channel";
@@ -235,25 +238,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Group="22 - Inner Outline";
 			SortPriority=33;
 		];
-		ScalarParameter Global_UV_Offset_X = 0.0 [
-			ParameterName="Global UV Offset X";
-			Group="00 - Global Settings";
-			SortPriority=102;
-		];
-		ScalarParameter Global_UV_Offset_Y = 0.0 [
-			ParameterName="Global UV Offset Y";
-			Group="00 - Global Settings";
-			SortPriority=102;
-		];
-		ScalarParameter Global_UV_Scale_X = 1.0 [
-			ParameterName="Global UV Scale X";
+		VectorParameter Global_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
+			ParameterName="Global UV Scale/Offset";
 			Group="00 - Global Settings";
 			SortPriority=101;
-		];
-		ScalarParameter Global_UV_Scale_Y = 1.0 [
-			ParameterName="Global UV Scale Y";
-			Group="00 - Global Settings";
-			SortPriority=101;
+			Description="xy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
 		];
 		ScalarParameter Global_UV_Channel = 0.0 [
 			ParameterName="Global UV Channel";
@@ -331,25 +320,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SortPriority=35;
 			Description="通过AO可以使某些区域始终处于阴影中.\r\n\r\nAO Map: 0为被遮挡, 1为被照亮. 默认为1.\r\n颜色空间: 线性.\r\n\r\n\r\nAO allows certain areas to be always in shadow.\r\n\r\nAO Map: 0 means occluded, 1 means illuminated. Default is 1.\r\nColor space: linear.";
 		];
-		ScalarParameter Normal_Map_UV_Offset_X = 0.0 [
-			ParameterName="Normal Map UV Offset X";
-			Group="20 - Normal";
-			SortPriority=102;
-		];
-		ScalarParameter Normal_Map_UV_Offset_Y = 0.0 [
-			ParameterName="Normal Map UV Offset Y";
-			Group="20 - Normal";
-			SortPriority=102;
-		];
-		ScalarParameter Normal_Map_UV_Scale_X = 1.0 [
-			ParameterName="Normal Map UV Scale X";
+		VectorParameter Normal_Map_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
+			ParameterName="Normal Map UV Scale/Offset";
 			Group="20 - Normal";
 			SortPriority=101;
-		];
-		ScalarParameter Normal_Map_UV_Scale_Y = 1.0 [
-			ParameterName="Normal Map UV Scale Y";
-			Group="20 - Normal";
-			SortPriority=101;
+			Description="xy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
 		];
 		ScalarParameter Normal_Map_UV_Channel = 0.0 [
 			ParameterName="Normal Map UV Channel";
@@ -517,9 +492,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float4 Sampled_Vertex_Color = StaticSwitchParameter;
 		#Region "UVs"
-		float2 MF_UVChannelSwitch = MF_UVChannelSwitch(Global_Mask_Map_UV_Channel);
-		float2 Multiply_1 = (MF_UVChannelSwitch * float2(Global_Mask_Map_UV_Scale_X, Global_Mask_Map_UV_Scale_Y));
-		float2 Add_1 = (Multiply_1 + float2(Global_Mask_Map_UV_Offset_X, Global_Mask_Map_UV_Offset_Y));
+		float2 Add_1 = MF_ToonUV(Global_Mask_Map_UV_Channel, Global_Mask_Map_UV_Scale_Offset);
 		#EndRegion
 
 		float2 Global_Mask_Map_UV = Add_1;
@@ -660,9 +633,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float3 InnerOutlineColor = StaticSwitchParameter_4;
 		#Region "UVs"
-		float2 MF_UVChannelSwitch_2 = MF_UVChannelSwitch(Global_UV_Channel);
-		float2 Multiply_2 = (MF_UVChannelSwitch_2 * float2(Global_UV_Scale_X, Global_UV_Scale_Y));
-		float2 Add_2 = (Multiply_2 + float2(Global_UV_Offset_X, Global_UV_Offset_Y));
+		float2 Add_2 = MF_ToonUV(Global_UV_Channel, Global_UV_Scale_Offset);
 		#EndRegion
 
 		float2 Global_UV = Add_2;
@@ -1103,9 +1074,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float AO = LinearInterpolate_2;
 		Attributes.AmbientOcclusion = AO;
 		#Region "UVs"
-		float2 MF_UVChannelSwitch_3 = MF_UVChannelSwitch(Normal_Map_UV_Channel);
-		float2 Multiply_10 = (MF_UVChannelSwitch_3 * float2(Normal_Map_UV_Scale_X, Normal_Map_UV_Scale_Y));
-		float2 Add_3 = (Multiply_10 + float2(Normal_Map_UV_Offset_X, Normal_Map_UV_Offset_Y));
+		float2 Add_3 = MF_ToonUV(Normal_Map_UV_Channel, Normal_Map_UV_Scale_Offset);
 		#EndRegion
 
 		float2 Normal_Map_UV = Add_3;
@@ -2065,14 +2034,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		Node(Var="MF_MooaMainLightDirection", X=-11600, Y=480);
 		Node(Var="Custom", X=-11376, Y=528);
 		Node(Var="Global_Mask_Map_UV_Channel", X=-10670, Y=-4046);
-		Node(Var="Global_Mask_Map_UV_Scale_X", X=-10670, Y=-3854);
-		Node(Var="Global_Mask_Map_UV_Scale_Y", X=-10670, Y=-3774);
 		Node(Var="Global_UV_Channel", X=-10670, Y=-3550);
-		Node(Var="Global_UV_Scale_X", X=-10670, Y=-3358);
-		Node(Var="Global_UV_Scale_Y", X=-10670, Y=-3278);
 		Node(Var="Normal_Map_UV_Channel", X=-10670, Y=-3038);
-		Node(Var="Normal_Map_UV_Scale_X", X=-10670, Y=-2846);
-		Node(Var="Normal_Map_UV_Scale_Y", X=-10670, Y=-2766);
 		Node(Var="Multiply_19", X=-10352, Y=160);
 		Node(Var="MF_UVChannelSwitch", X=-10334, Y=-4030);
 		Node(Var="MF_UVChannelSwitch_2", X=-10334, Y=-3534);
@@ -2080,14 +2043,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		Node(Var="Inner_Outline_Map_UV_Channel", X=-10158, Y=7202);
 		Node(Var="ID_Map_UV_Channel", X=-10078, Y=5458);
 		Node(Var="Multiply_2", X=-10030, Y=-3534);
-		Node(Var="Global_UV_Offset_X", X=-10030, Y=-3358);
-		Node(Var="Global_UV_Offset_Y", X=-10030, Y=-3278);
 		Node(Var="Multiply_10", X=-10030, Y=-3022);
-		Node(Var="Normal_Map_UV_Offset_X", X=-10030, Y=-2846);
-		Node(Var="Normal_Map_UV_Offset_Y", X=-10030, Y=-2766);
 		Node(Var="Multiply_1", X=-10014, Y=-4030);
-		Node(Var="Global_Mask_Map_UV_Offset_X", X=-10014, Y=-3854);
-		Node(Var="Global_Mask_Map_UV_Offset_Y", X=-10014, Y=-3774);
 		Node(Var="Rim_Light_Width_Channel_1", X=-9902, Y=4994);
 		Node(Var="MF_UVChannelSwitch_1", X=-9886, Y=7218);
 		Node(Var="MF_UVChannelSwitch_4", X=-9870, Y=5474);
