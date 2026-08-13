@@ -1,0 +1,62 @@
+// Per-texture-sampler sampling, shared. sRGB colour maps (base colour, emissive, specular colour, ...)
+//
+// UE has no way to switch a texture sample between the material's own sampler and the shared
+// world sampler group other than sampling twice and picking with a static switch -- the sampler
+// source is a node property, not a pin. The base input therefore repeated that three-node idiom
+// fourteen times. It is stated once here, per SamplerType, because SamplerType is a node property
+// too and cannot be an argument.
+//
+// The texture itself stays a parameter at the CALL SITE (a TextureObjectParameter in the base
+// input), not in here: a parameter declared inside a shared function would collapse all fourteen
+// maps onto one name. "Enable Per Texture Sampler" is deliberately the opposite -- one shared name
+// for one shared decision, so it stays a single row in the material instance panel.
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSampleColor", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Samples a texture object with the per-texture-sampler switch. sRGB colour maps (base colour, emissive, specular colour, ...)";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+		Texture2D Tex [Description="要采样的贴图. 由调用方的 TextureObjectParameter 提供, 参数名留在调用点."];
+		opt float2 UV = float2(0.0, 0.0) [Description="采样坐标."];
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+
+	Properties = {
+		StaticSwitchParameter Enable_Per_Texture_Sampler = false [
+			ParameterName="Enable Per Texture Sampler";
+			Group="00 - Global Settings";
+			SortPriority=32;
+			Description="开启后每张贴图使用自己的采样器设置; 关闭则共用 World 采样器组(省采样器槽位, UE 上限 16). 这一个开关同时作用于本材质的全部贴图.";
+		];
+	}
+
+	Graph = {
+		float4 OwnSampler =
+			UE.Expression(
+				Class="TextureSample",
+				OutputType="float4",
+				OutputIndex=5,
+				TextureObject=Tex,
+				Coordinates=UV,
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		float4 SharedSampler =
+			UE.Expression(
+				Class="TextureSample",
+				OutputType="float4",
+				OutputIndex=5,
+				TextureObject=Tex,
+				Coordinates=UV,
+				SamplerType="SAMPLERTYPE_Color",
+				SamplerSource="SSM_Wrap_WorldGroupSettings"
+			);
+		Result = Enable_Per_Texture_Sampler(True = OwnSampler, False = SharedSampler);
+	}
+}

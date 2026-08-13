@@ -117,6 +117,66 @@ VirtualFunction(Name="MF_ToonUV")
 		float2 UV;
 	}
 }
+VirtualFunction(Name="MF_ToonSampleColor")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleColor");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonSampleLinear")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleLinear");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonSampleLinearMip0")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleLinearMip0");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonSampleNormal")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleNormal");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
 ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonToon")
 {
 	Settings = {
@@ -126,6 +186,71 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 	}
 
 	Properties = {
+		TextureObjectParameter Global_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Global Mask Map";
+			Group="01 - Global Mask Map";
+			Description="用于存放各种线性数据的贴图, 每个通道存放什么数据可以根据你的项目需求定制.\r\n颜色空间: 线性.\r\n\r\n\r\nTexture used to store various linear data. What data is stored in each channel can be customized according to your project needs.\r\nColor space: linear.";
+		];
+		TextureObjectParameter Base_Color_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
+			ParameterName="Base Color Map";
+			Group="10 - Diffuse";
+			SortPriority=5;
+		];
+		TextureObjectParameter Metallic_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Metallic Map";
+			Group="11 - Specular";
+			SortPriority=51;
+		];
+		TextureObjectParameter Roughness_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Roughness Map";
+			Group="11 - Specular";
+			SortPriority=41;
+		];
+		TextureObjectParameter Emissive_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
+			ParameterName="Emissive Map";
+			Group="23 - Emissive";
+		];
+		TextureObjectParameter Opacity_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
+			ParameterName="Opacity Map";
+			Group="21 - Translucency";
+		];
+		TextureObjectParameter SA_Map = Path(Engine, "EngineResources/Black") [
+			ParameterName="SA Map";
+			Group="00 - Global Settings";
+		];
+		TextureObjectParameter AO_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="AO Map";
+			Group="10 - Diffuse";
+		];
+		TextureObjectParameter Normal_Map = Path(Engine, "EngineMaterials/BaseFlattenNormalMap") [
+			ParameterName="Normal Map";
+			Group="20 - Normal";
+		];
+		TextureObjectParameter ID_Map_R_ = Path(Plugins.MoonToon, "Textures/T_Black_Linear") [
+			ParameterName="ID Map(R)";
+			Group="13 - Ray Tracing Shadow";
+			Description="ID Map是指将角色的不同部位填充不同的颜色, 以便在制作贴图或者后期效果时方便抠图.\r\n在影视工作流中通常是必备的贴图, 其分辨率可以很低, 只要保证不溢出UV边界即可.\r\n不同的值代表不同的ID, ID之间至少要有0.031(也就是8/255)的数值差.\r\n颜色空间: 线性.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID Map refers to filling different parts of the character with different colors to facilitate cutout when making textures or post-effects.\r\nID Map are usually necessary in film production workflows, and their resolution can be very low, as long as they do not overflow the UV boundary.\r\nDifferent values ​​represent different IDs, and there must be at least a numerical difference of 0.031 (that is, 8/255) between IDs.\r\nColor space: linear.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.";
+		];
+		TextureObjectParameter Shadow_Color_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
+			ParameterName="Shadow Color Map";
+			Group="10 - Diffuse";
+			SortPriority=15;
+		];
+		TextureObjectParameter Diffuse_Ramp_Offset_Map = Path(Plugins.MoonToon, "Assets/Textures/T_Gray_Linear") [
+			ParameterName="Diffuse Ramp Offset Map";
+			Group="10 - Diffuse";
+			SortPriority=36;
+		];
+		TextureObjectParameter Specular_Color_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
+			ParameterName="Specular Color Map";
+			Group="11 - Specular";
+			SortPriority=4;
+		];
+		TextureObjectParameter Specular_Ramp_Offset_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Specular Ramp Offset Map";
+			Group="11 - Specular";
+			SortPriority=61;
+		];
 		// Feature selection used to be a runtime ScalarParameter with an enum dropdown, plus a
 		// second one for a dual-feature mask that was wired to the constant 1.0 and so could never
 		// fire. Both are gone: the choice is now the static switches in MF_MoonToonFeatureSelect,
@@ -497,41 +622,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 Global_Mask_Map_UV = Add_1;
 		#Region "Texture Sample"
-		float4 Global_Mask_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Global Mask Map",
-				Group="01 - Global Mask Map",
-				Desc="用于存放各种线性数据的贴图, 每个通道存放什么数据可以根据你的项目需求定制.\r\n颜色空间: 线性.\r\n\r\n\r\nTexture used to store various linear data. What data is stored in each channel can be customized according to your project needs.\r\nColor space: linear.",
-				Coordinates=Global_Mask_Map_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor"
-			);
-		float4 Global_Mask_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Global Mask Map",
-				Group="01 - Global Mask Map",
-				Desc="用于存放各种线性数据的贴图, 每个通道存放什么数据可以根据你的项目需求定制.\r\n颜色空间: 线性.\r\n\r\n\r\nTexture used to store various linear data. What data is stored in each channel can be customized according to your project needs.\r\nColor space: linear.",
-				Coordinates=Global_Mask_Map_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_1 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=Global_Mask_Map.rgba,
-				False=Global_Mask_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_1 = MF_ToonSampleLinear(Global_Mask_Map, Global_Mask_Map_UV).rgba;
 		float4 StaticSwitchParameter_2 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -638,41 +729,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 Global_UV = Add_2;
 		#Region "Texture Sample"
-		float4 Base_Color_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Base Color Map",
-				Group="10 - Diffuse",
-				SortPriority=5,
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color"
-			);
-		float4 Base_Color_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Base Color Map",
-				Group="10 - Diffuse",
-				SortPriority=5,
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_5 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=Base_Color_Map.rgba,
-				False=Base_Color_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_5 = MF_ToonSampleColor(Base_Color_Map, Global_UV).rgba;
 		#EndRegion
 
 		float4 Sampled_Base_Color = StaticSwitchParameter_5;
@@ -704,41 +761,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		Attributes.BaseColor = StaticSwitchParameter_7;
 		#Region "Texture Sample"
-		float4 Metallic_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Metallic Map",
-				Group="11 - Specular",
-				SortPriority=51,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor"
-			);
-		float4 Metallic_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Metallic Map",
-				Group="11 - Specular",
-				SortPriority=51,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_8 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=Metallic_Map.rgba,
-				False=Metallic_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_8 = MF_ToonSampleLinear(Metallic_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_9 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -762,41 +785,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		Attributes.Metallic = Metallic_1;
 		Attributes.Specular = Specular;
 		#Region "Texture Sample"
-		float4 Roughness_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Roughness Map",
-				Group="11 - Specular",
-				SortPriority=41,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor"
-			);
-		float4 Roughness_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Roughness Map",
-				Group="11 - Specular",
-				SortPriority=41,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_10 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=Roughness_Map.rgba,
-				False=Roughness_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_10 = MF_ToonSampleLinear(Roughness_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_11 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -844,39 +833,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float Anisotropy_Output = StaticSwitchParameter_13;
 		Attributes.Anisotropy = Anisotropy_Output;
 		#Region "Texture Sample"
-		float4 Emissive_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Emissive Map",
-				Group="23 - Emissive",
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color"
-			);
-		float4 Emissive_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Emissive Map",
-				Group="23 - Emissive",
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float3 StaticSwitchParameter_14 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float3",
-				True=Emissive_Map.rgb,
-				False=Emissive_Map_1.rgb,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float3 StaticSwitchParameter_14 = MF_ToonSampleColor(Emissive_Map, Global_UV).rgb;
 		#EndRegion
 
 		float3 Sampled_Emissive = StaticSwitchParameter_14;
@@ -897,39 +854,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float3 Emission = StaticSwitchParameter_15;
 		Attributes.EmissiveColor = Emission;
 		#Region "Texture Sample"
-		float4 Opacity_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Opacity Map",
-				Group="21 - Translucency",
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color"
-			);
-		float4 Opacity_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Opacity Map",
-				Group="21 - Translucency",
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_16 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=Opacity_Map.rgba,
-				False=Opacity_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_16 = MF_ToonSampleColor(Opacity_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_17 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -969,76 +894,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float Shadow_Opacity_1 = Multiply_9;
 		Attributes.OpacityMask = Shadow_Opacity_1;
 		#Region "Texture Sample"
-		float4 SA_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="SA Map",
-				Group="00 - Global Settings",
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/Black"),
-				SamplerType="SAMPLERTYPE_Color"
-			);
-		float4 SA_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="SA Map",
-				Group="00 - Global Settings",
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/Black"),
-				SamplerType="SAMPLERTYPE_Color",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float3 StaticSwitchParameter_19 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float3",
-				True=SA_Map.rgb,
-				False=SA_Map_1.rgb,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float3 StaticSwitchParameter_19 = MF_ToonSampleColor(SA_Map, Global_UV).rgb;
 		#EndRegion
 
 		float3 SA_Map_2 = StaticSwitchParameter_19;
 		#Region "Texture Sample"
-		float4 AO_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="AO Map",
-				Group="10 - Diffuse",
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor"
-			);
-		float4 AO_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="AO Map",
-				Group="10 - Diffuse",
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_20 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=AO_Map.rgba,
-				False=AO_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_20 = MF_ToonSampleLinear(AO_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_21 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -1079,39 +940,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 Normal_Map_UV = Add_3;
 		#Region "Texture Sample"
-		float4 Normal_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Normal Map",
-				Group="20 - Normal",
-				Coordinates=Normal_Map_UV,
-				Texture=Path(Engine, "EngineMaterials/BaseFlattenNormalMap"),
-				SamplerType="SAMPLERTYPE_Normal"
-			);
-		float4 Normal_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Normal Map",
-				Group="20 - Normal",
-				Coordinates=Normal_Map_UV,
-				Texture=Path(Engine, "EngineMaterials/BaseFlattenNormalMap"),
-				SamplerType="SAMPLERTYPE_Normal",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float3 StaticSwitchParameter_23 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float3",
-				True=Normal_Map.rgb,
-				False=Normal_Map_1.rgb,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float3 StaticSwitchParameter_23 = MF_ToonSampleNormal(Normal_Map, Normal_Map_UV).rgb;
 		#EndRegion
 
 		float3 Sampled_Normal = StaticSwitchParameter_23;
@@ -1299,45 +1128,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		#Region "Texture Sample"
 		float2 MF_UVChannelSwitch_4 = MF_UVChannelSwitch(ID_Map_UV_Channel);
-		float4 ID_Map_R_ =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="ID Map(R)",
-				Group="13 - Ray Tracing Shadow",
-				Desc="ID Map是指将角色的不同部位填充不同的颜色, 以便在制作贴图或者后期效果时方便抠图.\r\n在影视工作流中通常是必备的贴图, 其分辨率可以很低, 只要保证不溢出UV边界即可.\r\n不同的值代表不同的ID, ID之间至少要有0.031(也就是8/255)的数值差.\r\n颜色空间: 线性.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID Map refers to filling different parts of the character with different colors to facilitate cutout when making textures or post-effects.\r\nID Map are usually necessary in film production workflows, and their resolution can be very low, as long as they do not overflow the UV boundary.\r\nDifferent values ​​represent different IDs, and there must be at least a numerical difference of 0.031 (that is, 8/255) between IDs.\r\nColor space: linear.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.",
-				Coordinates=MF_UVChannelSwitch_4,
-				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				MipValueMode="TMVM_MipLevel",
-				ConstMipValue=0
-			);
-		float4 ID_Map_R_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="ID Map(R)",
-				Group="13 - Ray Tracing Shadow",
-				Desc="ID Map是指将角色的不同部位填充不同的颜色, 以便在制作贴图或者后期效果时方便抠图.\r\n在影视工作流中通常是必备的贴图, 其分辨率可以很低, 只要保证不溢出UV边界即可.\r\n不同的值代表不同的ID, ID之间至少要有0.031(也就是8/255)的数值差.\r\n颜色空间: 线性.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID Map refers to filling different parts of the character with different colors to facilitate cutout when making textures or post-effects.\r\nID Map are usually necessary in film production workflows, and their resolution can be very low, as long as they do not overflow the UV boundary.\r\nDifferent values ​​represent different IDs, and there must be at least a numerical difference of 0.031 (that is, 8/255) between IDs.\r\nColor space: linear.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.",
-				Coordinates=MF_UVChannelSwitch_4,
-				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings",
-				MipValueMode="TMVM_MipLevel",
-				ConstMipValue=0
-			);
-		float4 StaticSwitchParameter_36 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=ID_Map_R_.rgba,
-				False=ID_Map_R_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_36 = MF_ToonSampleLinearMip0(ID_Map_R_, MF_UVChannelSwitch_4).rgba;
 		float4 StaticSwitchParameter_37 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -1390,41 +1181,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float Encoded_Ray_Tracing_Data = Encode_Mooa_Ray_Tracing_Data;
 		Attributes.CustomData0 = Encoded_Ray_Tracing_Data;
 		#Region "Texture Sample"
-		float4 Shadow_Color_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Shadow Color Map",
-				Group="10 - Diffuse",
-				SortPriority=15,
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color"
-			);
-		float4 Shadow_Color_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Shadow Color Map",
-				Group="10 - Diffuse",
-				SortPriority=15,
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float3 StaticSwitchParameter_45 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float3",
-				True=Shadow_Color_Map.rgb,
-				False=Shadow_Color_Map_1.rgb,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float3 StaticSwitchParameter_45 = MF_ToonSampleColor(Shadow_Color_Map, Global_UV).rgb;
 		#EndRegion
 
 		float3 Sampled_Shadow_Color = StaticSwitchParameter_45;
@@ -1446,41 +1203,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		float Diffuse_Ramp_Index = Diffuse_Color_Ramp_Index;
 		#Region "Texture Sample"
-		float4 Diffuse_Ramp_Offset_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Diffuse Ramp Offset Map",
-				Group="10 - Diffuse",
-				SortPriority=36,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Assets/Textures/T_Gray_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor"
-			);
-		float4 Diffuse_Ramp_Offset_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Diffuse Ramp Offset Map",
-				Group="10 - Diffuse",
-				SortPriority=36,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Assets/Textures/T_Gray_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_47 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=Diffuse_Ramp_Offset_Map.rgba,
-				False=Diffuse_Ramp_Offset_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_47 = MF_ToonSampleLinear(Diffuse_Ramp_Offset_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_48 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -1502,41 +1225,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float Diffuse_Ramp_UV_Offset = LinearInterpolate_3;
 		#Region "Texture Sample"
-		float4 Specular_Color_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Specular Color Map",
-				Group="11 - Specular",
-				SortPriority=4,
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color"
-			);
-		float4 Specular_Color_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Specular Color Map",
-				Group="11 - Specular",
-				SortPriority=4,
-				Coordinates=Global_UV,
-				Texture=Path(Engine, "EngineResources/WhiteSquareTexture"),
-				SamplerType="SAMPLERTYPE_Color",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float3 StaticSwitchParameter_49 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float3",
-				True=Specular_Color_Map.rgb,
-				False=Specular_Color_Map_1.rgb,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float3 StaticSwitchParameter_49 = MF_ToonSampleColor(Specular_Color_Map, Global_UV).rgb;
 		#EndRegion
 
 		float3 Sampled_Specular_Color = StaticSwitchParameter_49;
@@ -1547,41 +1236,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float3 Specular_Color_1 = Multiply_16;
 		float Specular_Ramp_Index = Specular_Color_Ramp_Index;
 		#Region "Texture Sample"
-		float4 Specular_Ramp_Offset_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Specular Ramp Offset Map",
-				Group="11 - Specular",
-				SortPriority=61,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor"
-			);
-		float4 Specular_Ramp_Offset_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Specular Ramp Offset Map",
-				Group="11 - Specular",
-				SortPriority=61,
-				Coordinates=Global_UV,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
-			);
-		float4 StaticSwitchParameter_50 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=Specular_Ramp_Offset_Map.rgba,
-				False=Specular_Ramp_Offset_Map_1.rgba,
-				Group="00 - Global Settings",
-				SortPriority=32,
-				ParameterName="Enable Per Texture Sampler"
-			);
+		float4 StaticSwitchParameter_50 = MF_ToonSampleLinear(Specular_Ramp_Offset_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_51 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
