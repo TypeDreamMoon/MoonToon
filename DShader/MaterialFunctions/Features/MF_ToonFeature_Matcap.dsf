@@ -1,0 +1,51 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_Matcap(
+	in float Intensity,
+	in float3 MatcapColor,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_MATCAP;
+	TBuffer.FeatureInputScalarA = Intensity;
+	TBuffer.FeatureInputVector.xyz = MatcapColor;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Matcap", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the Matcap toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_Matcap_Intensity = 0.0 [Group="MT >> 10 << Matcap"; SortPriority=0];
+		VectorParameter In_Matcap_ColorRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 10 << Matcap"; SortPriority=1];
+	}
+
+	Graph = {
+		ToonFeatureWrite_Matcap(
+			In_Matcap_Intensity,
+			In_Matcap_ColorRGB.rgb,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

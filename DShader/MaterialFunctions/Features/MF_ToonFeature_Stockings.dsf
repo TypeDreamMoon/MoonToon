@@ -1,0 +1,79 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_Stockings(
+	in float Density,
+	in float FresnelPower,
+	in float TransmissionStrength,
+	in float RoughnessScale,
+	in float SpecularIntensity,
+	in float ShadowStrength,
+	in float GrazingDarkenStrength,
+	in float3 BaseColor,
+	in float GrazingSpecBoost,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_PBR_STOCKINGS;
+	TBuffer.FeatureInputScalarA = Density;
+	TBuffer.FeatureInputScalarB = FresnelPower;
+	TBuffer.FeatureInputScalarC = TransmissionStrength;
+	TBuffer.FeatureInputScalarD = RoughnessScale;
+	TBuffer.FeatureInputScalarE = SpecularIntensity;
+	TBuffer.FeatureInputScalarF = ShadowStrength;
+	TBuffer.FeatureInputScalarG = GrazingDarkenStrength;
+	TBuffer.FeatureInputVector.xyz = BaseColor;
+	TBuffer.FeatureInputVector.w = GrazingSpecBoost;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the Stockings toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_Stockings_Density = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=0];
+		ScalarParameter In_Stockings_FresnelPower = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=1];
+		ScalarParameter In_Stockings_TransStrength = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=2];
+		ScalarParameter In_Stockings_RoughnessScale = 1.0 [Group="MT >> 05 << Stockings"; SortPriority=3];
+		ScalarParameter In_Stockings_SpecIntensity = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=4];
+		ScalarParameter In_Stockings_ShadowStrength = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=5];
+		ScalarParameter In_Stockings_GrazingDarken = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=6];
+		VectorParameter In_Stockings_BodyColorRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 05 << Stockings"; SortPriority=7];
+		ScalarParameter In_Stockings_GrazingSpecBoost = 0.0 [Group="MT >> 05 << Stockings"; SortPriority=8];
+	}
+
+	Graph = {
+		ToonFeatureWrite_Stockings(
+			In_Stockings_Density,
+			In_Stockings_FresnelPower,
+			In_Stockings_TransStrength,
+			In_Stockings_RoughnessScale,
+			In_Stockings_SpecIntensity,
+			In_Stockings_ShadowStrength,
+			In_Stockings_GrazingDarken,
+			In_Stockings_BodyColorRGB.rgb,
+			In_Stockings_GrazingSpecBoost,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

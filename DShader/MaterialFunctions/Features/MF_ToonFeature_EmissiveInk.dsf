@@ -1,0 +1,79 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_EmissiveInk(
+	in float LightInfluence,
+	in float ShadowLift,
+	in float InkDarkenStrength,
+	in float RoughnessScale,
+	in float SpecularIntensity,
+	in float EdgeBoost,
+	in float InkBlend,
+	in float3 InkTint,
+	in float RimBias,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_TOON_EMISSIVE_INK;
+	TBuffer.FeatureInputScalarA = LightInfluence;
+	TBuffer.FeatureInputScalarB = ShadowLift;
+	TBuffer.FeatureInputScalarC = InkDarkenStrength;
+	TBuffer.FeatureInputScalarD = RoughnessScale;
+	TBuffer.FeatureInputScalarE = SpecularIntensity;
+	TBuffer.FeatureInputScalarF = EdgeBoost;
+	TBuffer.FeatureInputScalarG = InkBlend;
+	TBuffer.FeatureInputVector.xyz = InkTint;
+	TBuffer.FeatureInputVector.w = RimBias;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_EmissiveInk", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the EmissiveInk toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_ToonEmissiveInk_LightInfluence = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=0];
+		ScalarParameter In_ToonEmissiveInk_ShadowLift = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=1];
+		ScalarParameter In_ToonEmissiveInk_InkDarkenStrength = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=2];
+		ScalarParameter In_ToonEmissiveInk_RoughnessScale = 1.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=3];
+		ScalarParameter In_ToonEmissiveInk_SpecularIntensity = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=4];
+		ScalarParameter In_ToonEmissiveInk_EdgeBoost = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=5];
+		ScalarParameter In_ToonEmissiveInk_InkBlend = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=6];
+		VectorParameter In_ToonEmissiveInk_InkTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 09 << Emissive Ink"; SortPriority=7];
+		ScalarParameter In_ToonEmissiveInk_RimBias = 0.0 [Group="MT >> 09 << Emissive Ink"; SortPriority=8];
+	}
+
+	Graph = {
+		ToonFeatureWrite_EmissiveInk(
+			In_ToonEmissiveInk_LightInfluence,
+			In_ToonEmissiveInk_ShadowLift,
+			In_ToonEmissiveInk_InkDarkenStrength,
+			In_ToonEmissiveInk_RoughnessScale,
+			In_ToonEmissiveInk_SpecularIntensity,
+			In_ToonEmissiveInk_EdgeBoost,
+			In_ToonEmissiveInk_InkBlend,
+			In_ToonEmissiveInk_InkTintRGB.rgb,
+			In_ToonEmissiveInk_RimBias,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

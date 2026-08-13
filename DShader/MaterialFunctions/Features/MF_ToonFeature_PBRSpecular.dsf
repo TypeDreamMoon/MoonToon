@@ -1,0 +1,47 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_PBRSpecular(
+	in float BloomWeight,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_PBR_SPECULAR;
+	TBuffer.FeatureInputVector.w = BloomWeight;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_PBRSpecular", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the PBRSpecular toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_PBRSpecular_BloomWeight = 0.0 [Group="MT >> 00 << Default"; SortPriority=0];
+	}
+
+	Graph = {
+		ToonFeatureWrite_PBRSpecular(
+			In_PBRSpecular_BloomWeight,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

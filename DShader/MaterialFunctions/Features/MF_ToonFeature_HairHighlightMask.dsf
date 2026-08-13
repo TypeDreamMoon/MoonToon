@@ -1,0 +1,59 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_HairHighlightMask(
+	in float Mask,
+	in float Intensity,
+	in float ShadowIntensity,
+	in float ViewAnchorBlend,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_HAIR_HIGHLIGHT_MASK;
+	TBuffer.FeatureInputScalarA = Mask;
+	TBuffer.FeatureInputScalarB = Intensity;
+	TBuffer.FeatureInputScalarC = ShadowIntensity;
+	TBuffer.FeatureInputScalarD = ViewAnchorBlend;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the HairHighlightMask toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_Hair_HighlightMask = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=0];
+		ScalarParameter In_Hair_HighlightMaskIntensity = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=1];
+		ScalarParameter In_Hair_HighlightMaskShadowIntensity = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=2];
+		ScalarParameter In_Hair_HighlightViewAnchorBlend = 0.0 [Group="MT >> 01 << Hair Highlight Mask"; SortPriority=3];
+	}
+
+	Graph = {
+		ToonFeatureWrite_HairHighlightMask(
+			In_Hair_HighlightMask,
+			In_Hair_HighlightMaskIntensity,
+			In_Hair_HighlightMaskShadowIntensity,
+			In_Hair_HighlightViewAnchorBlend,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

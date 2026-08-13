@@ -1,0 +1,79 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_Eye(
+	in float DiffuseWrapStrength,
+	in float LimbalDarkenStrength,
+	in float SpecularShadowStrength,
+	in float PrimaryRoughnessScale,
+	in float SecondaryRoughnessScale,
+	in float PrimaryIntensity,
+	in float SecondaryIntensity,
+	in float3 EyeTint,
+	in float SecondaryRampOffset,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_EYE;
+	TBuffer.FeatureInputScalarA = DiffuseWrapStrength;
+	TBuffer.FeatureInputScalarB = LimbalDarkenStrength;
+	TBuffer.FeatureInputScalarC = SpecularShadowStrength;
+	TBuffer.FeatureInputScalarD = PrimaryRoughnessScale;
+	TBuffer.FeatureInputScalarE = SecondaryRoughnessScale;
+	TBuffer.FeatureInputScalarF = PrimaryIntensity;
+	TBuffer.FeatureInputScalarG = SecondaryIntensity;
+	TBuffer.FeatureInputVector.xyz = EyeTint;
+	TBuffer.FeatureInputVector.w = SecondaryRampOffset;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the Eye toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_Eye_DiffuseWrapStrength = 0.0 [Group="MT >> 06 << Eye"; SortPriority=0];
+		ScalarParameter In_Eye_LimbalDarkenStrength = 0.0 [Group="MT >> 06 << Eye"; SortPriority=1];
+		ScalarParameter In_Eye_SpecularShadowStrength = 0.0 [Group="MT >> 06 << Eye"; SortPriority=2];
+		ScalarParameter In_Eye_PrimaryRoughnessScale = 1.0 [Group="MT >> 06 << Eye"; SortPriority=3];
+		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="MT >> 06 << Eye"; SortPriority=4];
+		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="MT >> 06 << Eye"; SortPriority=5];
+		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="MT >> 06 << Eye"; SortPriority=6];
+		VectorParameter In_Eye_EyeTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="MT >> 06 << Eye"; SortPriority=7];
+		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="MT >> 06 << Eye"; SortPriority=8];
+	}
+
+	Graph = {
+		ToonFeatureWrite_Eye(
+			In_Eye_DiffuseWrapStrength,
+			In_Eye_LimbalDarkenStrength,
+			In_Eye_SpecularShadowStrength,
+			In_Eye_PrimaryRoughnessScale,
+			In_Eye_SecondaryRoughnessScale,
+			In_Eye_PrimaryIntensity,
+			In_Eye_SecondaryIntensity,
+			In_Eye_EyeTintRGB.rgb,
+			In_Eye_SecondaryRampOffset,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}
