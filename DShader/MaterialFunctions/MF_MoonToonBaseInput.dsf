@@ -12,42 +12,26 @@
 // Warning: Exported 'MaterialExpressionMoonEncodeToonAttributes' as UE.Expression; review reflected literal properties if the node has editor-only state.
 // Warning: Exported 'MaterialExpressionIf' as UE.Expression; review reflected literal properties if the node has editor-only state.
 
-VirtualFunction(Name="MF_MoonToonBuffer")
+VirtualFunction(Name="MF_MoonToonFeatureSelect")
 {
 	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonBuffer");
-		Description = "Generated from /MoonToon/MaterialFunctions/MF_MoonToonBuffer.MF_MoonToonBuffer";
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonFeatureSelect");
+		Description = "Static toon feature selection; see Tools/gen_feature_functions.py.";
 	}
 
 	Inputs = {
-		opt float ShadingFeatureID = 0.0 [
-			Description="MOON_SHADING_FEATURE_ID_*. Selects the toon feature branch.";
-		];
-		opt float SecondaryShadingFeatureID = 0.0 [
-			Description="Feature used when DMask < 0.5 on the Skin branch.";
-		];
-		opt float DMask = 1.0 [
-			Description="Skin dual-feature mask. >= 0.5 keeps ShadingFeatureID. Defaults to 1.0 to match the old white-texture default.";
-		];
-		opt float InHighlightMask = 0.0 [
-			Description="Hair highlight mask.";
-		];
-		opt float InToonKajiyaKay_PrimaryStrandShift = 0.0 [
-			Description="Toon Kajiya primary strand shift.";
-		];
-		opt float InToonKajiyaKay_SecondaryStrandShift = 0.0 [
-			Description="Toon Kajiya secondary strand shift.";
-		];
-		opt float3 InToonStockings_BodyColor = float3(0, 0, 0) [
-			Description="Stockings body colour.";
-		];
+		opt float InToonKajiyaSecondaryStrandShift = 0.0;
+		opt float InToonKajiyaPrimaryStrandShift = 0.0;
+		opt float InHairHighlightMask = 0.0;
+		opt float3 InStockingsBodyColor = float3(0.0, 0.0, 0.0);
 	}
 
 	Outputs = {
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
-		float4 ResultShadingFeatureColor;
+		float ShadingFeatureID;
+		float4 DebugColor;
 	}
 }
 VirtualFunction(Name="AppendMany")
@@ -127,34 +111,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 	}
 
 	Properties = {
-		// Toon feature selection. These replace the old chain of "Enable Feature X"
-		// StaticSwitchParameters, which could only ever reach IDs 0-6 -- every feature the engine
-		// added past that (PBR Stockings, Eye, Cloth Velvet, Toon Metal, Toon Emissive Ink, Eyebrow,
-		// Matcap) was unreachable from the material. One enum dropdown covers all of them, and the
-		// dropdown is the C++ UENUM EMoonToonShadingFeature, which static_asserts against the
-		// MOON_SHADING_FEATURE_ID_* macros the shader branches on -- one list, no drift.
-		ScalarParameter Shading_Feature_ID = 0.0 [
-			ParameterName="ShadingFeatureID";
-			Group="00 - Global Settings";
-			SortPriority=40;
-			ControlType=Enumeration;
-			Enumeration=Path("/Script/Engine.EMoonToonShadingFeature");
-			Description="Toon shading feature for this material. Values match MOON_SHADING_FEATURE_ID_*.";
-		];
-		// NOTE: the "Enable Feature Kajiya Hair Specular" / "Enable Feature Distance Field Facial
-		// Shadow" StaticSwitchParameters still exist further down. They are NOT redundant: a static
-		// switch compiles its unused side away, so they still gate the optional data those features
-		// need (Kajiya tangent basis, facial-shadow SDF sampling). A runtime scalar cannot drive a
-		// shader permutation, so picking the feature here and enabling its data there stay separate.
-		// Only consulted on the Skin branch, where DMask < 0.5 swaps to this feature instead.
-		ScalarParameter Secondary_Shading_Feature_ID = 0.0 [
-			ParameterName="SecondaryShadingFeatureID";
-			Group="00 - Global Settings";
-			SortPriority=41;
-			ControlType=Enumeration;
-			Enumeration=Path("/Script/Engine.EMoonToonShadingFeature");
-			Description="Feature used where the dual-feature mask (DMask) is below 0.5 on the Skin branch.";
-		];
+		// Feature selection used to be a runtime ScalarParameter with an enum dropdown, plus a
+		// second one for a dual-feature mask that was wired to the constant 1.0 and so could never
+		// fire. Both are gone: the choice is now the static switches in MF_MoonToonFeatureSelect,
+		// which is what lets a material instance hide the ~69 parameters belonging to features it
+		// did not pick. A runtime scalar cannot drive a shader permutation, so it could not.
 		// Per-material multiplier on the screen-space depth-test hair shadow (receiver side, on top
 		// of the global post-process intensity). 3-bit in the GBuffer -> 8 usable steps.
 		ScalarParameter Screen_Space_Hair_Shadow_Intensity = 1.0 [
@@ -649,8 +610,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float Hair_Highlight_Mask_Channel_Masked = Hair_Highlight_Mask_Channel(Input = Hair_Highlight_Mask.rgb);
 		float Hair_Highlight_Mask_Texture = Hair_Highlight_Mask_Channel_Masked;
-		float4 MF_MoonToonBufferInput = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=3);
-		float4 ShadingFeatureColor = MF_MoonToonBufferInput;
+		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=3);
+		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=4);
 		#Region "Texture Sample"
 		float2 MF_UVChannelSwitch_1 = MF_UVChannelSwitch(Inner_Outline_Map_UV_Channel);
 		float4 Inner_Outline_Map =
@@ -1932,7 +1893,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="MoonEncodeToonAttributes",
 				OutputType="float4",
-				ShadingFeatureID=Shading_Feature_ID,
+				ShadingFeatureID=ShadingFeatureID,
 				MainLightShadowColor=StaticSwitchParameter_46,
 				DiffuseColorRampIndex=Diffuse_Ramp_Index,
 				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
@@ -1953,7 +1914,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				Class="MoonEncodeToonAttributes",
 				OutputType="float4",
 				OutputIndex=1,
-				ShadingFeatureID=Shading_Feature_ID,
+				ShadingFeatureID=ShadingFeatureID,
 				MainLightShadowColor=StaticSwitchParameter_46,
 				DiffuseColorRampIndex=Diffuse_Ramp_Index,
 				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
@@ -1976,7 +1937,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				Class="MoonEncodeToonAttributes",
 				OutputType="float4",
 				OutputIndex=2,
-				ShadingFeatureID=Shading_Feature_ID,
+				ShadingFeatureID=ShadingFeatureID,
 				MainLightShadowColor=StaticSwitchParameter_46,
 				DiffuseColorRampIndex=Diffuse_Ramp_Index,
 				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
@@ -1997,7 +1958,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				Class="MoonEncodeToonAttributes",
 				OutputType="float4",
 				OutputIndex=3,
-				ShadingFeatureID=Shading_Feature_ID,
+				ShadingFeatureID=ShadingFeatureID,
 				MainLightShadowColor=StaticSwitchParameter_46,
 				DiffuseColorRampIndex=Diffuse_Ramp_Index,
 				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
@@ -2018,7 +1979,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				Class="MoonEncodeToonAttributes",
 				OutputType="float4",
 				OutputIndex=4,
-				ShadingFeatureID=Shading_Feature_ID,
+				ShadingFeatureID=ShadingFeatureID,
 				MainLightShadowColor=StaticSwitchParameter_46,
 				DiffuseColorRampIndex=Diffuse_Ramp_Index,
 				DiffuseColorRampUVOffset=Diffuse_Ramp_UV_Offset,
@@ -2035,12 +1996,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		Attributes.MoonEncodedAttribute4 = MoonEncodeToonAttributes_4.rgba;
 		Attributes.CustomData1 = 1.0;
-		float4 MF_MoonToonBufferInput_1 = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=0);
+		float4 MF_MoonToonBufferInput_1 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=0);
 		float4 ToonBufferA_1 = MF_MoonToonBufferInput_1;
-		float4 MF_MoonToonBufferInput_2 = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=1);
+		float4 MF_MoonToonBufferInput_2 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=1);
 		float4 ToonBufferB_1 = MF_MoonToonBufferInput_2;
 		#Region "Toon Buffer"
-		float4 MF_MoonToonBufferInput_3 = MF_MoonToonBuffer(Shading_Feature_ID, Secondary_Shading_Feature_ID, 1.0, Hair_Highlight_Mask_Texture, KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, BodyBaseColor.rgb, OutputIndex=2);
+		float4 MF_MoonToonBufferInput_3 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=2);
 		#EndRegion
 
 		float4 ToonBufferC_1 = MF_MoonToonBufferInput_3;

@@ -43,6 +43,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 	}
 
 	Inputs = {
+		opt float3 InBodyColor = float3(0.0, 0.0, 0.0) [Description="Per-pixel BaseColor from a map, added to the parameter."];
 	}
 
 	Outputs = {
@@ -72,7 +73,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 			In_Stockings_SpecIntensity,
 			In_Stockings_ShadowStrength,
 			In_Stockings_GrazingDarken,
-			In_Stockings_BodyColorRGB.rgb,
+			InBodyColor + In_Stockings_BodyColorRGB.rgb,
 			In_Stockings_GrazingSpecBoost,
 			ToonBufferA, ToonBufferB, ToonBufferC);
 	}

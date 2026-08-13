@@ -43,6 +43,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 	}
 
 	Inputs = {
+
 	}
 
 	Outputs = {

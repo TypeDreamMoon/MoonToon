@@ -33,6 +33,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 	}
 
 	Inputs = {
+		opt float InHighlightMask = 0.0 [Description="Per-pixel Mask from a map, added to the parameter."];
 	}
 
 	Outputs = {
@@ -50,7 +51,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 
 	Graph = {
 		ToonFeatureWrite_HairHighlightMask(
-			In_Hair_HighlightMask,
+			InHighlightMask + In_Hair_HighlightMask,
 			In_Hair_HighlightMaskIntensity,
 			In_Hair_HighlightMaskShadowIntensity,
 			In_Hair_HighlightViewAnchorBlend,
