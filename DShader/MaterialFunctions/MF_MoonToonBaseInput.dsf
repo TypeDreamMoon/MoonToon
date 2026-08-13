@@ -125,7 +125,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Description="屏幕空间发影强度的每实例乘数(叠加在后处理体积的全局强度上). 0=关闭, 1=全强度. GBuffer中以3bit存储(8档).\r\n\r\nPer-instance multiplier on the screen-space depth-test hair shadow, applied on top of the post-process volume's global intensity. 0 = off, 1 = full strength. Stored as 3 bits (8 steps) in the GBuffer.";
 		];
 		ChannelMaskParameter KajiyaSecondaryMaskChannel = float4(1.0, 0.0, 0.0, 0.0) [
-			Group="04- Kajiya Kay";
+			Group="04 - Kajiya Kay";
 			MaskChannel=Red
 		];
 		ScalarParameter Global_Mask_Map_UV_Offset_X = 0.0 [
@@ -152,21 +152,22 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		];
 		TextureSampleParameter2D BodyBaseColor = Path(Engine, "EngineResources/DefaultTexture") [
 			SamplerType="SAMPLERTYPE_Color";
+			Group="05 - Stockings";
 		];
 		ChannelMaskParameter Hair_Highlight_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [
 			ParameterName="Hair Highlight Mask Channel";
-			Group="02 - Distance Field Facial Shadow";
+			Group="03 - Hair Highlight Mask";
 			MaskChannel=Red
 		];
-		ScalarParameter AddOffset = 0.0;
-		ScalarParameter DynMin = -0.01;
-		ScalarParameter DynMax = 0.01;
-		ScalarParameter ElevMin = -0.6;
-		ScalarParameter ElevMax = 0.6;
-		ScalarParameter Curve = 1.2;
-		ScalarParameter ClampMin = -0.03;
-		ScalarParameter ClampMax = 0.03;
-		ScalarParameter VSign = 1.0;
+		ScalarParameter AddOffset = 0.0 [Group="02 - Distance Field Facial Shadow"; SortPriority=60];
+		ScalarParameter DynMin = -0.01 [Group="02 - Distance Field Facial Shadow"; SortPriority=61];
+		ScalarParameter DynMax = 0.01 [Group="02 - Distance Field Facial Shadow"; SortPriority=62];
+		ScalarParameter ElevMin = -0.6 [Group="02 - Distance Field Facial Shadow"; SortPriority=63];
+		ScalarParameter ElevMax = 0.6 [Group="02 - Distance Field Facial Shadow"; SortPriority=64];
+		ScalarParameter Curve = 1.2 [Group="02 - Distance Field Facial Shadow"; SortPriority=65];
+		ScalarParameter ClampMin = -0.03 [Group="02 - Distance Field Facial Shadow"; SortPriority=66];
+		ScalarParameter ClampMax = 0.03 [Group="02 - Distance Field Facial Shadow"; SortPriority=67];
+		ScalarParameter VSign = 1.0 [Group="02 - Distance Field Facial Shadow"; SortPriority=68];
 		// See Through Overlay (眉透/瞳透): when enabled, the renderer re-draws this material after
 		// lighting wherever it is occluded by same-actor toon hair, blending
 		// BaseColor * Tint at Through Hair Opacity over the lit hair (Moon_MeshPass_FaceOverlay).
