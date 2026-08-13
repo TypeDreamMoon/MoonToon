@@ -163,25 +163,33 @@ ToonBufferX 却装 TBufferX)**已经修了**。
 | `dsc compile -Force` | 13 个 feature 函数、派发器、基础函数、M_MoonToon、M_MoonToonOutline **能生成** |
 | 静态一致性 grep | 删除的符号无残留引用;所有调用点参数个数对齐 |
 
-**没有做过的验证:**
+### 补充:着色器 HLSL 已经真正编译过了(2026-08-14 后补)
 
-- **着色器 HLSL 从未被真正编译过。** `dsc` 走 `-nullrhi`,绿灯不代表 HLSL 正确
-  (这条是计划里就写明的)。引擎侧的 `.ush`/`.usf` 改动只经过静态检查。
-- **没有任何画面目检。** 按约定归你。
-- **MI override 未做快照对比**(编辑器未运行)。不过 P1–P6 **刻意没有重命名任何现存参数**,
-  所以理论上不该有 override 丢失;唯二消失的是两个死参数(`ShadingFeatureID` /
-  `SecondaryShadingFeatureID`),它们被静态开关取代。
+上面那条"着色器从未真正编译过"的限制**已经解除**。编辑器启动后:
+
+| 证据 | 覆盖到什么 |
+| --- | --- |
+| `Engine is initialized`,编辑器正常启动 | 引擎 C++ 改动在运行期没有崩 |
+| `LogShaderCompilers: Shaders Compiled: 10,979`,**0 错误、0 个 ShaderCompileWorker 失败** | 所有 include `DeferredShadingCommon.ush` 的着色器 —— 即 P1–P4 的引擎 `.ush` 改动 |
+| `Compiled OcclusionRGS for RTPSO in 2523 ms` | **改动最深的那条链**:`RayTracingOcclusionRGS.usf` → `RayTracingDeferredShadingCommon.ush` → 带 `InTBufferD` 的生成签名 → `ToonBufferCommon.ush` 解码 |
+| `recompile_material` 后 `M_MoonToon` 报 432 VS / 393 PS 指令,`M_MoonToonOutline` 报 488 / 415 | 两个 toon 材质的 shader map **真的建起来了**(编译失败的材质会回落默认材质,报不出指令数) |
+| 全日志中 `Failed to compile` 无一条涉及 MoonToon | 静态派发 + 13 个 feature 函数在真实材质编译中成立 |
+
+**仍然没有做的**:画面目检(按约定归你)、MI override 快照对比(P1–P6 刻意没重命名任何现存
+参数,唯二消失的是两个死参数)。
+
+### 顺带发现的、与本次改动无关的既有问题
+
+- `M_BL_Textures_Parity`(DreamShader 的 Blender 对拍资产)编译失败:
+  `PreSkinnedPosition` / `PreSkinnedNormal` 在 pixel shader 里不可用。**先于本次改动存在。**
+- 两条 DreamShader 错误来自 `DShader/Decompiled/` 下 MooaToon 的反编译源:
+  `Functions/MoonToon/MF_MoonToonBaseInput.dsf` 路径解析不到,以及 `MF_MooaDecodeAttributes`
+  资产不是 DreamShader 生成的。**先于本次改动存在。**
 
 ## 你回来后建议的第一件事
 
-打开编辑器,让它编译 toon 着色器。**最可能出问题的地方是引擎 `.ush` 改动**,尤其:
-
-1. `ToonMaterialCommon.ush` 的 `ComposeToonBufferD` —— 新代码,用了 `FPixelMaterialInputs`
-2. `ToonBasePassPixelShader.usf` 的 `SV_Target3/4` 重排
-3. `ShaderGenerationUtil.cpp` 生成的 `DecodeGBufferData` 签名多了 `InTBufferD`
-
-然后逐特征目检,重点看:**SDF 脸的高光**(P1+P6 后第一次可能非零)、**Matcap**(全新)、
-**发丝高光的视角锚定**。
+**逐特征目检。** 重点三个:**SDF 脸的高光**(P1+P6 之后第一次可能非零)、**Matcap**(全新)、
+**发丝高光的视角锚定**(全新)。
 
 ## 环境限制(影响验收口径)
 
