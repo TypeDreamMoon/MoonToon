@@ -1,0 +1,79 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_ClothVelvet(
+	in float WrapStrength,
+	in float SheenPower,
+	in float SheenShadowStrength,
+	in float RoughnessScale,
+	in float SheenIntensity,
+	in float RetroDiffuseStrength,
+	in float GrazingDarkenStrength,
+	in float3 SheenTint,
+	in float RimBias,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_CLOTH_VELVET;
+	TBuffer.FeatureInputScalarA = WrapStrength;
+	TBuffer.FeatureInputScalarB = SheenPower;
+	TBuffer.FeatureInputScalarC = SheenShadowStrength;
+	TBuffer.FeatureInputScalarD = RoughnessScale;
+	TBuffer.FeatureInputScalarE = SheenIntensity;
+	TBuffer.FeatureInputScalarF = RetroDiffuseStrength;
+	TBuffer.FeatureInputScalarG = GrazingDarkenStrength;
+	TBuffer.FeatureInputVector.xyz = SheenTint;
+	TBuffer.FeatureInputVector.w = RimBias;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ClothVelvet", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the ClothVelvet toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_ClothVelvet_DiffuseWrapStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=0];
+		ScalarParameter In_ClothVelvet_SheenPower = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=1];
+		ScalarParameter In_ClothVelvet_SheenShadowStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=2];
+		ScalarParameter In_ClothVelvet_RoughnessScale = 1.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=3];
+		ScalarParameter In_ClothVelvet_SheenIntensity = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=4];
+		ScalarParameter In_ClothVelvet_RetroDiffuseStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=5];
+		ScalarParameter In_ClothVelvet_GrazingDarkenStrength = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=6];
+		VectorParameter In_ClothVelvet_SheenTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="MT >> 07 << Cloth Velvet"; SortPriority=7];
+		ScalarParameter In_ClothVelvet_RimBias = 0.0 [Group="MT >> 07 << Cloth Velvet"; SortPriority=8];
+	}
+
+	Graph = {
+		ToonFeatureWrite_ClothVelvet(
+			In_ClothVelvet_DiffuseWrapStrength,
+			In_ClothVelvet_SheenPower,
+			In_ClothVelvet_SheenShadowStrength,
+			In_ClothVelvet_RoughnessScale,
+			In_ClothVelvet_SheenIntensity,
+			In_ClothVelvet_RetroDiffuseStrength,
+			In_ClothVelvet_GrazingDarkenStrength,
+			In_ClothVelvet_SheenTintRGB.rgb,
+			In_ClothVelvet_RimBias,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

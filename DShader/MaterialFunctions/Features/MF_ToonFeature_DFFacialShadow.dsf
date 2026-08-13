@@ -1,0 +1,87 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_DFFacialShadow(
+	in float ScatterStrength,
+	in float TransmissionStrength,
+	in float TransmissionPower,
+	in float PrimaryRoughnessScale,
+	in float SecondaryRoughnessScale,
+	in float SecondaryRampOffset,
+	in float OverallSpecIntensity,
+	in float PrimaryLobeIntensity,
+	in float SecondaryLobeIntensity,
+	in float SpecShadowStrength,
+	in float WarmTintStrength,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_DISTANCE_FIELD_FACIAL_SHADOW;
+	TBuffer.FeatureInputScalarA = ScatterStrength;
+	TBuffer.FeatureInputScalarB = TransmissionStrength;
+	TBuffer.FeatureInputScalarC = TransmissionPower;
+	TBuffer.FeatureInputScalarD = PrimaryRoughnessScale;
+	TBuffer.FeatureInputScalarE = SecondaryRoughnessScale;
+	TBuffer.FeatureInputScalarF = SecondaryRampOffset;
+	TBuffer.FeatureInputScalarG = OverallSpecIntensity;
+	TBuffer.FeatureInputVector.x = PrimaryLobeIntensity;
+	TBuffer.FeatureInputVector.y = SecondaryLobeIntensity;
+	TBuffer.FeatureInputVector.z = SpecShadowStrength;
+	TBuffer.FeatureInputVector.w = WarmTintStrength;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_DFFacialShadow", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the DFFacialShadow toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_SdfFace_ScatterStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=0];
+		ScalarParameter In_SdfFace_TransStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=1];
+		ScalarParameter In_SdfFace_TransPower = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=2];
+		ScalarParameter In_SdfFace_PrimaryRoughnessScale = 1.0 [Group="MT >> 04b << SDF Face"; SortPriority=3];
+		ScalarParameter In_SdfFace_SecondaryRoughnessScale = 1.0 [Group="MT >> 04b << SDF Face"; SortPriority=4];
+		ScalarParameter In_SdfFace_SecondaryRampOffset = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=5];
+		ScalarParameter In_SdfFace_OverallSpecIntensity = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=6];
+		ScalarParameter In_SdfFace_PrimaryLobeIntensity = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=7];
+		ScalarParameter In_SdfFace_SecondaryLobeIntensity = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=8];
+		ScalarParameter In_SdfFace_SpecShadowStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=9];
+		ScalarParameter In_SdfFace_WarmTintStrength = 0.0 [Group="MT >> 04b << SDF Face"; SortPriority=10];
+	}
+
+	Graph = {
+		ToonFeatureWrite_DFFacialShadow(
+			In_SdfFace_ScatterStrength,
+			In_SdfFace_TransStrength,
+			In_SdfFace_TransPower,
+			In_SdfFace_PrimaryRoughnessScale,
+			In_SdfFace_SecondaryRoughnessScale,
+			In_SdfFace_SecondaryRampOffset,
+			In_SdfFace_OverallSpecIntensity,
+			In_SdfFace_PrimaryLobeIntensity,
+			In_SdfFace_SecondaryLobeIntensity,
+			In_SdfFace_SpecShadowStrength,
+			In_SdfFace_WarmTintStrength,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

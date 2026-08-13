@@ -1,0 +1,75 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_ToonMetal(
+	in float DiffuseIntensity,
+	in float ShadowSpecularFloor,
+	in float RampOffset,
+	in float RoughnessScale,
+	in float SpecularIntensity,
+	in float EdgeBoost,
+	in float SpecularContrast,
+	in float3 MetalTint,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_TOON_METAL;
+	TBuffer.FeatureInputScalarA = DiffuseIntensity;
+	TBuffer.FeatureInputScalarB = ShadowSpecularFloor;
+	TBuffer.FeatureInputScalarC = RampOffset;
+	TBuffer.FeatureInputScalarD = RoughnessScale;
+	TBuffer.FeatureInputScalarE = SpecularIntensity;
+	TBuffer.FeatureInputScalarF = EdgeBoost;
+	TBuffer.FeatureInputScalarG = SpecularContrast;
+	TBuffer.FeatureInputVector.xyz = MetalTint;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonMetal", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the ToonMetal toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [Group="MT >> 08 << Metal"; SortPriority=0];
+		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [Group="MT >> 08 << Metal"; SortPriority=1];
+		ScalarParameter In_ToonMetal_RampOffset = 0.0 [Group="MT >> 08 << Metal"; SortPriority=2];
+		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [Group="MT >> 08 << Metal"; SortPriority=3];
+		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [Group="MT >> 08 << Metal"; SortPriority=4];
+		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [Group="MT >> 08 << Metal"; SortPriority=5];
+		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [Group="MT >> 08 << Metal"; SortPriority=6];
+		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="MT >> 08 << Metal"; SortPriority=7];
+	}
+
+	Graph = {
+		ToonFeatureWrite_ToonMetal(
+			In_ToonMetal_DiffuseIntensity,
+			In_ToonMetal_ShadowSpecularFloor,
+			In_ToonMetal_RampOffset,
+			In_ToonMetal_RoughnessScale,
+			In_ToonMetal_SpecularIntensity,
+			In_ToonMetal_EdgeBoost,
+			In_ToonMetal_SpecularContrast,
+			In_ToonMetal_MetalTintRGB.rgb,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}

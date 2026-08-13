@@ -1,0 +1,87 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_KajiyaHair(
+	in float TangentRotate,
+	in float SecondaryShift,
+	in float SecondaryMask,
+	in float PrimaryShift,
+	in float PrimaryExpScale,
+	in float SecondaryExpScale,
+	in float OverallIntensity,
+	in float PrimaryIntensity,
+	in float SecondaryIntensity,
+	in float SecondaryShiftScale,
+	in float ShadowStrength,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_KAJIYA_HAIR_SPECULAR;
+	TBuffer.FeatureInputScalarA = TangentRotate;
+	TBuffer.FeatureInputScalarB = SecondaryShift;
+	TBuffer.FeatureInputScalarC = SecondaryMask;
+	TBuffer.FeatureInputScalarD = PrimaryShift;
+	TBuffer.FeatureInputScalarE = PrimaryExpScale;
+	TBuffer.FeatureInputScalarF = SecondaryExpScale;
+	TBuffer.FeatureInputScalarG = OverallIntensity;
+	TBuffer.FeatureInputVector.x = PrimaryIntensity;
+	TBuffer.FeatureInputVector.y = SecondaryIntensity;
+	TBuffer.FeatureInputVector.z = SecondaryShiftScale;
+	TBuffer.FeatureInputVector.w = ShadowStrength;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_KajiyaHair", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the KajiyaHair toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_Hair_TangentRotate = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=0];
+		ScalarParameter In_Hair_SecondaryShift = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=1];
+		ScalarParameter In_Hair_SecondaryMask = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=2];
+		ScalarParameter In_Hair_PrimaryShift = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=3];
+		ScalarParameter In_Hair_PrimaryExpScale = 1.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=4];
+		ScalarParameter In_Hair_SecondaryExpScale = 1.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=5];
+		ScalarParameter In_Hair_OverallSpecIntensity = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=6];
+		ScalarParameter In_Hair_PrimaryIntensity = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=7];
+		ScalarParameter In_Hair_SecondaryIntensity = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=8];
+		ScalarParameter In_Hair_SecondaryShiftScale = 1.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=9];
+		ScalarParameter In_Hair_ShadowStrength = 0.0 [Group="MT >> 02 << Hair Kajiya Kay"; SortPriority=10];
+	}
+
+	Graph = {
+		ToonFeatureWrite_KajiyaHair(
+			In_Hair_TangentRotate,
+			In_Hair_SecondaryShift,
+			In_Hair_SecondaryMask,
+			In_Hair_PrimaryShift,
+			In_Hair_PrimaryExpScale,
+			In_Hair_SecondaryExpScale,
+			In_Hair_OverallSpecIntensity,
+			In_Hair_PrimaryIntensity,
+			In_Hair_SecondaryIntensity,
+			In_Hair_SecondaryShiftScale,
+			In_Hair_ShadowStrength,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}
