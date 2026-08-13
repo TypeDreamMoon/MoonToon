@@ -207,10 +207,8 @@ ToonBufferX 却装 TBufferX)**已经修了**。
 `_1` 掩的是**另一个输入**(顶点色 / 第二张 SDF 贴图)。同一个参数名、两个使用点,就必须是两个节点 ——
 UE 里 ChannelMaskParameter 的遮罩通道共享而节点不共享。删掉会断图。**这一项作废,不做。**
 
-**P5 已完成(此前记的"只做了一半"作废)。** UV 链抽成 `MF_ToonUV`, 另外 14 对"双采样 + Enable Per Texture Sampler"
-静态开关的抽取 —— 需要把 17 个 `TextureSampleParameter2D` 换成 `TextureObjectParameter` +
-3 个按 SamplerType 分的共享采样函数。名字保持不变时 MI 绑定不会丢(引擎源码已确认按类型+名字查),
-但这是一次两千行文件里的十四处结构替换,留给下一轮。
+**P5 已完成。** UV 链抽成 `MF_ToonUV`,14 对"双采样 + Enable Per Texture Sampler"抽成 4 个共享
+采样函数 —— 细节见文末的「P5 收尾」一节。
 
 **P7 的验收方式。** 改名前后各抓一次全项目 MI 快照(资产注册表全量,88 个 MI、5,773 条 override),
 逐项语义对比:**0 丢失、0 改变、0 新增**。快照两份都提交在本目录,可复查。
