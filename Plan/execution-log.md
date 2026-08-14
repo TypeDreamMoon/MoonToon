@@ -118,7 +118,7 @@ feature==DFF 时置位),但阴影技术不再和表面模型绑死 —— 这是
 | P0 X-macro spike | ✅ 完成 | `29f219d` (插件) | 用引擎自己的 stb_preprocess 实跑,0 诊断 |
 | P1 SDF 迁出 Metallic/Anisotropy | ✅ 完成 | `f17230a7` (引擎) | DevTestEditor 编译 0 错误 |
 | P2 删 2-bit legacy ID | ✅ 完成 | 同上 | 同上(两者交织,见提交说明) |
-| P3 RT 改名 | ✅ **完成**(拆 context 除外) | `ab3218fd` `7ad255d7` `962fa89f` | 429 处改名含 Engine/Plugins;`UnrealEditor` 目标编译 0 错误。`FMoonToonContext` 拆分未做 |
+| P3 RT 改名 + context 拆分 | ✅ **完成** | `ab3218fd` `7ad255d7` `962fa89f` + 本次 | 429 处改名含 Engine/Plugins;`FMoonToonContext` 按生命周期拆成 3 份、删 2 个死字段、3 个宏变函数;顺带修掉 P1 引入的 SDF 恒零 bug;两个目标编译 0 错误 |
 | P4 槽位表 + 读侧具名化 | ✅ **完成** | `9f534e52` `7ad255d7` | 表 + 13 个生成结构体 + Matcap 修复 + **80 处裸读全部具名化** |
 | P5 基础函数解耦 | OK **完成** | `2614d8b` `5fcb621` | UV 链 + 14 对贴图双采样全部抽出;基础函数 2308 -> 1882 行 |
 | P6 特征拆分 + 静态派发 | ✅ 完成 | `22aa9bf` `71383a4` (插件) | 13 个函数 + 派发器 + 基础函数 + 2 个材质全部 dsc 编译通过 |
@@ -329,4 +329,99 @@ P6 删掉了 `ShadingFeatureID` 标量参数,但**13 个 MI 覆盖过它**。MI 
 `IterateDependentFunctions` 在 `/Game/Decompiled/` 那棵 MooaToon 反编译树上解引用了空的
 `MaterialFunction`(那三个缺失函数先于本次改动存在,第一次启动就在报)。引擎那里没有 null 检查。
 
-**2. `FMoonToonContext` 拆分** —— P3 的另一半,约 100 处消费点,未做。
+**2. `FMoonToonContext` 拆分** —— 已完成,见下节。
+
+---
+
+## P3 下半场:`FMoonToonContext` 拆分
+
+`FGBufferData` 上原来挂着一个 13 字段的 `FMoonToonContext`,里面混着**三种生命周期**,类型上没有
+任何东西能把它们区分开:
+
+| 字段 | 真实生命周期 |
+| --- | --- |
+| `ToonBuffer` / `ToonGBuffer` | 每像素 |
+| `EncodedToonSurfaceRT` | 每像素,而且根本不是 toon 状态 —— 是一张原始 GBuffer 槽 |
+| `ToonLight` / `LightType` / `LightColor` / `TintShadow` | **每盏灯** |
+| `PixelPos` / `BufferUV` / `ViewportUV` | **每视图** |
+| `Exposure` | 每视图,而且是 `GetMoonExposure()` 的一份镜像 |
+| `ShadowMap` / `IsEditorPreviewWorldType` | **没有任何地方读** |
+
+代价不是抽象的:所有 helper 的签名都写着 `FMoonToonContext`,你得读函数体才知道它到底依赖什么。
+
+### 改成
+
+新文件 `Toon/ToonShadingContext.ush`:`FToonLightContext`(每灯)、`FToonViewContext`(每视图),
+外加 `InitToonLightContext()` / `InitToonViewContext()` / `MoonToonClassifyLightType()` /
+`MoonToonSetViewPixelPos()`。每像素那半不需要包装 —— `FToonGBufferData` / `FToonBuffer` 本来就是
+那两个类型,直接挂在 `FGBufferData` 上(`ToonGBuffer` / `ToonFeature`)。`EncodedToonSurfaceRT`
+搬到顶层与 `CustomData` 并排,它一直就是那个东西。
+
+`ShadowMap` / `IsEditorPreviewWorldType` 删除。`Exposure` 删除,唯一的读者改为直接调
+`GetMoonExposure()`。三个 `SetMoonToonContext_*` 宏(伸进两层嵌套改字段,还隐含依赖作用域里
+有个叫 `GBuffer` 的变量)变成普通函数。
+
+签名现在自己说明生命周期:
+
+```
+GetShadowColorIntensity(FToonLightContext)                        // 只要灯
+GetToonFilteredSurfaceShadow(FToonLightContext, FToonViewContext, ...)  // 真的跨两种
+GetMainLightShadowTint(FGBufferData, FToonGBufferData, FToonLightContext)
+```
+
+### 顺手抓到一个真 bug(P1 引入的,一直是活的)
+
+`GBUFFER_REFACTOR` 恒为 1(`ShaderGenerationUtil.cpp:2259` 写死 `bUseRefactor = true`),所以走的
+是**生成**的 GBuffer 解码器。而它的顺序是:
+
+```
+...槽位赋值(含 Ret.EncodedToonSurfaceRT)...
+GBufferPostDecode(Ret, ...);          // 这里面读 Ret.ToonFeature
+Ret.ToonFeature = DecodeToonDataFromBuffer(...);   // 才在这里赋值
+```
+
+这不是读代码推的,是从**实际生成的文件**里读出来的 ——
+`Intermediate/ShaderAutogen/PCD3D_SM6/AutogenShaderHeaders.ush`:`DecodeGBufferDataDirect`
+(约 106 行)调 `GBufferPostDecode` 而**整个函数从头到尾没有 `Ret.ToonFeature` 的赋值**;
+MRT 版(约 166 行)调完 `GBufferPostDecode` 之后才在 175 行赋值。
+
+`GBufferPostDecode` 里 `DecodeToonGBufferDataFromMRT(..., Ret.ToonFeature, ...)` 把 SDF 对拷进
+`FToonGBufferData`,而此时 `Ret.ToonFeature` 还是 `(FGBufferData)0` 的零值。
+`ApplyDistanceFieldFacialShadow` 读的正是这份拷贝 ⇒ **`shadowSdf` 恒为 0,SDF 脸部阴影是死的。**
+
+P1 之前不会:那时 SDF 从 `Ret.Metallic` / `Ret.Anisotropy` 里捞,而它们是普通槽位,在
+`GBufferPostDecode` 之前就填好了。P1 把 SDF 挪到 ToonFeatureRT3 之后,读取点跟着挪,顺序依赖
+就此成立而没人发现 —— **L 类验收(编译 0 错误)对这种 bug 完全失明。**
+
+修法是取消那份拷贝,不是调顺序:SDF 只有一个家(`FToonBuffer` 的 ToonFeatureRT3 通道),
+`ApplyDistanceFieldFacialShadow` 直接从它已经收到的 `TBuffer` 读。于是
+`DecodeToonGBufferDataFromMRT` 的 `FToonBuffer` 参数整个删掉,顺序依赖从根上没了。
+
+同族清理(都是签名说谎):
+
+- `EncodeToonGBufferDataToMRT` 的 `FToonBuffer` 参数 —— 函数体一行都没读过
+- `ApplyDistanceFieldFacialShadow` 的 `FGBufferData` / `FToonGBufferData` 两个参数 —— 拷贝取消后全部无用
+- BasePass 里 `ToonFeatureRT0Texture.Load` + 解码 —— 只为喂上面那个没人读的参数,
+  而且 ToonFeatureRT0 是本 pass 自己的 MRT(源码上等于在读正在写的 render target)。
+  **实测:删掉前后 `M_MoonToon` 指令数一模一样(VS 432 / PS 393),说明 DXC 早就把它整条
+  消掉了 —— 这是源码清晰度修复,不是性能修复,别把它说成性能收益。**
+
+### 验收
+
+- `UnrealEditor Win64 Development`:`Result: Succeeded`,0 错误
+- `DevTestEditor Win64 Development`:`Result: Succeeded`,0 错误
+- 全树残留:`MoonToonContext` 只剩注释里的历史说明;`Engine/Plugins` 零命中(**这次是改之前就查了**)
+- 编辑器重启后全量 shader 编译:**6,411 个 job 全部完成,0 个 `error X####`,0 个
+  ShaderCompileWorker 失败**,日志里没有任何一条来自 toon 文件的诊断
+- `M_MoonToon` 432/393、`M_MoonToonOutline` 488/415、`M_EyeBase` 521/375 —— 与改动前逐位一致
+- 唯一的材质编译失败是既有的 `M_BL_Textures_Parity`
+  (`PreSkinnedPosition`/`PreSkinnedNormal` 不能在 pixel shader 里用),与 toon 无关
+
+### 没做的部分,以及为什么
+
+计划里写的是「`FGBufferData` 不再嵌套 toon context」。**没做到,而且不是疏忽。**
+`ToonBxDF` 的签名由 `IntegrateBxDF`(`ShadingModels.ush`)固定,引擎里每条光照路径都在调它,
+toon 载荷没有别的入口。正确的去处是把每灯那半挂到 `FAreaLight` 上 —— 它本来就是 `ToonBxDF` 的
+参数,而且已经带着 `FToonLight` —— 但 `FRect` / `FCapsule` 在 deferred lighting 之外还有十几处
+构造点,那些地方会把新字段留成未初始化,而今天它们拿到的是 `InitToonLightContext()` 的默认值。
+那是另一件事,得配自己的测试。
