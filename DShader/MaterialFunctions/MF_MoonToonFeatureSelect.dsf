@@ -246,148 +246,148 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 	}
 
 	Properties = {
-		StaticSwitchParameter Feature_Is_PBRSpecular = false [Group="30 - Shading Feature (pick one)"; SortPriority=0; Description="启用 PBR Specular 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_KajiyaHair = false [Group="30 - Shading Feature (pick one)"; SortPriority=1; Description="启用 Hair Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_ToonKajiyaHair = false [Group="30 - Shading Feature (pick one)"; SortPriority=2; Description="启用 Hair Toon Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_DFFacialShadow = false [Group="30 - Shading Feature (pick one)"; SortPriority=3; Description="启用 SDF Face 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_HairHighlightMask = false [Group="30 - Shading Feature (pick one)"; SortPriority=4; Description="启用 Hair Highlight Mask 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_Skin = false [Group="30 - Shading Feature (pick one)"; SortPriority=5; Description="启用 Skin 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_Stockings = false [Group="30 - Shading Feature (pick one)"; SortPriority=6; Description="启用 Stockings 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_Eye = false [Group="30 - Shading Feature (pick one)"; SortPriority=7; Description="启用 Eye 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_ClothVelvet = false [Group="30 - Shading Feature (pick one)"; SortPriority=8; Description="启用 Cloth Velvet 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_ToonMetal = false [Group="30 - Shading Feature (pick one)"; SortPriority=9; Description="启用 Metal 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_EmissiveInk = false [Group="30 - Shading Feature (pick one)"; SortPriority=10; Description="启用 Emissive Ink 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Feature_Is_Matcap = false [Group="30 - Shading Feature (pick one)"; SortPriority=11; Description="启用 Matcap 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_PBRSpecular = false [ParameterName="Is PBRSpecular"; Group="30 - Shading Feature (pick one)"; SortPriority=0; Description="启用 PBR Specular 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_KajiyaHair = false [ParameterName="Is KajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=1; Description="启用 Hair Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_ToonKajiyaHair = false [ParameterName="Is ToonKajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=2; Description="启用 Hair Toon Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_DFFacialShadow = false [ParameterName="Is DFFacialShadow"; Group="30 - Shading Feature (pick one)"; SortPriority=3; Description="启用 SDF Face 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_HairHighlightMask = false [ParameterName="Is HairHighlightMask"; Group="30 - Shading Feature (pick one)"; SortPriority=4; Description="启用 Hair Highlight Mask 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_Skin = false [ParameterName="Is Skin"; Group="30 - Shading Feature (pick one)"; SortPriority=5; Description="启用 Skin 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_Stockings = false [ParameterName="Is Stockings"; Group="30 - Shading Feature (pick one)"; SortPriority=6; Description="启用 Stockings 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_Eye = false [ParameterName="Is Eye"; Group="30 - Shading Feature (pick one)"; SortPriority=7; Description="启用 Eye 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_ClothVelvet = false [ParameterName="Is ClothVelvet"; Group="30 - Shading Feature (pick one)"; SortPriority=8; Description="启用 Cloth Velvet 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_ToonMetal = false [ParameterName="Is ToonMetal"; Group="30 - Shading Feature (pick one)"; SortPriority=9; Description="启用 Metal 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_EmissiveInk = false [ParameterName="Is EmissiveInk"; Group="30 - Shading Feature (pick one)"; SortPriority=10; Description="启用 Emissive Ink 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_Matcap = false [ParameterName="Is Matcap"; Group="30 - Shading Feature (pick one)"; SortPriority=11; Description="启用 Matcap 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 	}
 
 	Graph = {
-		ToonBufferA = Feature_Is_PBRSpecular(
+		ToonBufferA = Is_PBRSpecular(
 			True = MF_ToonFeature_PBRSpecular(OutputIndex=0),
-			False = Feature_Is_KajiyaHair(
+			False = Is_KajiyaHair(
 				True = MF_ToonFeature_KajiyaHair(OutputIndex=0),
-				False = Feature_Is_ToonKajiyaHair(
+				False = Is_ToonKajiyaHair(
 					True = MF_ToonFeature_ToonKajiyaHair(InToonKajiyaSecondaryStrandShift, InToonKajiyaPrimaryStrandShift, OutputIndex=0),
-					False = Feature_Is_DFFacialShadow(
+					False = Is_DFFacialShadow(
 						True = MF_ToonFeature_DFFacialShadow(OutputIndex=0),
-						False = Feature_Is_HairHighlightMask(
+						False = Is_HairHighlightMask(
 							True = MF_ToonFeature_HairHighlightMask(InHairHighlightMask, OutputIndex=0),
-							False = Feature_Is_Skin(
+							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=0),
-								False = Feature_Is_Stockings(
+								False = Is_Stockings(
 									True = MF_ToonFeature_Stockings(InStockingsBodyColor, OutputIndex=0),
-									False = Feature_Is_Eye(
+									False = Is_Eye(
 										True = MF_ToonFeature_Eye(OutputIndex=0),
-										False = Feature_Is_ClothVelvet(
+										False = Is_ClothVelvet(
 											True = MF_ToonFeature_ClothVelvet(OutputIndex=0),
-											False = Feature_Is_ToonMetal(
+											False = Is_ToonMetal(
 												True = MF_ToonFeature_ToonMetal(OutputIndex=0),
-												False = Feature_Is_EmissiveInk(
+												False = Is_EmissiveInk(
 													True = MF_ToonFeature_EmissiveInk(OutputIndex=0),
-													False = Feature_Is_Matcap(
+													False = Is_Matcap(
 														True = MF_ToonFeature_Matcap(OutputIndex=0),
 														False = MF_ToonFeature_Default(OutputIndex=0)))))))))))));
 
-		ToonBufferB = Feature_Is_PBRSpecular(
+		ToonBufferB = Is_PBRSpecular(
 			True = MF_ToonFeature_PBRSpecular(OutputIndex=1),
-			False = Feature_Is_KajiyaHair(
+			False = Is_KajiyaHair(
 				True = MF_ToonFeature_KajiyaHair(OutputIndex=1),
-				False = Feature_Is_ToonKajiyaHair(
+				False = Is_ToonKajiyaHair(
 					True = MF_ToonFeature_ToonKajiyaHair(InToonKajiyaSecondaryStrandShift, InToonKajiyaPrimaryStrandShift, OutputIndex=1),
-					False = Feature_Is_DFFacialShadow(
+					False = Is_DFFacialShadow(
 						True = MF_ToonFeature_DFFacialShadow(OutputIndex=1),
-						False = Feature_Is_HairHighlightMask(
+						False = Is_HairHighlightMask(
 							True = MF_ToonFeature_HairHighlightMask(InHairHighlightMask, OutputIndex=1),
-							False = Feature_Is_Skin(
+							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=1),
-								False = Feature_Is_Stockings(
+								False = Is_Stockings(
 									True = MF_ToonFeature_Stockings(InStockingsBodyColor, OutputIndex=1),
-									False = Feature_Is_Eye(
+									False = Is_Eye(
 										True = MF_ToonFeature_Eye(OutputIndex=1),
-										False = Feature_Is_ClothVelvet(
+										False = Is_ClothVelvet(
 											True = MF_ToonFeature_ClothVelvet(OutputIndex=1),
-											False = Feature_Is_ToonMetal(
+											False = Is_ToonMetal(
 												True = MF_ToonFeature_ToonMetal(OutputIndex=1),
-												False = Feature_Is_EmissiveInk(
+												False = Is_EmissiveInk(
 													True = MF_ToonFeature_EmissiveInk(OutputIndex=1),
-													False = Feature_Is_Matcap(
+													False = Is_Matcap(
 														True = MF_ToonFeature_Matcap(OutputIndex=1),
 														False = MF_ToonFeature_Default(OutputIndex=1)))))))))))));
 
-		ToonBufferC = Feature_Is_PBRSpecular(
+		ToonBufferC = Is_PBRSpecular(
 			True = MF_ToonFeature_PBRSpecular(OutputIndex=2),
-			False = Feature_Is_KajiyaHair(
+			False = Is_KajiyaHair(
 				True = MF_ToonFeature_KajiyaHair(OutputIndex=2),
-				False = Feature_Is_ToonKajiyaHair(
+				False = Is_ToonKajiyaHair(
 					True = MF_ToonFeature_ToonKajiyaHair(InToonKajiyaSecondaryStrandShift, InToonKajiyaPrimaryStrandShift, OutputIndex=2),
-					False = Feature_Is_DFFacialShadow(
+					False = Is_DFFacialShadow(
 						True = MF_ToonFeature_DFFacialShadow(OutputIndex=2),
-						False = Feature_Is_HairHighlightMask(
+						False = Is_HairHighlightMask(
 							True = MF_ToonFeature_HairHighlightMask(InHairHighlightMask, OutputIndex=2),
-							False = Feature_Is_Skin(
+							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=2),
-								False = Feature_Is_Stockings(
+								False = Is_Stockings(
 									True = MF_ToonFeature_Stockings(InStockingsBodyColor, OutputIndex=2),
-									False = Feature_Is_Eye(
+									False = Is_Eye(
 										True = MF_ToonFeature_Eye(OutputIndex=2),
-										False = Feature_Is_ClothVelvet(
+										False = Is_ClothVelvet(
 											True = MF_ToonFeature_ClothVelvet(OutputIndex=2),
-											False = Feature_Is_ToonMetal(
+											False = Is_ToonMetal(
 												True = MF_ToonFeature_ToonMetal(OutputIndex=2),
-												False = Feature_Is_EmissiveInk(
+												False = Is_EmissiveInk(
 													True = MF_ToonFeature_EmissiveInk(OutputIndex=2),
-													False = Feature_Is_Matcap(
+													False = Is_Matcap(
 														True = MF_ToonFeature_Matcap(OutputIndex=2),
 														False = MF_ToonFeature_Default(OutputIndex=2)))))))))))));
 
-		ShadingFeatureID = Feature_Is_PBRSpecular(
+		ShadingFeatureID = Is_PBRSpecular(
 			True = 1.0,
-			False = Feature_Is_KajiyaHair(
+			False = Is_KajiyaHair(
 				True = 2.0,
-				False = Feature_Is_ToonKajiyaHair(
+				False = Is_ToonKajiyaHair(
 					True = 5.0,
-					False = Feature_Is_DFFacialShadow(
+					False = Is_DFFacialShadow(
 						True = 3.0,
-						False = Feature_Is_HairHighlightMask(
+						False = Is_HairHighlightMask(
 							True = 4.0,
-							False = Feature_Is_Skin(
+							False = Is_Skin(
 								True = 6.0,
-								False = Feature_Is_Stockings(
+								False = Is_Stockings(
 									True = 7.0,
-									False = Feature_Is_Eye(
+									False = Is_Eye(
 										True = 8.0,
-										False = Feature_Is_ClothVelvet(
+										False = Is_ClothVelvet(
 											True = 9.0,
-											False = Feature_Is_ToonMetal(
+											False = Is_ToonMetal(
 												True = 10.0,
-												False = Feature_Is_EmissiveInk(
+												False = Is_EmissiveInk(
 													True = 11.0,
-													False = Feature_Is_Matcap(
+													False = Is_Matcap(
 														True = 13.0,
 														False = 0.0))))))))))));
 
-		DebugColor = Feature_Is_PBRSpecular(
+		DebugColor = Is_PBRSpecular(
 			True = float4(0.25, 0.25, 0.25, 1.0),
-			False = Feature_Is_KajiyaHair(
+			False = Is_KajiyaHair(
 				True = float4(0.0, 1.0, 0.0, 1.0),
-				False = Feature_Is_ToonKajiyaHair(
+				False = Is_ToonKajiyaHair(
 					True = float4(0.0, 0.0, 1.0, 1.0),
-					False = Feature_Is_DFFacialShadow(
+					False = Is_DFFacialShadow(
 						True = float4(1.0, 1.0, 1.0, 1.0),
-						False = Feature_Is_HairHighlightMask(
+						False = Is_HairHighlightMask(
 							True = float4(1.0, 0.0, 0.0, 1.0),
-							False = Feature_Is_Skin(
+							False = Is_Skin(
 								True = float4(1.0, 1.0, 0.0, 1.0),
-								False = Feature_Is_Stockings(
+								False = Is_Stockings(
 									True = float4(1.0, 0.0, 1.0, 1.0),
-									False = Feature_Is_Eye(
+									False = Is_Eye(
 										True = float4(0.0, 1.0, 1.0, 1.0),
-										False = Feature_Is_ClothVelvet(
+										False = Is_ClothVelvet(
 											True = float4(0.5, 1.0, 0.5, 1.0),
-											False = Feature_Is_ToonMetal(
+											False = Is_ToonMetal(
 												True = float4(1.0, 0.5, 0.5, 1.0),
-												False = Feature_Is_EmissiveInk(
+												False = Is_EmissiveInk(
 													True = float4(0.5, 0.5, 1.0, 1.0),
-													False = Feature_Is_Matcap(
+													False = Is_Matcap(
 														True = float4(1.0, 0.75, 0.0, 1.0),
 														False = float4(0.0, 0.0, 0.0, 1.0)))))))))))));
 	}
