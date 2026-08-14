@@ -496,12 +496,22 @@ def emit_selector(tables, ids):
         '\t\topt %s %s = %s [Description="Per-pixel value from a map; added to the matching parameter."];'
         % (t, n, "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0") for (t, n) in sel_inputs)
 
+    # Two spellings of one switch, as close as the languages allow. The DSL identifier has to be an
+    # identifier, so it uses an underscore; the panel label is what an artist reads, so it uses a
+    # space and matches the plugin's existing "Is Face" / "Is Hair" switches.
+    def switch_id(k):
+        return "Is_%s" % FEATURES[k][0]
+
+    def switch_label(k):
+        return "Is %s" % FEATURES[k][0]
+
     props = "\n".join(
-        '\t\tStaticSwitchParameter Feature_Is_%s = false '
-        '[Group="30 - Shading Feature (pick one)"; SortPriority=%d; '
+        '\t\tStaticSwitchParameter %s = false '
+        '[ParameterName="%s"; Group="30 - Shading Feature (pick one)"; SortPriority=%d; '
         'Description="启用 %s 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. '
         '勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];'
-        % (FEATURES[k][0], i, FEATURES[k][3].split(": ")[-1]) for i, k in enumerate(picks))
+        % (switch_id(k), switch_label(k), i, FEATURES[k][3].split(": ")[-1])
+        for i, k in enumerate(picks))
 
     def call(k, out_index):
         args = "".join("%s, " % sel_in for (_, _, sel_in) in _feature_inputs(k, tables))
@@ -512,16 +522,16 @@ def emit_selector(tables, ids):
             return call(FALLBACK, out_index)
         k = picks[depth]
         pad = "\t\t\t" + "\t" * depth
-        return ("Feature_Is_%s(\n%sTrue = %s,\n%sFalse = %s)"
-                % (FEATURES[k][0], pad, call(k, out_index), pad, chain(out_index, depth + 1)))
+        return ("%s(\n%sTrue = %s,\n%sFalse = %s)"
+                % (switch_id(k), pad, call(k, out_index), pad, chain(out_index, depth + 1)))
 
     def id_chain(depth=0):
         if depth == len(picks):
             return "%d.0" % ids[FEATURES[FALLBACK][1]]
         k = picks[depth]
         pad = "\t\t\t" + "\t" * depth
-        return ("Feature_Is_%s(\n%sTrue = %d.0,\n%sFalse = %s)"
-                % (FEATURES[k][0], pad, ids[FEATURES[k][1]], pad, id_chain(depth + 1)))
+        return ("%s(\n%sTrue = %d.0,\n%sFalse = %s)"
+                % (switch_id(k), pad, ids[FEATURES[k][1]], pad, id_chain(depth + 1)))
 
     body = "\n\n".join("\t\t%s = %s;" % (name, chain(i))
                        for i, name in enumerate(["ToonBufferA", "ToonBufferB", "ToonBufferC"]))
@@ -530,8 +540,8 @@ def emit_selector(tables, ids):
             return values[FALLBACK]
         k = picks[depth]
         pad = "\t\t\t" + "\t" * depth
-        return ("Feature_Is_%s(\n%sTrue = %s,\n%sFalse = %s)"
-                % (FEATURES[k][0], pad, values[k], pad, const_chain(values, depth + 1)))
+        return ("%s(\n%sTrue = %s,\n%sFalse = %s)"
+                % (switch_id(k), pad, values[k], pad, const_chain(values, depth + 1)))
 
     body += "\n\n\t\tShadingFeatureID = %s;" % id_chain()
     body += "\n\n\t\tDebugColor = %s;" % const_chain(DEBUG_COLORS)

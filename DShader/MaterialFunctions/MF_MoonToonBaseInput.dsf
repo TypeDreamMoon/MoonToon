@@ -190,19 +190,26 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// data" are the same decision -- these used to be two more switches an artist had to remember
 		// to tick in agreement with the feature dropdown. Same names as in MF_MoonToonFeatureSelect,
 		// which makes them the same material parameter: one row in the panel, one source of truth.
-		StaticSwitchParameter Feature_Is_KajiyaHair = false [
+		// ParameterName carries the space; the DSL identifier can't. Both spellings must match
+		// MF_MoonToonFeatureSelect (Tools/gen_feature_functions.py) exactly -- the ParameterName is
+		// what makes these the same material parameter as the selector's, and SortPriority is what
+		// keeps the panel rows in the generator's order rather than this file's.
+		StaticSwitchParameter Is_KajiyaHair = false [
+			ParameterName="Is KajiyaHair";
 			Group="30 - Shading Feature (pick one)";
-			SortPriority=2;
+			SortPriority=1;
 			Description="启用 Kajiya Kay 发丝高光. 同时决定是否解码 UV23 里烘焙的高光切线 —— 旧版这是另一个叫 Enable Feature Kajiya Hair Specular 的开关, 忘了同步就会静默不生效.";
 		];
-		StaticSwitchParameter Feature_Is_ToonKajiyaHair = false [
+		StaticSwitchParameter Is_ToonKajiyaHair = false [
+			ParameterName="Is ToonKajiyaHair";
 			Group="30 - Shading Feature (pick one)";
-			SortPriority=3;
+			SortPriority=2;
 			Description="启用 Toon Kajiya Kay 发丝高光. 与上面一样会解码烘焙的高光切线.";
 		];
-		StaticSwitchParameter Feature_Is_DFFacialShadow = false [
+		StaticSwitchParameter Is_DFFacialShadow = false [
+			ParameterName="Is DFFacialShadow";
 			Group="30 - Shading Feature (pick one)";
-			SortPriority=4;
+			SortPriority=3;
 			Description="启用距离场脸部阴影. 同时决定是否采样 SDF 贴图、以及切线通道解码成脸朝向而不是高光切线 —— 旧版这是另一个叫 Enable Feature Distance Field Facial Shadow 的开关.";
 		];
 		TextureObjectParameter Global_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
@@ -1012,10 +1019,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				ParameterName="Use Highlight Tangent baked in Houdini UV23",
 				DefaultValue=true
 			);
-		float3 StaticSwitchParameter_26 = Feature_Is_KajiyaHair(
+		float3 StaticSwitchParameter_26 = Is_KajiyaHair(
 			True = StaticSwitchParameter_25,
-			False = Feature_Is_ToonKajiyaHair(True = StaticSwitchParameter_25, False = float3(0.0, 0.0, 0.0)));
-		float3 StaticSwitchParameter_27 = Feature_Is_DFFacialShadow(True = normalize(float3(MaterialExpressionTextureCoordinate_4.rg, MaterialExpressionTextureCoordinate_5.r)), False = StaticSwitchParameter_26);
+			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_25, False = float3(0.0, 0.0, 0.0)));
+		float3 StaticSwitchParameter_27 = Is_DFFacialShadow(True = normalize(float3(MaterialExpressionTextureCoordinate_4.rg, MaterialExpressionTextureCoordinate_5.r)), False = StaticSwitchParameter_26);
 		#EndRegion
 
 		float3 TangentWS = StaticSwitchParameter_27;
@@ -1037,10 +1044,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 MaterialExpressionTextureCoordinate_6_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
 		#Region "Decode Hightlight Tangent or Face Forward Dir"
-		float2 StaticSwitchParameter_29 = Feature_Is_KajiyaHair(
+		float2 StaticSwitchParameter_29 = Is_KajiyaHair(
 			True = StaticSwitchParameter_28,
-			False = Feature_Is_ToonKajiyaHair(True = StaticSwitchParameter_28, False = MaterialExpressionTextureCoordinate_6_1));
-		float2 StaticSwitchParameter_30 = Feature_Is_DFFacialShadow(True = normalize(Transform).rg, False = StaticSwitchParameter_29);
+			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_28, False = MaterialExpressionTextureCoordinate_6_1));
+		float2 StaticSwitchParameter_30 = Is_DFFacialShadow(True = normalize(Transform).rg, False = StaticSwitchParameter_29);
 		#EndRegion
 
 		float2 Custom_Vertex_UV1 = StaticSwitchParameter_30;
@@ -1064,10 +1071,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 MaterialExpressionTextureCoordinate_7_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
 		#Region "Decode Hightlight Tangent or Face Forward Dir"
-		float2 StaticSwitchParameter_32 = Feature_Is_KajiyaHair(
+		float2 StaticSwitchParameter_32 = Is_KajiyaHair(
 			True = StaticSwitchParameter_31,
-			False = Feature_Is_ToonKajiyaHair(True = StaticSwitchParameter_31, False = MaterialExpressionTextureCoordinate_7_1));
-		float2 StaticSwitchParameter_33 = Feature_Is_DFFacialShadow(True = float2(normalize(Transform).b, MaterialExpressionTextureCoordinate_5_3.g), False = StaticSwitchParameter_32);
+			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_31, False = MaterialExpressionTextureCoordinate_7_1));
+		float2 StaticSwitchParameter_33 = Is_DFFacialShadow(True = float2(normalize(Transform).b, MaterialExpressionTextureCoordinate_5_3.g), False = StaticSwitchParameter_32);
 		#EndRegion
 
 		float2 Custom_Vertex_UV2 = StaticSwitchParameter_33;
@@ -1330,7 +1337,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SortPriority=32,
 				ParameterName="Flip Left Right"
 			);
-		float StaticSwitchParameter_55 = Feature_Is_DFFacialShadow(True = StaticSwitchParameter_54, False = 0.0);
+		float StaticSwitchParameter_55 = Is_DFFacialShadow(True = StaticSwitchParameter_54, False = 0.0);
 		#EndRegion
 
 		float FacialShadowSdfLeft = StaticSwitchParameter_55;
@@ -1373,7 +1380,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SortPriority=32,
 				ParameterName="Flip Left Right"
 			);
-		float StaticSwitchParameter_58 = Feature_Is_DFFacialShadow(True = StaticSwitchParameter_57, False = 0.0);
+		float StaticSwitchParameter_58 = Is_DFFacialShadow(True = StaticSwitchParameter_57, False = 0.0);
 		#EndRegion
 
 		float FacialShadowSdfRight = StaticSwitchParameter_58;
