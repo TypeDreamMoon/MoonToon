@@ -307,6 +307,58 @@ C++ 标识符跟着改(否则编不过),但那个字符串是 nDisplay / 外部�
 
 ## 仍然欠着的
 
+## Matcap:从"死特征"到修饰符(M1–M6)
+
+用户指出 matcap 应该有贴图和 mask。查下来比这更糟:`In_Matcap_ColorRGB` 是个默认
+`(0,0,0,0)` 的 VectorParameter,描述里写着"由材质图用视空间法线当 UV 采样贴图后接进来",
+**但没有任何东西那样接** —— matcap 恒输出黑色,整个特征从落地起就是死的。
+
+### 查了标准再动手
+
+用户让去查 NPR matcap 的通行做法,结论和我原来的设计相反:
+
+- **MToon 1.0(VRM 规范)**:`The result of matcap is additive blended to the lighting result.`
+  遮罩来自 `rimMultiplyTexture`,另有 `rimLightingMix` 控制吃不吃光照。
+- **Unity Toon Shader**:混合模式 Multiply/Add,并有独立的 MatCap Mask + Mask Level + Invert。
+
+UV 也不是"视空间法线 .xy*0.5+0.5",而是拿视线现搭一个坐标架:
+
+```
+worldViewX = normalize(Vector3(V.z, 0.0, -V.x))   // y 分量硬写 0
+worldViewY = cross(V, worldViewX)
+matcapUv   = Vector2(dot(worldViewX,N), dot(worldViewY,N)) * 0.495 + 0.5
+```
+
+`worldViewX.y = 0` 是**抗相机 roll** 的关键(Unity 把这件事做成了 Stabilize Camera Rolling
+开关);`0.495` 是防止采样溢出球边的半像素余量。MToon 是 Y-up,UE 是 **Z-up**,所以照抄会绕
+错轴 —— 这里写成 `normalize(float3(V.y, -V.x, 0))`。另外规范没写的一条:正上方俯视时该坐标架
+退化(V.xy≈0),这里加了固定轴回退,否则出 NaN。
+
+### 结构后果:matcap 根本不该是特征
+
+既然是**加性**,matcap 表面同时还是皮肤/头发/布料表面。做成互斥的 `ShadingFeatureID` 意味着
+"勾了 matcap 就关掉皮肤着色" —— 和 SDF 脸部阴影**同一个类别错误**(阴影*技术*不是表面*模型*)。
+VRoid 的 SphereAdd 正是同时铺在全身各材质上的。
+
+所以走了 A 方案:**加第 5 张 RGBA8(`ToonFeatureRT4`)**,matcap 进 feature-independent 通道。
+`.xyz` = 已乘遮罩和强度的 matcap 颜色(遮罩折在授权侧,引擎只做乘法,GBuffer 不用多花通道),
+`.w` = lighting mix。特征 id 13 **退役不复用**,`MOON_TOON_SLOTS_MATCAP` / `FToonMatcapParams` /
+`bIsMatcap` 两个分支全部删除,着色只剩最后一句加法。
+
+### 三个值得记的坑
+
+1. **`FSceneTextureParameters` 和 `FSceneTextureUniformParameters` 是两个结构体**,分别在
+   `SceneTextureParameters.h` 和 `SceneTexturesConfig.h`。只加前者会编译过一半再炸。
+2. **`cross` 不是 DreamShaderLang 内建**(内建只有 lerp/dot/pow/min/max/clamp/saturate/sin/cos/
+   abs/floor/ceil/frac/sqrt/normalize/fmod)。矢量数学走 `Custom` 节点,反而让整段 MToon 公式
+   能按规范原样读。
+3. **`VirtualFunction` 是重述签名**:给 `MF_MoonToonBaseInput` 加输出,必须同时改 `M_MoonToon.dsm`
+   里的那份声明,否则报 `OutputIndex is out of range`。
+4. **`MoonToonShadingFeature.h` 是特征表的第三份拷贝**(C++ UENUM + static_assert 联动)。
+   删 id 时它编译报错 —— 这正是那套 static_assert 存在的意义,机制生效了。
+
+---
+
 **0. 面板改名 `Feature_Is_X` → `Is X`(已完成,提交 `0c83719`)**
 
 十二个特征开关是面板里唯一还带子系统前缀 + 下划线的一组,而同一张列表里它们的邻居是

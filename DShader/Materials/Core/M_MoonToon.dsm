@@ -33,6 +33,10 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 FaceOverlayData;
 		float4 FaceOverlayParams;
 		float4 FaceOverlayStencilIDs;
+		// rgb = matcap contribution (mask and intensity already applied), a = lighting mix.
+		// Must stay in step with MF_MoonToonBaseInput's own Outputs block -- this is a restated
+		// signature, and a missing entry is an "OutputIndex is out of range" build error.
+		float4 MatcapData;
 	}
 }
 
@@ -79,12 +83,16 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 FaceOverlay;
 		float4 FaceOverlayTuning;
 		float4 FaceOverlayStencils;
+		float4 ToonDataD;
 
 		Base.MaterialAttributes = Attributes;
 
 		Expression(Class="ToonMaterialOutput").Pin[0] = ToonDataA;
 		Expression(Class="ToonMaterialOutput").Pin[1] = ToonDataB;
 		Expression(Class="ToonMaterialOutput").Pin[2] = ToonDataC;
+		// Pin 3 is the feature-INDEPENDENT lane (ToonFeatureRT4): the matcap. A/B/C only mean
+		// something in the context of the selected feature; this one survives whichever it is.
+		Expression(Class="ToonMaterialOutput").Pin[3] = ToonDataD;
 
 		Expression(Class="MoonToonFaceOverlay").Pin[0] = FaceOverlay;
 		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
@@ -103,6 +111,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		FaceOverlay = MF_MoonToonBaseInput(OutputIndex=4);
 		FaceOverlayTuning = MF_MoonToonBaseInput(OutputIndex=5);
 		FaceOverlayStencils = MF_MoonToonBaseInput(OutputIndex=6);
+		ToonDataD = MF_MoonToonBaseInput(OutputIndex=7);
 	}
 
 	Layout = {

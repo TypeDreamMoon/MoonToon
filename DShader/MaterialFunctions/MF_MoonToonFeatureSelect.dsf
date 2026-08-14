@@ -201,22 +201,6 @@ VirtualFunction(Name="MF_ToonFeature_EmissiveInk")
 		float4 ToonBufferC;
 	}
 }
-VirtualFunction(Name="MF_ToonFeature_Matcap")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Features/MF_ToonFeature_Matcap");
-	}
-
-	Inputs = {
-
-	}
-
-	Outputs = {
-		float4 ToonBufferA;
-		float4 ToonBufferB;
-		float4 ToonBufferC;
-	}
-}
 
 ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.MoonToon")
 {
@@ -257,7 +241,6 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 		StaticSwitchParameter Is_ClothVelvet = false [ParameterName="Is ClothVelvet"; Group="30 - Shading Feature (pick one)"; SortPriority=8; Description="启用 Cloth Velvet 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 		StaticSwitchParameter Is_ToonMetal = false [ParameterName="Is ToonMetal"; Group="30 - Shading Feature (pick one)"; SortPriority=9; Description="启用 Metal 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 		StaticSwitchParameter Is_EmissiveInk = false [ParameterName="Is EmissiveInk"; Group="30 - Shading Feature (pick one)"; SortPriority=10; Description="启用 Emissive Ink 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
-		StaticSwitchParameter Is_Matcap = false [ParameterName="Is Matcap"; Group="30 - Shading Feature (pick one)"; SortPriority=11; Description="启用 Matcap 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 	}
 
 	Graph = {
@@ -283,9 +266,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 												True = MF_ToonFeature_ToonMetal(OutputIndex=0),
 												False = Is_EmissiveInk(
 													True = MF_ToonFeature_EmissiveInk(OutputIndex=0),
-													False = Is_Matcap(
-														True = MF_ToonFeature_Matcap(OutputIndex=0),
-														False = MF_ToonFeature_Default(OutputIndex=0)))))))))))));
+													False = MF_ToonFeature_Default(OutputIndex=0))))))))))));
 
 		ToonBufferB = Is_PBRSpecular(
 			True = MF_ToonFeature_PBRSpecular(OutputIndex=1),
@@ -309,9 +290,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 												True = MF_ToonFeature_ToonMetal(OutputIndex=1),
 												False = Is_EmissiveInk(
 													True = MF_ToonFeature_EmissiveInk(OutputIndex=1),
-													False = Is_Matcap(
-														True = MF_ToonFeature_Matcap(OutputIndex=1),
-														False = MF_ToonFeature_Default(OutputIndex=1)))))))))))));
+													False = MF_ToonFeature_Default(OutputIndex=1))))))))))));
 
 		ToonBufferC = Is_PBRSpecular(
 			True = MF_ToonFeature_PBRSpecular(OutputIndex=2),
@@ -335,9 +314,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 												True = MF_ToonFeature_ToonMetal(OutputIndex=2),
 												False = Is_EmissiveInk(
 													True = MF_ToonFeature_EmissiveInk(OutputIndex=2),
-													False = Is_Matcap(
-														True = MF_ToonFeature_Matcap(OutputIndex=2),
-														False = MF_ToonFeature_Default(OutputIndex=2)))))))))))));
+													False = MF_ToonFeature_Default(OutputIndex=2))))))))))));
 
 		ShadingFeatureID = Is_PBRSpecular(
 			True = 1.0,
@@ -361,9 +338,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 												True = 10.0,
 												False = Is_EmissiveInk(
 													True = 11.0,
-													False = Is_Matcap(
-														True = 13.0,
-														False = 0.0))))))))))));
+													False = 0.0)))))))))));
 
 		DebugColor = Is_PBRSpecular(
 			True = float4(0.25, 0.25, 0.25, 1.0),
@@ -387,8 +362,6 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 												True = float4(1.0, 0.5, 0.5, 1.0),
 												False = Is_EmissiveInk(
 													True = float4(0.5, 0.5, 1.0, 1.0),
-													False = Is_Matcap(
-														True = float4(1.0, 0.75, 0.0, 1.0),
-														False = float4(0.0, 0.0, 0.0, 1.0)))))))))))));
+													False = float4(0.0, 0.0, 0.0, 1.0))))))))))));
 	}
 }

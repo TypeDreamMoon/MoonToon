@@ -49,8 +49,10 @@ FEATURES = {
                           "MOON_TOON_SLOTS_TOON_METAL",          "41 - Feature: Metal"),
     "EmissiveInk":       ("EmissiveInk",       "MOON_SHADING_FEATURE_ID_TOON_EMISSIVE_INK",
                           "MOON_TOON_SLOTS_TOON_EMISSIVE_INK",   "42 - Feature: Emissive Ink"),
-    "Matcap":            ("Matcap",            "MOON_SHADING_FEATURE_ID_MATCAP",
-                          "MOON_TOON_SLOTS_MATCAP",              "43 - Feature: Matcap"),
+    # No Matcap entry. A matcap is additive on top of the lighting result (MToon 1.0), so it is a
+    # modifier that composes with every feature, not a 14th mutually exclusive one -- as a feature,
+    # ticking it turned skin/hair shading OFF. It is authored in MF_MoonToonBaseInput under
+    # "44 - Matcap" and rides ToonFeatureRT4. Group 43 is retired with the feature.
 }
 
 # slot Name (from the engine table) -> (material parameter name, default literal).
@@ -179,10 +181,6 @@ PARAMS = {
         "InkTint":                 ("In_ToonEmissiveInk_InkTintRGB", "float4(0.0, 0.0, 0.0, 0.0)"),
         "RimBias":                 ("In_ToonEmissiveInk_RimBias", "0.0"),
     },
-    "Matcap": {
-        "Intensity":               ("In_Matcap_Intensity", "0.0"),              # NEW
-        "MatcapColor":             ("In_Matcap_ColorRGB", "float4(0.0, 0.0, 0.0, 0.0)"),  # NEW
-    },
 }
 
 # Slots that can also be driven per-pixel from a map, on top of their constant parameter.
@@ -304,9 +302,9 @@ DESC = {
         "InkTint":           "墨色.",
         "RimBias":           "边缘高光的菲涅尔偏置.",
     },
-    "Matcap": {
-        "Intensity":   "Matcap 强度. 0 = 未授权(按 1.0 处理).",
-        "MatcapColor": "Matcap 采样结果. 由材质图用视空间法线当 UV 采样贴图后接进来 —— Matcap 自带光照, 不再乘光源颜色.",
+    "_RetiredMatcap": {
+        "Intensity":   "unused -- matcap is no longer a feature",
+        "MatcapColor": "unused -- matcap is no longer a feature",
     },
     "DFFacialShadow": {
         "OverallSpecIntensity": "两道高光的总强度. 在这次重构之前这个槽位写不进去, 所以每张 SDF 脸的 toon 高光都是 0 —— 现在可以打开了.",
@@ -328,7 +326,7 @@ DEBUG_COLORS = {
     "ClothVelvet":       "float4(0.5, 1.0, 0.5, 1.0)",
     "ToonMetal":         "float4(1.0, 0.5, 0.5, 1.0)",
     "EmissiveInk":       "float4(0.5, 0.5, 1.0, 1.0)",
-    "Matcap":            "float4(1.0, 0.75, 0.0, 1.0)",
+    # Matcap retired as a feature -- no debug colour needed.
 }
 
 HEADER = """// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
