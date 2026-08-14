@@ -254,3 +254,79 @@ P0–P8 全部完成。仍然刻意未做、并已在上文说明理由的两项
 2. **P4 的约 40 处裸槽位读取转换** —— 当前正确,转换只是可读性
 
 两项都不改行为,不 gate 任何东西。
+
+---
+
+## P3 / P4 收尾轮:两次同类错误,都记下来
+
+P3 的 290 处改名和 P4 的 80 处具名化都做完了,但过程中我犯了**两次同一类错误** ——
+改名的边界和范围都想窄了,而且两次都是"验证面比改动面窄"才拖到后面才暴露。
+
+### 错误一:规则没有左边界,误伤不相关代码
+
+`TBuffers` / `TBufferA` 我加了防 `TBufferArchive` 的排除,却忘了这些名字也会作为**子串**
+出现在别的标识符里。第一遍把这些一起改了:
+
+| 被误改 | 实际含义 |
+| --- | --- |
+| `SBTBuffers` | 路径追踪的 shader binding table |
+| `STAT_D3D12RTBuffers` | 光追显存统计 |
+| `PRTBuffers` | d3dx9mesh |
+| DXC / libwebp 里一批 `tbuffer` 符号 | 打包的第三方编译器 |
+
+**怎么抓到的**:提交时的文件列表里冒出了 `FreeImage` 和 `DirectXShaderCompiler` —— 一眼不对。
+已 `reset --soft` 撤回、从 HEAD 还原第三方树、把引擎侧那几个改回原名。
+最终提交 37 个文件,零第三方。
+
+正确的规则要有 `(?<![A-Za-z0-9_])` 左边界,而不是逐个排除已知冲突。
+
+### 错误二:范围漏了 Engine/Plugins
+
+第一遍只走了 `Engine/Source` 和 `Engine/Shaders`。TextureShare 还引用着
+`FSceneTextures::ToonBufferA`,引擎目标编不过。
+
+**为什么拖到这么晚才发现**:前几次都只编 `DevTestEditor`,而 TextureShare 没被这个项目启用。
+**只验证一个目标是不够的。**
+
+一处**没有**照改:
+
+```cpp
+// 字符串字面量故意保持旧名 —— 它是外部 TextureShare 消费者索取纹理用的线上名字
+static constexpr auto ToonSurfaceRT = TEXT("ToonBufferA");
+```
+
+C++ 标识符跟着改(否则编不过),但那个字符串是 nDisplay / 外部程序按名字要纹理的对外契约。
+改它属于行为外溢,不该由一次内部改名顺手决定。想统一的话改一行即可。
+
+### 验收
+
+`UnrealEditor Win64 Development` 编译成功,0 错误。全树残留检查:引擎 C++ 只剩
+`TBufferArchive`(有意排除),着色器侧零残留。
+
+---
+
+## 仍然欠着的
+
+**1. MI 迁移(必须做,否则 13 个材质实例的特征选择是失效的)**
+
+P6 删掉了 `ShadingFeatureID` 标量参数,但**13 个 MI 覆盖过它**。MI 里存的 override 不会因为
+材质删了参数而消失,只是失效 —— 所以快照对比报「0 丢失」,而它们实际上已经选不到任何特征,
+全部回落成普通 toon。**我在 P6 提交里写的「这个提交本身不改变任何材质实例」对这 13 个是错的。**
+
+要迁的映射(feature id -> 静态开关):
+
+| id | MI |
+| --- | --- |
+| 2 KajiyaHair | MI_N00_000_00_HairBack, MI_N00_000_Hair_01, MI_N00_000_Hair_02, MI_MI_Bangs, MI_MI_Hair |
+| 3 DFFacialShadow | MI_RadDollV3_Face, MI_N00_000_00_Face, MI_MI_Face, MI_face |
+| 6 Skin | MI_N00_000_00_Body |
+| 9 ClothVelvet | MI_Cloth |
+| 10 ToonMetal | MI_Metal, MI_头饰 |
+
+外加 5 个开着旧 `Enable Feature *` 开关的(与上面有重叠)。
+
+**迁移脚本必须跳过父链解析不了的 MI。** 第一次尝试崩了编辑器:
+`IterateDependentFunctions` 在 `/Game/Decompiled/` 那棵 MooaToon 反编译树上解引用了空的
+`MaterialFunction`(那三个缺失函数先于本次改动存在,第一次启动就在报)。引擎那里没有 null 检查。
+
+**2. `FMoonToonContext` 拆分** —— P3 的另一半,约 100 处消费点,未做。
