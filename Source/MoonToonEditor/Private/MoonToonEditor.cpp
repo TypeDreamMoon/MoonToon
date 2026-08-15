@@ -2,6 +2,7 @@
 
 #include "MoonToonEditor.h"
 
+#include "MoonToonMaterialMenus.h"
 #include "MoonToonSmoothNormalTool.h"
 #include "SMoonToonToolsPanel.h"
 #include "ToolMenus.h"
@@ -130,6 +131,7 @@ namespace
 		FToolMenuOwnerScoped OwnerScoped(TEXT("MoonToonEditor"));
 		AddMoonToonSection(TEXT("ContentBrowser.AssetContextMenu.StaticMesh"));
 		AddMoonToonSection(TEXT("ContentBrowser.AssetContextMenu.SkeletalMesh"));
+		RegisterMoonToonMaterialMenus();
 		AddToolsMenuEntry();
 	}
 }
