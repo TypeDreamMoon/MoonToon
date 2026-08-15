@@ -315,7 +315,32 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalForLOD(UObject* Mesh, int32 LO
 		TArray<float> Curvatures;
 		UMoonToonEditorBPLibrary::MoonGetMeshNormalDiffCurvatures(Mesh, LODIndex, Curvatures);
 
-		for (int32 WedgeIndex = 0; WedgeIndex < VertexIndices.Num(); ++WedgeIndex)
+		// The channels the bake owns have to exist before anything is written, or the loop below
+		// runs to completion and stores nothing -- which then reads back as a mesh that was baked.
+		// That silence is what let SK_星穹铁道—昔涟5 ship with 5% of its wedges encoding a zero
+		// vector; say it out loud instead.
+		const int32 NumWedges = VertexIndices.Num();
+		if (UV2s.Num() < NumWedges || UV3s.Num() < NumWedges)
+		{
+			UE_LOG(LogMoonToonSmoothNormal, Error,
+				TEXT("[MoonToon] %s LOD%d: the smoothed-normal bake needs UV2 and UV3, and this mesh has "
+					 "%d/%d entries in them for %d wedges. Nothing was written. Re-import with at least 4 "
+					 "UV channels first."),
+				*Mesh->GetName(), LODIndex, UV2s.Num(), UV3s.Num(), NumWedges);
+			return;
+		}
+
+		// Everything the shader can do with a degenerate encode is guess, so never write one: the
+		// honest fallback for "no smoothing information here" is the wedge's own normal, which in
+		// tangent space is exactly (0,0,1). Counted so the run can report how much of the mesh
+		// ended up on that path rather than leaving it to a later visual surprise.
+		int32 NumFallbackWedges = 0;
+		const FVector TangentSpaceUp(0.0, 0.0, 1.0);
+		// Below this the encoded vector is too short to survive UV quantisation and normalize back
+		// to a direction, so it is treated as no information rather than as a very flat normal.
+		constexpr float MinEncodedCurvature = 0.05f;
+
+		for (int32 WedgeIndex = 0; WedgeIndex < NumWedges; ++WedgeIndex)
 		{
 			if (!Mask.Contains(WedgeIndex))
 			{
@@ -334,40 +359,72 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalForLOD(UObject* Mesh, int32 LO
 			FIntVector TriVerts = UGeometryScriptLibrary_MeshQueryFunctions::GetTriangleIndices(
 				SmoothedDynamicMesh, NearestResult[VertexIndex].TriangleID, bIsValidTriangle);
 
-			const FVector QueryPosition(Positions[VertexIndex]);
-			bool bIsValidVertex = false;
-			const FVector P0 = UGeometryScriptLibrary_MeshQueryFunctions::GetVertexPosition(SmoothedDynamicMesh, TriVerts.X, bIsValidVertex);
-			const FVector P1 = UGeometryScriptLibrary_MeshQueryFunctions::GetVertexPosition(SmoothedDynamicMesh, TriVerts.Y, bIsValidVertex);
-			const FVector P2 = UGeometryScriptLibrary_MeshQueryFunctions::GetVertexPosition(SmoothedDynamicMesh, TriVerts.Z, bIsValidVertex);
+			FVector TangentSpaceNormal = TangentSpaceUp;
+			float Curvature = 1.0f;
+			bool bHasSmoothedNormal = false;
 
-			const double D0 = FVector::Distance(P0, QueryPosition);
-			const double D1 = FVector::Distance(P1, QueryPosition);
-			const double D2 = FVector::Distance(P2, QueryPosition);
+			if (bIsValidTriangle)
+			{
+				const FVector QueryPosition(Positions[VertexIndex]);
+				bool bIsValidVertex = false;
+				const FVector P0 = UGeometryScriptLibrary_MeshQueryFunctions::GetVertexPosition(SmoothedDynamicMesh, TriVerts.X, bIsValidVertex);
+				const FVector P1 = UGeometryScriptLibrary_MeshQueryFunctions::GetVertexPosition(SmoothedDynamicMesh, TriVerts.Y, bIsValidVertex);
+				const FVector P2 = UGeometryScriptLibrary_MeshQueryFunctions::GetVertexPosition(SmoothedDynamicMesh, TriVerts.Z, bIsValidVertex);
 
-			int32 NearestVertexID = (D0 < D1) ? TriVerts.X : TriVerts.Y;
-			NearestVertexID = (FMath::Min(D0, D1) < D2) ? NearestVertexID : TriVerts.Z;
+				const double D0 = FVector::Distance(P0, QueryPosition);
+				const double D1 = FVector::Distance(P1, QueryPosition);
+				const double D2 = FVector::Distance(P2, QueryPosition);
 
-			bool bIsValidIndex = false;
-			const FVector SmoothedNormal = UGeometryScriptLibrary_ListUtilityFunctions::GetVectorListItem(
-				SmoothedNormalList, NearestVertexID, bIsValidIndex);
+				int32 NearestVertexID = (D0 < D1) ? TriVerts.X : TriVerts.Y;
+				NearestVertexID = (FMath::Min(D0, D1) < D2) ? NearestVertexID : TriVerts.Z;
 
-			const FMatrix TangentToLocal = BuildTangentToLocal(WedgeIndex, Mesh, Normals, Tangents, Binormals);
-			const FVector TangentSpaceNormal = TangentToLocal.InverseTransformVector(SmoothedNormal).GetSafeNormal();
+				bool bIsValidIndex = false;
+				const FVector SmoothedNormal = UGeometryScriptLibrary_ListUtilityFunctions::GetVectorListItem(
+					SmoothedNormalList, NearestVertexID, bIsValidIndex);
+
+				// bIsValidIndex used to be ignored, and a miss returns the zero vector -- which
+				// GetSafeNormal() then turns into another zero rather than into a complaint.
+				if (bIsValidIndex && !SmoothedNormal.IsNearlyZero())
+				{
+					const FMatrix TangentToLocal = BuildTangentToLocal(WedgeIndex, Mesh, Normals, Tangents, Binormals);
+					const FVector Candidate = TangentToLocal.InverseTransformVector(SmoothedNormal).GetSafeNormal();
+					if (!Candidate.IsNearlyZero())
+					{
+						TangentSpaceNormal = Candidate;
+						bHasSmoothedNormal = true;
+					}
+				}
+			}
 
 			// Curvature scales the stored normal, and the whole thing is remapped from [-1,1] to
-			// [0,1] so it survives UV channels that may be stored unsigned.
-			const float Curvature = Curvatures.IsValidIndex(WedgeIndex) ? Curvatures[WedgeIndex] : 1.0f;
+			// [0,1] so it survives UV channels that may be stored unsigned. A flat patch legitimately
+			// has curvature 0, but 0 times a unit normal is the zero vector again, so the floor
+			// applies to real data too -- the direction is still correct there, it is just shorter
+			// than the encoding can carry.
+			if (bHasSmoothedNormal)
+			{
+				Curvature = Curvatures.IsValidIndex(WedgeIndex) ? Curvatures[WedgeIndex] : 1.0f;
+			}
+			if (!bHasSmoothedNormal || Curvature < MinEncodedCurvature)
+			{
+				Curvature = FMath::Max(Curvature, MinEncodedCurvature);
+				++NumFallbackWedges;
+			}
+
 			const FVector Encoded = TangentSpaceNormal * Curvature * 0.5 + FVector(0.5);
 
 			// UV2.x carries unrelated data and must be preserved; only .y is ours.
-			if (UV2s.IsValidIndex(WedgeIndex))
-			{
-				UV2s[WedgeIndex] = FVector2f(UV2s[WedgeIndex].X, static_cast<float>(Encoded.X));
-			}
-			if (UV3s.IsValidIndex(WedgeIndex))
-			{
-				UV3s[WedgeIndex] = FVector2f(static_cast<float>(Encoded.Y), static_cast<float>(Encoded.Z));
-			}
+			UV2s[WedgeIndex] = FVector2f(UV2s[WedgeIndex].X, static_cast<float>(Encoded.X));
+			UV3s[WedgeIndex] = FVector2f(static_cast<float>(Encoded.Y), static_cast<float>(Encoded.Z));
+		}
+
+		if (NumFallbackWedges > 0)
+		{
+			UE_LOG(LogMoonToonSmoothNormal, Warning,
+				TEXT("[MoonToon] %s LOD%d: %d of %d wedges (%.1f%%) had no usable smoothed normal (flat, "
+					 "or the welded-mesh lookup missed) and were baked as the vertex normal instead."),
+				*Mesh->GetName(), LODIndex, NumFallbackWedges, NumWedges,
+				NumWedges > 0 ? 100.0f * NumFallbackWedges / NumWedges : 0.0f);
 		}
 
 		UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LODIndex, Positions, VertexIndices, Normals,
