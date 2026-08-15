@@ -12,171 +12,8 @@
 // Warning: Exported 'MaterialExpressionMoonEncodeToonAttributes' as UE.Expression; review reflected literal properties if the node has editor-only state.
 // Warning: Exported 'MaterialExpressionIf' as UE.Expression; review reflected literal properties if the node has editor-only state.
 
-VirtualFunction(Name="MF_MoonToonFeatureSelect")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonFeatureSelect");
-		Description = "Static toon feature selection; see Tools/gen_feature_functions.py.";
-	}
+import "Shared/ToonFunctions.dsh";
 
-	Inputs = {
-		opt float InToonKajiyaSecondaryStrandShift = 0.0;
-		opt float InToonKajiyaPrimaryStrandShift = 0.0;
-		opt float InHairHighlightMask = 0.0;
-		opt float3 InStockingsBodyColor = float3(0.0, 0.0, 0.0);
-	}
-
-	Outputs = {
-		float4 ToonBufferA;
-		float4 ToonBufferB;
-		float4 ToonBufferC;
-		float ShadingFeatureID;
-		float4 DebugColor;
-	}
-}
-VirtualFunction(Name="AppendMany")
-{
-	Options = {
-		Asset = Path(Engine, "Functions/Engine_MaterialFunctions02/Utility/AppendMany");
-		Description = "Generated from /Engine/Functions/Engine_MaterialFunctions02/Utility/AppendMany.AppendMany";
-	}
-
-	Inputs = {
-		opt float R = 0.0;
-		opt float G = 0.0;
-		opt float B = 0.0;
-		opt float A = 0.0;
-	}
-
-	Outputs = {
-		float2 RG;
-		float3 RGB;
-		float4 RGBA;
-	}
-}
-VirtualFunction(Name="MF_UVChannelSwitch")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Utils/MF_UVChannelSwitch");
-		Description = "Generated from /MoonToon/MaterialFunctions/Utils/MF_UVChannelSwitch.MF_UVChannelSwitch";
-	}
-
-	Inputs = {
-		float UVChannelIndex [
-			Description="The UV channel index to output.";
-			SortPriority=100;
-		];
-	}
-
-	Outputs = {
-		float2 Result;
-	}
-}
-VirtualFunction(Name="MF_MoonMainLightDirection")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonMainLightDirection");
-		Description = "Generated from /MooaToon/MaterialFunctions/MF_MoonMainLightDirection.MF_MoonMainLightDirection";
-	}
-
-	Inputs = {
-	}
-
-	Outputs = {
-		float3 Result;
-	}
-}
-VirtualFunction(Name="FlattenNormal")
-{
-	Options = {
-		Asset = Path(Engine, "Functions/Engine_MaterialFunctions01/Texturing/FlattenNormal");
-		Description = "Generated from /Engine/Functions/Engine_MaterialFunctions01/Texturing/FlattenNormal.FlattenNormal";
-	}
-
-	Inputs = {
-		opt float3 Normal = float3(0, 0, 1);
-		opt float Flatness = 0.0;
-	}
-
-	Outputs = {
-		float3 Result;
-	}
-}
-VirtualFunction(Name="MF_ToonUV")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonUV");
-	}
-
-	Inputs = {
-		opt float UVChannel = 0.0;
-		opt float4 ScaleOffset = float4(1.0, 1.0, 0.0, 0.0);
-	}
-
-	Outputs = {
-		float2 UV;
-	}
-}
-VirtualFunction(Name="MF_ToonSampleColor")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleColor");
-	}
-
-	Inputs = {
-		Texture2D Tex;
-		opt float2 UV = float2(0.0, 0.0);
-	}
-
-	Outputs = {
-		float4 Result;
-	}
-}
-VirtualFunction(Name="MF_ToonSampleLinear")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleLinear");
-	}
-
-	Inputs = {
-		Texture2D Tex;
-		opt float2 UV = float2(0.0, 0.0);
-	}
-
-	Outputs = {
-		float4 Result;
-	}
-}
-VirtualFunction(Name="MF_ToonSampleLinearMip0")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleLinearMip0");
-	}
-
-	Inputs = {
-		Texture2D Tex;
-		opt float2 UV = float2(0.0, 0.0);
-	}
-
-	Outputs = {
-		float4 Result;
-	}
-}
-VirtualFunction(Name="MF_ToonSampleNormal")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleNormal");
-	}
-
-	Inputs = {
-		Texture2D Tex;
-		opt float2 UV = float2(0.0, 0.0);
-	}
-
-	Outputs = {
-		float4 Result;
-	}
-}
 ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonToon")
 {
 	Settings = {
@@ -216,48 +53,6 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// matcap is additive on top of the lighting result, so a matcap surface is still a skin /
 		// hair / cloth surface -- it gets its own switch instead of one more row in group 30's
 		// pick-one list, and it composes with whichever feature is selected there.
-		StaticSwitchParameter Enable_Matcap = false [
-			ParameterName="Enable Matcap";
-			Group="44 - Matcap";
-			SortPriority=0;
-			Description="启用 Matcap(球面环境贴图). 叠加在正常着色之上, 与任意着色特征共存 —— 它不是特征, 不占 30 组的单选.";
-		];
-		TextureObjectParameter Matcap_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
-			ParameterName="Matcap Map";
-			Group="44 - Matcap";
-			SortPriority=1;
-			Description="Matcap 贴图: 一张正对镜头的球体渲染. 用视线坐标架投影法线取 UV, 所以它自带光照与材质感. 默认白图 —— 忘记指定会明显发白, 而不是悄悄变黑.";
-		];
-		TextureObjectParameter Matcap_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
-			ParameterName="Matcap Mask Map";
-			Group="44 - Matcap";
-			SortPriority=2;
-			Description="遮罩(取 R 通道), 控制哪里出 matcap: 白=全强度, 黑=完全不出. 对应 MToon 的 rimMultiplyTexture.";
-		];
-		ScalarParameter Matcap_Intensity = 1.0 [
-			ParameterName="Matcap Intensity";
-			Group="44 - Matcap";
-			SortPriority=3;
-			Description="Matcap 强度, 直接乘在采样结果上. 对应 MToon 的 matcapFactor.";
-		];
-		ScalarParameter Matcap_Lighting_Mix = 0.0 [
-			ParameterName="Matcap Lighting Mix";
-			Group="44 - Matcap";
-			SortPriority=4;
-			Description="Matcap 受场景光照影响的程度. 0 = 完全不受光(常规做法, 暗部也保持高光), 1 = 完全被光照结果调制. 对应 MToon 的 rimLightingMix.";
-		];
-		ScalarParameter Matcap_Mask_UV_Channel = 0.0 [
-			ParameterName="Matcap Mask UV Channel";
-			Group="44 - Matcap";
-			SortPriority=5;
-			Description="遮罩贴图使用的 UV 通道. 只影响遮罩 —— matcap 本身的 UV 是从视线和法线算出来的, 与网格 UV 无关.";
-		];
-		VectorParameter Matcap_Mask_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
-			ParameterName="Matcap Mask UV Scale/Offset";
-			Group="44 - Matcap";
-			SortPriority=6;
-			Description="遮罩 UV 的缩放(xy)与偏移(zw).";
-		];
 		TextureObjectParameter Global_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Global Mask Map";
 			Group="01 - Global Mask Map";
@@ -354,71 +149,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SamplerType="SAMPLERTYPE_Color";
 			Group="05 - Stockings";
 		];
-		ChannelMaskParameter Hair_Highlight_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [
-			ParameterName="Hair Highlight Mask Channel";
-			Group="03 - Hair Highlight Mask";
-			MaskChannel=Red
-		];
-		ScalarParameter AddOffset = 0.0 [Group="02 - Distance Field Facial Shadow"; SortPriority=60];
-		ScalarParameter DynMin = -0.01 [Group="02 - Distance Field Facial Shadow"; SortPriority=61];
-		ScalarParameter DynMax = 0.01 [Group="02 - Distance Field Facial Shadow"; SortPriority=62];
-		ScalarParameter ElevMin = -0.6 [Group="02 - Distance Field Facial Shadow"; SortPriority=63];
-		ScalarParameter ElevMax = 0.6 [Group="02 - Distance Field Facial Shadow"; SortPriority=64];
-		ScalarParameter Curve = 1.2 [Group="02 - Distance Field Facial Shadow"; SortPriority=65];
-		ScalarParameter ClampMin = -0.03 [Group="02 - Distance Field Facial Shadow"; SortPriority=66];
-		ScalarParameter ClampMax = 0.03 [Group="02 - Distance Field Facial Shadow"; SortPriority=67];
-		ScalarParameter VSign = 1.0 [Group="02 - Distance Field Facial Shadow"; SortPriority=68];
 		// See Through Overlay (眉透/瞳透): when enabled, the renderer re-draws this material after
 		// lighting wherever it is occluded by same-actor toon hair, blending
 		// BaseColor * Tint at Through Hair Opacity over the lit hair (Moon_MeshPass_FaceOverlay).
-		ScalarParameter Through_Hair_Opacity = 0.5 [
-			ParameterName="Through Hair Opacity";
-			Group="24 - See Through Overlay";
-			SortPriority=10;
-			Description="Opacity of the re-blend where hair covers this material. 眉毛/睫毛建议 0.5~0.7, 瞳孔建议 0.35~0.55.";
-		];
-		VectorParameter Through_Hair_Tint = float4(1.0, 1.0, 1.0, 1.0) [
-			ParameterName="Through Hair Tint";
-			Group="24 - See Through Overlay";
-			SortPriority=20;
-			Description="Multiplied with the material BaseColor for the through-hair re-blend only.";
-		];
-		ScalarParameter Through_Hair_Depth_Threshold = 0.0 [
-			ParameterName="Through Hair Depth Threshold";
-			Group="24 - See Through Overlay";
-			SortPriority=30;
-			Description="Max occluder distance in cm for the re-blend. 0 = use the global r.MoonToon.FaceOverlay.DepthThreshold.";
-		];
-		ScalarParameter Through_Hair_Depth_Fade = 0.0 [
-			ParameterName="Through Hair Depth Fade";
-			Group="24 - See Through Overlay";
-			SortPriority=31;
-			Description="Opacity feathers to zero over the last N cm before the threshold. Only used when Depth Threshold > 0; 0 with an overridden threshold = hard cutoff.";
-		];
-		ScalarParameter Through_Hair_View_Fade_Start = 0.12 [
-			ParameterName="Through Hair View Fade Start";
-			Group="24 - See Through Overlay";
-			SortPriority=32;
-			Description="N dot V below which the re-blend is fully gone (profile views). Start < End required; equal values fall back to the engine curve 0.12-0.40.";
-		];
-		ScalarParameter Through_Hair_View_Fade_End = 0.40 [
-			ParameterName="Through Hair View Fade End";
-			Group="24 - See Through Overlay";
-			SortPriority=33;
-			Description="N dot V above which the re-blend is at full strength (frontal views).";
-		];
-		ScalarParameter Through_Hair_Occluder_ID_A = -1.0 [
-			ParameterName="Through Hair Occluder ID A";
-			Group="24 - See Through Overlay";
-			SortPriority=40;
-			Description="Extra occluder to show through, named by its CustomDepth stencil value (0-255) -- i.e. the occluder material's 'Material Stencil Value' override. The occluder's mesh also needs 'Render CustomDepth Pass' enabled. Use for occluders that are NOT hair-shaded: hat brims, hair accessories, glasses frames. -1 = unused. Hair shading features (2/4/5) always pass regardless of this.";
-		];
-		ScalarParameter Through_Hair_Occluder_ID_B = -1.0 [
-			ParameterName="Through Hair Occluder ID B";
-			Group="24 - See Through Overlay";
-			SortPriority=41;
-			Description="Second accepted occluder CustomDepth stencil value. -1 = unused.";
-		];
 		VectorParameter Inner_Outline_Color = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="Inner Outline Color";
 			Group="22 - Inner Outline";
@@ -647,16 +380,6 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SortPriority=35;
 			Description="屏幕空间深度测试边缘光宽度.\r\n与传统的基于法线方向与视线方向的角度(N dot V)的边缘光不同, 屏幕空间边缘光的宽度与表面曲率无关, 看起来更加扁平化.\r\n可以用控制台命令调整更多全局参数.\r\n\r\n\r\nScreen Space Depth Test Rim Light Width.\r\nDifferent from the traditional rim light based on the angle between the normal direction and the view direction (N dot V), the width of the screen space rim light has nothing to do with the surface curvature and looks flatter.\r\nMore global parameters can be adjusted using console variables.";
 		];
-		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel = float4(1.0, 0.0, 0.0, 0.0) [
-			ParameterName="Distance Field Facial Shadow Map Channel";
-			Group="02 - Distance Field Facial Shadow";
-			MaskChannel=Red
-		];
-		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel_1 = float4(1.0, 0.0, 0.0, 0.0) [
-			ParameterName="Distance Field Facial Shadow Map Channel";
-			Group="02 - Distance Field Facial Shadow";
-			MaskChannel=Red
-		];
 		ScalarParameter Face_ID = 250.0 [
 			ParameterName="Face ID";
 			Group="13 - Ray Tracing Shadow";
@@ -737,44 +460,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float4 Sampled_Global_Mask_Map = StaticSwitchParameter_2;
 		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Sampled_Global_Mask_Map);
-		float2 MaterialExpressionTextureCoordinate_3 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
-		float3 MF_MoonMainLightDirection = MF_MoonMainLightDirection();
-		float2 Custom =
-			UE.Expression(
-				Class="Custom",
-				OutputType="float2",
-				Code="float3 L = normalize(MainLightDirWS);\r\nfloat3 U = normalize(WorldUpWS);\r\n\r\n// 主光“上下”量（仰角）\r\nfloat elev = dot(L, U); // [-1,1]\r\n\r\n// 映射到自定义区间\r\nfloat a = min(ElevMin, ElevMax);\r\nfloat b = max(ElevMin, ElevMax);\r\nfloat t = saturate((elev - a) / max(1e-4, b - a));\r\nif (ElevMin > ElevMax) t = 1.0 - t;\r\n\r\n// 曲线\r\nt = pow(t, max(1e-3, Curve));\r\n\r\n// 动态偏移 + 手动偏移 + 总区间限制\r\nfloat dyn = lerp(DynMin, DynMax, t) * VSign;\r\nfloat offsetV = clamp(AddOffset + dyn, ClampMin, ClampMax);\r\n\r\nreturn UV + float2(0.0, offsetV);",
-				Description="Custom",
-				UV=MaterialExpressionTextureCoordinate_3,
-				MainLightDirWS=MF_MoonMainLightDirection,
-				WorldUpWS=float3(0.0, 0.0, 1.0),
-				AddOffset=AddOffset,
-				DynMin=DynMin,
-				DynMax=DynMax,
-				ElevMin=ElevMin,
-				ElevMax=ElevMax,
-				Curve=Curve,
-				ClampMin=ClampMin,
-				ClampMax=ClampMax,
-				VSign=VSign
-			);
-		#Region "Texture Sample"
-		float4 Hair_Highlight_Mask =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Hair Highlight Mask",
-				Group="03 - Hair Highlight Mask",
-				SortPriority=5,
-				Coordinates=Custom,
-				Texture=Path(Engine, "EngineResources/Black"),
-				SamplerType="SAMPLERTYPE_Color"
-			);
-		#EndRegion
-
-		float Hair_Highlight_Mask_Channel_Masked = Hair_Highlight_Mask_Channel(Input = Hair_Highlight_Mask.rgb);
-		float Hair_Highlight_Mask_Texture = Hair_Highlight_Mask_Channel_Masked;
+		// Mask sample plus the light-elevation UV offset that scrolls it are in
+		// MF_ToonHairHighlightMask. See the note there about the nine offset parameters being filed
+		// under the SDF facial shadow group in the panel while being consumed here.
+		float Hair_Highlight_Mask_Texture = MF_ToonHairHighlightMask();
 		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=3);
 		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=4);
 		#Region "Texture Sample"
@@ -825,9 +514,25 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float3 InnerOutlineColor = StaticSwitchParameter_4;
 		#Region "UVs"
 		float2 Add_2 = MF_ToonUV(Global_UV_Channel, Global_UV_Scale_Offset);
+		// Applied to the global UV rather than to the base colour alone: an eye's iris, its shadow
+		// colour, its ramp offsets and its emissive have to travel together, or the shading slides
+		// off the thing it is shading. The switch is off for everything that is not an eye, and the
+		// unused branch is culled at translation.
+		float2 Eye_Parallax_UV = MF_ToonEyeParallax(Add_2);
+		float2 Global_UV_Selected =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=Eye_Parallax_UV,
+				False=Add_2,
+				Group="06 - Eye Parallax",
+				SortPriority=0,
+				ParameterName="Enable Eye Parallax",
+				DefaultValue=false
+			);
 		#EndRegion
 
-		float2 Global_UV = Add_2;
+		float2 Global_UV = Global_UV_Selected;
 		#Region "Texture Sample"
 		float4 StaticSwitchParameter_5 = MF_ToonSampleColor(Base_Color_Map, Global_UV).rgba;
 		#EndRegion
@@ -1062,40 +767,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		Attributes.Normal = NormalTS;
 
 		#Region "Matcap"
-		// MToon 1.0 builds the matcap frame from the VIEW VECTOR and pins one axis to the horizontal
-		// plane, rather than taking the view-space normal directly. That is what keeps the matcap
-		// still while the camera rolls -- Unity's toon shader ships the same thing as a separate
-		// "Stabilize Camera Rolling" toggle. The spec is Y-up, so its
-		//     normalize(float3(V.z, 0, -V.x))
-		// becomes normalize(float3(V.y, -V.x, 0)) here, because UE's world is Z-up. Porting it
-		// verbatim would rotate the matcap about the wrong axis.
-		// 0.495 rather than 0.5 is the spec's half-texel guard against sampling past the sphere edge.
-		// One line the spec does not have: straight down the world Z axis that frame is degenerate
-		// (V.xy == 0), so it falls back to a fixed axis instead of producing NaNs.
-		float3 Matcap_NormalWS = UE.Expression(Class="Transform", OutputType="float3", Input=NormalTS);
-		float3 Matcap_ViewWS = UE.Expression(Class="CameraVectorWS", OutputType="float3");
-		float2 Matcap_UV =
-			UE.Expression(
-				Class="Custom",
-				OutputType="float2",
-				Code="float3 N = normalize(NormalWS);\r\nfloat3 V = normalize(ViewWS);\r\nfloat2 Horizontal = float2(V.y, -V.x);\r\nfloat HorizontalLen = length(Horizontal);\r\nfloat3 AxisX = HorizontalLen > 1e-4f ? float3(Horizontal / HorizontalLen, 0.0f) : float3(1.0f, 0.0f, 0.0f);\r\nfloat3 AxisY = cross(V, AxisX);\r\nreturn float2(dot(AxisX, N), dot(AxisY, N)) * 0.495f + 0.5f;",
-				Description="Matcap UV (MToon roll-stable frame, Z-up)",
-				NormalWS=Matcap_NormalWS,
-				ViewWS=Matcap_ViewWS
-			);
-		float2 Matcap_Mask_UV = MF_ToonUV(Matcap_Mask_UV_Channel, Matcap_Mask_UV_Scale_Offset);
-		float3 Matcap_Sampled = MF_ToonSampleColor(Matcap_Map, Matcap_UV).rgb;
-		float4 Matcap_Mask_Sampled = MF_ToonSampleLinear(Matcap_Mask_Map, Matcap_Mask_UV).rgba;
-		// Mask and intensity are folded in here rather than sent to the engine separately: the
-		// engine only ever multiplies them, so this keeps the mask texture entirely on the authoring
-		// side and costs the GBuffer nothing.
-		float3 Matcap_RGB = ((Matcap_Sampled * Matcap_Mask_Sampled.r) * Matcap_Intensity);
-		// Uses the switch declared in Properties rather than an inline copy: two nodes with the same
-		// ParameterName would still be one panel row, but only the declared one carries the
-		// Description every parameter is required to have.
-		float4 Matcap_Data = Enable_Matcap(
-			True = float4(Matcap_RGB, Matcap_Lighting_Mix),
-			False = float4(0.0, 0.0, 0.0, 0.0));
+		// Frame construction, mask and packing all live in MF_ToonMatcap now. It reads the shading
+		// normal and nothing else from here, which is why it was the first thing to leave.
+		float4 Matcap_Data = MF_ToonMatcap(NormalTS);
 		#EndRegion
 
 		float2 MaterialExpressionTextureCoordinate_4 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
@@ -1442,61 +1116,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SamplerSource="SSM_Wrap_WorldGroupSettings"
 			);
 		float SA_SDF_Left = SA_Map_3.r;
-		float2 MaterialExpressionTextureCoordinate_2 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
-		#Region "Texture Sample"
-		float2 Multiply_19 = (float2(-1.0, 1.0) * MaterialExpressionTextureCoordinate_2);
-		float4 Distance_Field_Facial_Shadow_Map =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Distance Field Facial Shadow Map",
-				Group="02 - Distance Field Facial Shadow",
-				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
-				Coordinates=Multiply_19,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings",
-				MipValueMode="TMVM_MipLevel",
-				ConstMipValue=0
-			);
-		#EndRegion
-
-		float Distance_Field_Facial_Shadow_Map_Channel_Masked = Distance_Field_Facial_Shadow_Map_Channel(Input = Distance_Field_Facial_Shadow_Map.rgba);
-		float SampledFacialShadowSdfRight = Distance_Field_Facial_Shadow_Map_Channel_Masked;
-		float2 MaterialExpressionTextureCoordinate_2_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
-		#Region "Texture Sample"
-		float4 Distance_Field_Facial_Shadow_Map_1 =
-			UE.Expression(
-				Class="TextureSampleParameter2D",
-				OutputType="float4",
-				OutputIndex=5,
-				ParameterName="Distance Field Facial Shadow Map",
-				Group="02 - Distance Field Facial Shadow",
-				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
-				Coordinates=MaterialExpressionTextureCoordinate_2_1,
-				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
-				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings",
-				MipValueMode="TMVM_MipLevel",
-				ConstMipValue=0
-			);
-		#EndRegion
-
-		float Distance_Field_Facial_Shadow_Map_Channel_1_Masked = Distance_Field_Facial_Shadow_Map_Channel_1(Input = Distance_Field_Facial_Shadow_Map_1.rgba);
-		float SampledFacialShadowSdfLeft = Distance_Field_Facial_Shadow_Map_Channel_1_Masked;
 		#Region "Distance Field Facial Shadow"
-		float StaticSwitchParameter_54 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=SampledFacialShadowSdfRight,
-				False=SampledFacialShadowSdfLeft,
-				Group="02 - Distance Field Facial Shadow",
-				SortPriority=32,
-				ParameterName="Flip Left Right"
-			);
-		float StaticSwitchParameter_55 = Is_DFFacialShadow(True = StaticSwitchParameter_54, False = 0.0);
+		// Both halves come out of MF_ToonDFFacialShadow; the feature gate stays here because it
+		// selects between four different things in this function, not just this one.
+		float Facial_Shadow_Sdf_Left = MF_ToonDFFacialShadow(OutputIndex=0);
+		float Facial_Shadow_Sdf_Right = MF_ToonDFFacialShadow(OutputIndex=1);
+		float StaticSwitchParameter_55 = Is_DFFacialShadow(True = Facial_Shadow_Sdf_Left, False = 0.0);
 		#EndRegion
 
 		float FacialShadowSdfLeft = StaticSwitchParameter_55;
@@ -1529,17 +1154,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float3 SA_SDF_Right = SA_Map_4.rgb;
 		#Region "Distance Field Facial Shadow"
-		float StaticSwitchParameter_57 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=SampledFacialShadowSdfLeft,
-				False=SampledFacialShadowSdfRight,
-				Group="02 - Distance Field Facial Shadow",
-				SortPriority=32,
-				ParameterName="Flip Left Right"
-			);
-		float StaticSwitchParameter_58 = Is_DFFacialShadow(True = StaticSwitchParameter_57, False = 0.0);
+		float StaticSwitchParameter_58 = Is_DFFacialShadow(True = Facial_Shadow_Sdf_Right, False = 0.0);
 		#EndRegion
 
 		float FacialShadowSdfRight = StaticSwitchParameter_58;
@@ -1753,22 +1368,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#Region "See Through Overlay"
 		// Base_Color_1 is the material's final albedo (base colour param x map x inner-outline),
 		// deliberately taken BEFORE the debug switches so debug views never leak into the overlay.
-		float3 Multiply_Overlay = (Base_Color_1 * Through_Hair_Tint.rgb);
-		float4 StaticSwitchParameter_Overlay =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float4",
-				True=float4(Multiply_Overlay, Through_Hair_Opacity),
-				False=float4(0.0, 0.0, 0.0, 0.0),
-				Group="24 - See Through Overlay",
-				SortPriority=5,
-				ParameterName="Enable See Through Overlay"
-			);
+		float4 Face_Overlay_Data = MF_ToonSeeThroughOverlay(Base_Color_1, OutputIndex=0);
+		float4 Face_Overlay_Params = MF_ToonSeeThroughOverlay(Base_Color_1, OutputIndex=1);
+		float4 Face_Overlay_Stencil_IDs = MF_ToonSeeThroughOverlay(Base_Color_1, OutputIndex=2);
 		#EndRegion
-
-		float4 Face_Overlay_Data = StaticSwitchParameter_Overlay;
-		float4 Face_Overlay_Params = float4(Through_Hair_Depth_Threshold, Through_Hair_Depth_Fade, Through_Hair_View_Fade_Start, Through_Hair_View_Fade_End);
-		float4 Face_Overlay_Stencil_IDs = float4(Through_Hair_Occluder_ID_A, Through_Hair_Occluder_ID_B, -1.0, -1.0);
 
 		Output = Attributes;
 		ToonBufferA = ToonBufferA_1;
