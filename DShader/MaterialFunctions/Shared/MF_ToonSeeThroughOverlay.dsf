@@ -1,0 +1,102 @@
+// The through-hair overlay, lifted out of MF_MoonToonBaseInput.
+//
+// The engine side of this is a forward re-draw (Moon_MeshPass_FaceOverlay) whose enrollment check is
+// value-based: a material is in the pass only if FaceOverlayData is non-zero. That is why the switch
+// collapses to a constant here rather than being read as a flag -- with it off the constant folds
+// away and the material never enters the pass at all.
+//
+// Nine parameters and three packed float4s that nothing else in the base input touches.
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the through-hair overlay colour, its tuning and its occluder IDs.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+		float3 BaseColor [
+			Description="The material's final albedo, taken BEFORE any debug switch so debug views never leak into the overlay.";
+		];
+	}
+
+	Outputs = {
+		// rgb = through-hair overlay colour, a = opacity. Constant zero while the enable switch is
+		// off, which keeps the material out of Moon_MeshPass_FaceOverlay entirely.
+		float4 FaceOverlayData;
+		// x = depth threshold cm (0 = global CVar), y = depth fade cm, z/w = view fade start/end.
+		// Never affects pass enrollment; only read where FaceOverlayData survives.
+		float4 FaceOverlayParams;
+		// Extra occluder toon-stencil IDs (0-255 authoring space, -1 = unused). z/w reserved so
+		// two more slots can be added without touching the engine node.
+		float4 FaceOverlayStencilIDs;
+	}
+
+	Properties = {
+		ScalarParameter Through_Hair_Opacity = 0.5 [
+			ParameterName="Through Hair Opacity";
+			Group="24 - See Through Overlay";
+			SortPriority=10;
+			Description="Opacity of the re-blend where hair covers this material. 眉毛/睫毛建议 0.5~0.7, 瞳孔建议 0.35~0.55.";
+		];
+		VectorParameter Through_Hair_Tint = float4(1.0, 1.0, 1.0, 1.0) [
+			ParameterName="Through Hair Tint";
+			Group="24 - See Through Overlay";
+			SortPriority=20;
+			Description="Multiplied with the material BaseColor for the through-hair re-blend only.";
+		];
+		ScalarParameter Through_Hair_Depth_Threshold = 0.0 [
+			ParameterName="Through Hair Depth Threshold";
+			Group="24 - See Through Overlay";
+			SortPriority=30;
+			Description="Max occluder distance in cm for the re-blend. 0 = use the global r.MoonToon.FaceOverlay.DepthThreshold.";
+		];
+		ScalarParameter Through_Hair_Depth_Fade = 0.0 [
+			ParameterName="Through Hair Depth Fade";
+			Group="24 - See Through Overlay";
+			SortPriority=31;
+			Description="Opacity feathers to zero over the last N cm before the threshold. Only used when Depth Threshold > 0; 0 with an overridden threshold = hard cutoff.";
+		];
+		ScalarParameter Through_Hair_View_Fade_Start = 0.12 [
+			ParameterName="Through Hair View Fade Start";
+			Group="24 - See Through Overlay";
+			SortPriority=32;
+			Description="N dot V below which the re-blend is fully gone (profile views). Start < End required; equal values fall back to the engine curve 0.12-0.40.";
+		];
+		ScalarParameter Through_Hair_View_Fade_End = 0.40 [
+			ParameterName="Through Hair View Fade End";
+			Group="24 - See Through Overlay";
+			SortPriority=33;
+			Description="N dot V above which the re-blend is at full strength (frontal views).";
+		];
+		ScalarParameter Through_Hair_Occluder_ID_A = -1.0 [
+			ParameterName="Through Hair Occluder ID A";
+			Group="24 - See Through Overlay";
+			SortPriority=40;
+			Description="Extra occluder to show through, named by its CustomDepth stencil value (0-255) -- i.e. the occluder material's 'Material Stencil Value' override. The occluder's mesh also needs 'Render CustomDepth Pass' enabled. Use for occluders that are NOT hair-shaded: hat brims, hair accessories, glasses frames. -1 = unused. Hair shading features (2/4/5) always pass regardless of this.";
+		];
+		ScalarParameter Through_Hair_Occluder_ID_B = -1.0 [
+			ParameterName="Through Hair Occluder ID B";
+			Group="24 - See Through Overlay";
+			SortPriority=41;
+			Description="Second accepted occluder CustomDepth stencil value. -1 = unused.";
+		];
+	}
+
+	Graph = {
+		float3 Multiply_Overlay = (BaseColor * Through_Hair_Tint.rgb);
+		FaceOverlayData =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=float4(Multiply_Overlay, Through_Hair_Opacity),
+				False=float4(0.0, 0.0, 0.0, 0.0),
+				Group="24 - See Through Overlay",
+				SortPriority=5,
+				ParameterName="Enable See Through Overlay"
+			);
+		FaceOverlayParams = float4(Through_Hair_Depth_Threshold, Through_Hair_Depth_Fade, Through_Hair_View_Fade_Start, Through_Hair_View_Fade_End);
+		FaceOverlayStencilIDs = float4(Through_Hair_Occluder_ID_A, Through_Hair_Occluder_ID_B, -1.0, -1.0);
+	}
+}

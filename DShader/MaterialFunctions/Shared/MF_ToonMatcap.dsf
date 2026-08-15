@@ -1,0 +1,113 @@
+// Matcap, lifted out of MF_MoonToonBaseInput.
+//
+// It was already the most self-contained thing in that file -- one tangent-space normal in, one
+// packed float4 out, and seven parameters nothing else reads. Keeping it there only meant that
+// touching the matcap frame required scrolling past sixteen hundred lines of everything else.
+//
+// The engine ADDS what comes out of here, and the switch collapses the whole thing to a constant
+// zero, so "off" costs nothing in the shader and nothing in the GBuffer.
+
+import "Shared/ToonFunctions.dsh";
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonMatcap", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "MToon-style matcap: samples a sphere render through a roll-stable view frame.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+		float3 NormalTS [
+			Description="Tangent-space normal, the same one the surface ends up shading with.";
+		];
+	}
+
+	Outputs = {
+		// rgb = the matcap contribution with its mask and intensity already applied, a = how much
+		// scene lighting modulates it. Goes to ToonMaterialOutput pin 3 -> ToonFeatureRT4.
+		float4 MatcapData;
+	}
+
+	Properties = {
+		StaticSwitchParameter Enable_Matcap = false [
+			ParameterName="Enable Matcap";
+			Group="44 - Matcap";
+			SortPriority=0;
+			Description="启用 Matcap(球面环境贴图). 叠加在正常着色之上, 与任意着色特征共存 —— 它不是特征, 不占 30 组的单选.";
+		];
+		TextureObjectParameter Matcap_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Matcap Map";
+			Group="44 - Matcap";
+			SortPriority=1;
+			Description="Matcap 贴图: 一张正对镜头的球体渲染. 用视线坐标架投影法线取 UV, 所以它自带光照与材质感. 默认白图 —— 忘记指定会明显发白, 而不是悄悄变黑.";
+		];
+		TextureObjectParameter Matcap_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Matcap Mask Map";
+			Group="44 - Matcap";
+			SortPriority=2;
+			Description="遮罩(取 R 通道), 控制哪里出 matcap: 白=全强度, 黑=完全不出. 对应 MToon 的 rimMultiplyTexture.";
+		];
+		ScalarParameter Matcap_Intensity = 1.0 [
+			ParameterName="Matcap Intensity";
+			Group="44 - Matcap";
+			SortPriority=3;
+			Description="Matcap 强度, 直接乘在采样结果上. 对应 MToon 的 matcapFactor.";
+		];
+		ScalarParameter Matcap_Lighting_Mix = 0.0 [
+			ParameterName="Matcap Lighting Mix";
+			Group="44 - Matcap";
+			SortPriority=4;
+			Description="Matcap 受场景光照影响的程度. 0 = 完全不受光(常规做法, 暗部也保持高光), 1 = 完全被光照结果调制. 对应 MToon 的 rimLightingMix.";
+		];
+		ScalarParameter Matcap_Mask_UV_Channel = 0.0 [
+			ParameterName="Matcap Mask UV Channel";
+			Group="44 - Matcap";
+			SortPriority=5;
+			Description="遮罩贴图使用的 UV 通道. 只影响遮罩 —— matcap 本身的 UV 是从视线和法线算出来的, 与网格 UV 无关.";
+		];
+		VectorParameter Matcap_Mask_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
+			ParameterName="Matcap Mask UV Scale/Offset";
+			Group="44 - Matcap";
+			SortPriority=6;
+			Description="遮罩 UV 的缩放(xy)与偏移(zw).";
+		];
+	}
+
+	Graph = {
+		// MToon 1.0 builds the matcap frame from the VIEW VECTOR and pins one axis to the horizontal
+		// plane, rather than taking the view-space normal directly. That is what keeps the matcap
+		// still while the camera rolls -- Unity's toon shader ships the same thing as a separate
+		// "Stabilize Camera Rolling" toggle. The spec is Y-up, so its
+		//     normalize(float3(V.z, 0, -V.x))
+		// becomes normalize(float3(V.y, -V.x, 0)) here, because UE's world is Z-up. Porting it
+		// verbatim would rotate the matcap about the wrong axis.
+		// 0.495 rather than 0.5 is the spec's half-texel guard against sampling past the sphere edge.
+		// One line the spec does not have: straight down the world Z axis that frame is degenerate
+		// (V.xy == 0), so it falls back to a fixed axis instead of producing NaNs.
+		float3 Matcap_NormalWS = UE.Expression(Class="Transform", OutputType="float3", Input=NormalTS);
+		float3 Matcap_ViewWS = UE.Expression(Class="CameraVectorWS", OutputType="float3");
+		float2 Matcap_UV =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float2",
+				Code="float3 N = normalize(NormalWS);\r\nfloat3 V = normalize(ViewWS);\r\nfloat2 Horizontal = float2(V.y, -V.x);\r\nfloat HorizontalLen = length(Horizontal);\r\nfloat3 AxisX = HorizontalLen > 1e-4f ? float3(Horizontal / HorizontalLen, 0.0f) : float3(1.0f, 0.0f, 0.0f);\r\nfloat3 AxisY = cross(V, AxisX);\r\nreturn float2(dot(AxisX, N), dot(AxisY, N)) * 0.495f + 0.5f;",
+				Description="Matcap UV (MToon roll-stable frame, Z-up)",
+				NormalWS=Matcap_NormalWS,
+				ViewWS=Matcap_ViewWS
+			);
+		float2 Matcap_Mask_UV = MF_ToonUV(Matcap_Mask_UV_Channel, Matcap_Mask_UV_Scale_Offset);
+		float3 Matcap_Sampled = MF_ToonSampleColor(Matcap_Map, Matcap_UV).rgb;
+		float4 Matcap_Mask_Sampled = MF_ToonSampleLinear(Matcap_Mask_Map, Matcap_Mask_UV).rgba;
+		// Mask and intensity are folded in here rather than sent to the engine separately: the
+		// engine only ever multiplies them, so this keeps the mask texture entirely on the authoring
+		// side and costs the GBuffer nothing.
+		float3 Matcap_RGB = ((Matcap_Sampled * Matcap_Mask_Sampled.r) * Matcap_Intensity);
+		// Uses the switch declared in Properties rather than an inline copy: two nodes with the same
+		// ParameterName would still be one panel row, but only the declared one carries the
+		// Description every parameter is required to have.
+		MatcapData = Enable_Matcap(
+			True = float4(Matcap_RGB, Matcap_Lighting_Mix),
+			False = float4(0.0, 0.0, 0.0, 0.0));
+	}
+}
