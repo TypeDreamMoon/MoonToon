@@ -518,7 +518,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// colour, its ramp offsets and its emissive have to travel together, or the shading slides
 		// off the thing it is shading. The switch is off for everything that is not an eye, and the
 		// unused branch is culled at translation.
-		float2 Eye_Parallax_UV = MF_ToonEyeParallax(Add_2);
+		float2 Eye_Parallax_UV = MF_ToonEyeParallax(Add_2, OutputIndex=0);
 		float2 Global_UV_Selected =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -544,12 +544,33 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#EndRegion
 
 		float3 Base_Color_1 = Multiply_4;
+		#Region "Eye Parallax"
+		// Debug views replace the albedo, the same way "Debug Shading Feature" below does, and they
+		// join the same chain rather than overwriting Base_Color_1 -- the see-through overlay reads
+		// that one deliberately BEFORE any debug switch, and a debug view leaking into the overlay
+		// would be a debug view that changes what it is measuring.
+		// The second call to MF_ToonEyeParallax is on purpose: with this switch off the branch is
+		// culled, so the debug half of that function never reaches the shader at all.
+		float4 Eye_Parallax_Debug = MF_ToonEyeParallax(Add_2, OutputIndex=1);
+		float3 Base_Color_Debugged =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=lerp(Base_Color_1, Eye_Parallax_Debug.rgb, Eye_Parallax_Debug.a),
+				False=Base_Color_1,
+				Group="06 - Eye Parallax",
+				SortPriority=9,
+				ParameterName="Enable Eye Parallax Debug",
+				DefaultValue=false
+			);
+		#EndRegion
+
 		float4 StaticSwitchParameter_6 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
 				True=ShadingFeatureColor,
-				False=Base_Color_1,
+				False=Base_Color_Debugged,
 				Group="00 - Global Settings",
 				SortPriority=70,
 				ParameterName="Debug Shading Feature"

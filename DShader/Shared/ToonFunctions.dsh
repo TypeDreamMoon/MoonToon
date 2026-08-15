@@ -124,6 +124,7 @@ VirtualFunction(Name="MF_ToonEyeParallax")
 
 	Outputs = {
 		float2 UVOut;
+		float4 DebugColor;
 	}
 }
 VirtualFunction(Name="MF_ToonSampleColor")

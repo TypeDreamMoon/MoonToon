@@ -29,7 +29,9 @@ Function ToonEyeParallax(
 	in float Curvature,
 	in float GrazingClamp,
 	in float AtlasColumns,
-	out float2 OutUV)
+	in float DebugMode,
+	out float2 OutUV,
+	out float4 Debug)
 {
 	// Both eyes normally share one texture side by side, so fold the atlas to a single eye before
 	// anything is measured. This fold is what the old node's magic ParallaxRatio of 0.5 was
@@ -49,9 +51,11 @@ Function ToonEyeParallax(
 
 	// The perspective divide is the effect. Clamped because it runs to infinity edge-on, and an eye
 	// seen edge-on should stop sliding rather than invert.
-	float3 View = normalize(TangentViewDir);
-	float CosView = max(abs(View.z), clamp(GrazingClamp, 0.05, 1.0));
-	float2 Slide = (View.xy / CosView) * Depth;
+	// Named ViewDir, not View: `View` is the engine's own uniform buffer, and a local of that name
+	// shadows it for the rest of the function body.
+	float3 ViewDir = normalize(TangentViewDir);
+	float CosView = max(abs(ViewDir.z), clamp(GrazingClamp, 0.05, 1.0));
+	float2 Slide = (ViewDir.xy / CosView) * Depth;
 
 	// Offset in iris space, then hold the sample inside the iris: past the rim is sclera, or worse,
 	// the other eye.
@@ -61,6 +65,68 @@ Function ToonEyeParallax(
 	// Back to UV space. The fold compressed x by the column count, so undo exactly that much.
 	float2 Offset = (P - SamplePoint) * IrisRadius / float2(Columns, 1.0);
 	OutUV = UV - Offset;
+
+	// ---- debug views -------------------------------------------------------------------------
+	// Drawn from the values computed above rather than from a second copy of the maths. A debug
+	// view with its own arithmetic stops telling the truth the first time one of the two is
+	// edited, and this effect is exactly the kind that gets edited.
+	//
+	// Alpha is coverage, so a view can draw over the eye art (view 0) or replace it (the rest).
+	float Radius01 = sqrt(RadiusSq);
+	float Mode = floor(DebugMode + 0.5);
+	Debug = float4(0.0, 0.0, 0.0, 0.0);
+
+	if (Mode < 0.5)
+	{
+		// 0 -- where the iris is believed to be: ring at the radius, faint ring at half of it,
+		// crosshair at the centre, over the real texture so the two can be lined up by eye. This
+		// is the view that answers the Center/Radius guessing.
+		// Widths are in screen pixels so they stay hairlines however far you zoom in.
+#if PIXELSHADER
+		float LinePx = fwidth(Radius01) * 1.5 + 1e-6;
+		float CrossPxX = fwidth(P.x) * 1.5 + 1e-6;
+		float CrossPxY = fwidth(P.y) * 1.5 + 1e-6;
+#else
+		float LinePx = 0.01;
+		float CrossPxX = 0.01;
+		float CrossPxY = 0.01;
+#endif
+		float Rim = 1.0 - smoothstep(0.0, LinePx, abs(Radius01 - 1.0));
+		float MidRing = (1.0 - smoothstep(0.0, LinePx, abs(Radius01 - 0.5))) * 0.4;
+		float Crosshair = max(1.0 - smoothstep(0.0, CrossPxX, abs(P.x)),
+		                      1.0 - smoothstep(0.0, CrossPxY, abs(P.y))) * step(Radius01, 0.2);
+		float3 Lines = float3(0.1, 1.0, 0.2) * (Rim + MidRing) + float3(1.0, 0.1, 0.1) * Crosshair;
+		Debug = float4(Lines, saturate(Rim + MidRing + Crosshair));
+	}
+	else if (Mode < 1.5)
+	{
+		// 1 -- the depth profile, which is what Curvature reshapes. White at the centre, black at
+		// the rim, and no crease anywhere unless something is wrong.
+		Debug = float4(Profile, Profile, Profile, 1.0);
+	}
+	else if (Mode < 2.5)
+	{
+		// 2 -- how far the iris is travelling right now, in iris radii, and RED where the disc
+		// clamp caught it. That red is the answer to "why has Depth stopped doing anything".
+		float Travel = length(P - SamplePoint);
+		float WasClamped = step(1.0, length(P - Slide * Profile));
+		Debug = float4(lerp(float3(Travel, Travel, Travel), float3(1.0, 0.15, 0.0), WasClamped), 1.0);
+	}
+	else if (Mode < 3.5)
+	{
+		// 3 -- view angle against the grazing clamp. Bright facing the camera, dark edge-on, RED
+		// once the clamp is holding it, which is the angle past which the slide stops responding.
+		float Facing = abs(ViewDir.z);
+		float Held = step(Facing, clamp(GrazingClamp, 0.05, 1.0));
+		Debug = float4(lerp(float3(Facing, Facing, Facing), float3(1.0, 0.15, 0.0), Held), 1.0);
+	}
+	else
+	{
+		// 4 -- the atlas fold: one red-to-green ramp per eye. Two ramps across a single eye, or
+		// one ramp spanning both, means Eye Atlas Columns is wrong -- and while it is wrong every
+		// other view here is measuring the wrong space.
+		Debug = float4(LocalUV.x, 1.0 - LocalUV.x, 0.0, 1.0);
+	}
 }
 
 ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonEyeParallax", Root="Plugin.MoonToon")
@@ -79,6 +145,10 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonEyeParallax", Root="Plugin.
 
 	Outputs = {
 		float2 UVOut;
+		// rgb = the debug view, a = how much of it covers the material's own colour. Only ever
+		// reached through "Enable Eye Parallax Debug" in the base input, so with that switch off
+		// the node is culled and none of this reaches the shader.
+		float4 DebugColor;
 	}
 
 	Properties = {
@@ -112,6 +182,12 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonEyeParallax", Root="Plugin.
 			SortPriority=5;
 			Description="一张贴图里横向排了几只眼睛. VRM / MMD 常见的左右眼并排就是 2, 单眼一张贴图填 1.\r\n填错的表现: 填 1 而实际是并排, 虹膜中心会落在两眼之间; 填 2 而实际是单眼, 眼睛中间会出现一条接缝.\r\n\r\n\r\nHow many eyes sit side by side across the texture. The VRM / MMD layout with both eyes in one map is 2; one eye per texture is 1.\r\nGetting it wrong shows: 1 on a side-by-side map puts the iris centre between the eyes, and 2 on a single-eye map puts a seam down the middle.";
 		];
+		ScalarParameter Eye_Parallax_Debug_View = 0.0 [
+			ParameterName="Eye Parallax Debug View";
+			Group="06 - Eye Parallax";
+			SortPriority=10;
+			Description="调试视图选择, 需要在基础输入里打开`Enable Eye Parallax Debug`才显示:\r\n\t0 = 虹膜圆盘(半径环 + 中心十字, 画在贴图之上) —— 对齐 Center/Radius 用这个\r\n\t1 = 深度剖面(白=中心, 黑=边缘) —— 看 Curvature 的形状\r\n\t2 = 当前实际位移量, 红色 = 被圆盘夹住了(Depth 加了没反应就是它)\r\n\t3 = 视角与掠射夹逼, 红色 = 已经被夹住, 再转也不会更远\r\n\t4 = 图集折叠(每只眼一条红→绿渐变) —— 先确认这个对, 否则上面几个量的都是错空间\r\n这是标量参数, 切视图不会重新编译着色器.\r\n\r\n\r\nWhich debug view to draw; needs `Enable Eye Parallax Debug` in the base input to be visible:\r\n\t0 = the iris disc (radius ring and centre crosshair, drawn over the art) -- the one for lining Center/Radius up\r\n\t1 = the depth profile, white at the centre -- what Curvature is shaping\r\n\t2 = how far the iris is travelling now; red where the disc clamp caught it\r\n\t3 = view angle against the grazing clamp; red once it is holding\r\n\t4 = the atlas fold, one red-to-green ramp per eye -- check this first, the others measure the wrong space while it is wrong\r\nA scalar, so switching views does not recompile.";
+		];
 	}
 
 	Graph = {
@@ -135,6 +211,8 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonEyeParallax", Root="Plugin.
 			Eye_Parallax_Curvature,
 			Eye_Parallax_Grazing_Clamp,
 			Eye_Atlas_Columns,
-			UVOut);
+			Eye_Parallax_Debug_View,
+			UVOut,
+			DebugColor);
 	}
 }
