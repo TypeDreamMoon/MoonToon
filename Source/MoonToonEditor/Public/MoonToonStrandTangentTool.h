@@ -85,6 +85,7 @@ public:
 	virtual FText GetToolName() const override;
 	virtual FText GetToolDescription() const override;
 	virtual FText GetRunLabel() const override;
+	virtual FName GetToolIconName() const override { return TEXT("Icons.Transform"); }
 	virtual bool IsDestructive() const override
 	{
 		return Mode == EMoonToonStrandTangentMode::Bake || Mode == EMoonToonStrandTangentMode::Restore;

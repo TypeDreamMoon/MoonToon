@@ -39,6 +39,14 @@ public:
 	/** Tooltip in the tool list, and the blurb above the settings. */
 	virtual FText GetToolDescription() const { return FText::GetEmpty(); }
 
+	/**
+	 * Editor style brush name for the tool list icon, e.g. "Icons.Details".
+	 *
+	 * A name rather than an FSlateIcon so that declaring a tool still costs nothing but this header --
+	 * the panel is the only place that has to know about Slate.
+	 */
+	virtual FName GetToolIconName() const { return TEXT("Icons.Adjust"); }
+
 	/** Label on the action button. */
 	virtual FText GetRunLabel() const;
 
