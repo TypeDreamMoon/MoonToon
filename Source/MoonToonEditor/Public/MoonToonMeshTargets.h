@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+// CoreMinimal leaves FWeakObjectPtr forward-declared, which is not enough to hold one by value.
+#include "UObject/WeakObjectPtr.h"
 
 /**
  * Shared mesh introspection for the MoonToon tools panel.
@@ -11,6 +13,14 @@
  * completely different import-data structures, and every tool in the panel needs to ask the same
  * three questions: how many LODs, what sections, and which wedges belong to a section.
  */
+
+// Declared here rather than inline as `class X*` in the MoonToonMesh signatures below: an
+// elaborated type specifier inside a namespace declares the class *in that namespace* unless the
+// real one is already visible, which made MoonToonMesh::USkeletalMesh appear (and the definitions
+// in the .cpp stop matching) whenever this header was reached before Engine/SkeletalMesh.h.
+class UMaterialInterface;
+class UMeshComponent;
+class USkeletalMesh;
 
 /** One material section of a mesh LOD, as the panel lists it. */
 struct FMoonToonSectionInfo
@@ -23,6 +33,14 @@ struct FMoonToonSectionInfo
 
 	/** Assigned material asset name, or "None". */
 	FString MaterialName;
+
+	/**
+	 * The assigned material itself, so a row can open or locate it without re-reading the mesh.
+	 *
+	 * Weak because the list outlives a reimport: sections are rebuilt from the mesh, but between the
+	 * rebuild and the next repaint the old material can already be gone.
+	 */
+	TWeakObjectPtr<UMaterialInterface> Material;
 
 	int32 NumTriangles = 0;
 };
@@ -104,7 +122,7 @@ namespace MoonToonMesh
 	 * so without the placed component's transform the lines land at the world origin instead of on
 	 * the character. The live preview additionally needs it to know whose materials to override.
 	 */
-	MOONTOONEDITOR_API class UMeshComponent* FindPlacedMeshComponent(const UObject* MeshAsset);
+	MOONTOONEDITOR_API UMeshComponent* FindPlacedMeshComponent(const UObject* MeshAsset);
 
 	/**
 	 * Pushes per-point vertex alpha straight into a skeletal mesh's live render data and editor
@@ -122,7 +140,7 @@ namespace MoonToonMesh
 	 * the caller must then fall back to a full PostEditChange.
 	 */
 	MOONTOONEDITOR_API bool PatchVertexAlphaLive(
-		class USkeletalMesh* Mesh,
+		USkeletalMesh* Mesh,
 		int32 LODIndex,
 		const TArray<float>& PointAlpha);
 
