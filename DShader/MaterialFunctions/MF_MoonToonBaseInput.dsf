@@ -560,6 +560,18 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SortPriority=0;
 			Description="选择使用那个Diffuse Color Ramp.\r\nRamp的横轴是光照方向和表面法线的角度(N dot L), 0为背光面, 0.5为明暗交界线, 1为正光面.\r\nRGB通道为漫反射颜色.\r\nA通道为阴影衰减, 1为被照亮, 0为被遮挡. 用于区分Base Color和Shadow Color.\r\n\r\n现在MooaToon使用Global Diffuse/Specular Color Ramps来描述表面的多光源着色结果, 这意味着使用同一套输入你既可以实现基于物理的着色, 也可以实现完全自定义的风格化着色.\r\n你可以在Project Settings > Engine > MooaToon中找到默认的Ramp Atlas, 其中存放了所有可供选择的Ramp, 要使用某个Ramp你需要在这里输入其Index.\r\n如果要添加新的Ramp, 请先将默认的Ramp Atlas复制一份, 然后在Project Settings中修改Ramp Atlas为复制的, 以避免在更新MooaToon的时候产生冲突.\r\n\r\n\r\nChoose which Diffuse Color Ramp to use.\r\nThe horizontal axis of Ramp is the angle between light direction and surface normal (N dot L), 0 is the backlight surface, 0.5 is the boundary between light and dark, and 1 is the front light surface.\r\nThe RGB channel is the diffuse color.\r\nThe A channel is shadow attenuation, 1 means illuminated, 0 means occluded. Used to distinguish Base Color and Shadow Color.\r\n\r\nMooaToon now uses Global Diffuse/Specular Color Ramps to describe the multi-light shading results of the surface, which means that using the same set of inputs you can achieve both physically based shading and completely customized stylized shading.\r\nYou can find the default Ramp Atlas in Project Settings > Engine > MooaToon, which stores all available Ramps. To use a Ramp, you need to enter its Index here.\r\nIf you want to add a new Ramp, please first copy the default Ramp Atlas, and then modify the Ramp Atlas to be copied in Project Settings to avoid conflicts when updating MooaToon.";
 		];
+		TextureObjectParameter Custom_Diffuse_Ramp = Path(Plugins.MoonToon, "Assets/Textures/T_White_Linear") [
+			ParameterName="Custom Diffuse Ramp";
+			Group="10 - Diffuse";
+			SortPriority=2;
+			Description="材质自带的Diffuse Ramp贴图, 需要打开`Use Custom Diffuse Ramp`才生效.\r\n引擎会自动把它注册进动态Ramp图集并分配Index, 不需要再手填`Diffuse Color Ramp Index`, 也不需要事先合进全局Ramp Atlas资产.\r\n横轴与全局Ramp一致(N dot L), A通道是明暗遮罩, RGB是漫反射颜色着色(受`Diffuse Color Ramp Tint Strength`控制).\r\n建议: 256x1, 无Mipmap, Clamp寻址, 线性色彩空间. 多行图集请用`Custom Diffuse Ramp Row`选行.\r\n\r\n\r\nA ramp texture supplied by the material itself; requires `Use Custom Diffuse Ramp`.\r\nThe engine registers it into the dynamic ramp atlas and assigns the index automatically, so neither `Diffuse Color Ramp Index` nor merging the ramp into the global atlas asset is needed.\r\nSame horizontal axis as the global ramps (N dot L); alpha is the lit/shadow mask, RGB tints the diffuse.\r\nRecommended: 256x1, no mipmaps, clamped, linear color space. For a multi-row atlas pick the row with `Custom Diffuse Ramp Row`.";
+		];
+		ScalarParameter Custom_Diffuse_Ramp_Row = -1.0 [
+			ParameterName="Custom Diffuse Ramp Row";
+			Group="10 - Diffuse";
+			SortPriority=3;
+			Description="当`Custom Diffuse Ramp`是多行图集时, 选择使用第几行(0为最上面一行).\r\n负数表示取贴图的垂直中心行, 也就是单条Ramp贴图的默认行为.\r\n每个被用到的(贴图, 行)组合各占一个图集slice, 没用到的行不占预算.\r\n\r\n\r\nSelects which row of a multi-row `Custom Diffuse Ramp` atlas to use (0 = top row).\r\nA negative value samples the texture's vertical center, which is the behaviour for single-strip ramps.\r\nEach (texture, row) pair actually used takes one atlas slice; unused rows cost nothing.";
+		];
 		ChannelMaskParameter Diffuse_Ramp_Offset_Channel = float4(0.0, 0.0, 1.0, 0.0) [
 			ParameterName="Diffuse Ramp Offset Channel";
 			Group="10 - Diffuse";
@@ -582,6 +594,18 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Group="11 - Specular";
 			SortPriority=0;
 			Description="选择使用哪个Specular Color Ramp.\r\n横坐标是根据经验归一化后的高光强度:\r\n\t- 0对应高光点边缘\r\n\t- 1对应高光点中心\r\nRGB通道的值为Specular Color.\r\n\r\n现在MooaToon使用Global Diffuse/Specular Color Ramps来描述表面的多光源着色结果, 这意味着使用同一套输入你既可以实现基于物理的着色, 也可以实现完全自定义的风格化着色.\r\n你可以在Project Settings > Engine > MooaToon中找到默认的Ramp Atlas, 其中存放了所有可供选择的Ramp, 要使用某个Ramp你需要在这里输入其Index.\r\n如果要添加新的Ramp, 请先将默认的Ramp Atlas复制一份, 然后在Project Settings中修改Ramp Atlas为复制的, 以避免在更新MooaToon的时候产生冲突.\r\n\r\n\r\nChoose which Specular Color Ramp to use.\r\nThe horizontal coordinate is the empirically normalized highlight intensity.\r\n\t- 0 is the edge of the highlight point.\r\n\t- 1 is the center of the highlight.\r\nThe value of the RGB channel is Specular Color.\r\n\r\nMooaToon now uses Global Diffuse/Specular Color Ramps to describe the multi-light shading results of the surface, which means that using the same set of inputs you can achieve both physically based shading and completely customized stylized shading.\r\nYou can find the default Ramp Atlas in Project Settings > Engine > MooaToon, which stores all available Ramps. To use a Ramp, you need to enter its Index here.\r\nIf you want to add a new Ramp, please first copy the default Ramp Atlas, and then modify the Ramp Atlas to be copied in Project Settings to avoid conflicts when updating MooaToon.";
+		];
+		TextureObjectParameter Custom_Specular_Ramp = Path(Plugins.MoonToon, "Assets/Textures/T_White_Linear") [
+			ParameterName="Custom Specular Ramp";
+			Group="11 - Specular";
+			SortPriority=2;
+			Description="材质自带的Specular Ramp贴图, 需要打开`Use Custom Specular Ramp`才生效.\r\n引擎会自动把它注册进动态Specular Ramp图集并分配Index, 不需要再手填`Specular Color Ramp Index`.\r\n横轴与全局Ramp一致(归一化高光强度), RGB通道是Specular Color.\r\n建议: 256x1, 无Mipmap, Clamp寻址, 线性色彩空间. 多行图集请用`Custom Specular Ramp Row`选行.\r\n注意: Specular图集只有32个slice(比Diffuse的64个少), 因为GBuffer里的Index只有5位.\r\n\r\n\r\nA specular ramp texture supplied by the material itself; requires `Use Custom Specular Ramp`.\r\nThe engine registers it into the dynamic specular ramp atlas and assigns the index automatically, so `Specular Color Ramp Index` is not needed.\r\nSame horizontal axis as the global ramps (normalized highlight intensity); RGB is the specular color.\r\nRecommended: 256x1, no mipmaps, clamped, linear color space. For a multi-row atlas pick the row with `Custom Specular Ramp Row`.\r\nNote: the specular atlas holds 32 slices (fewer than diffuse's 64) because its GBuffer index is only 5 bits.";
+		];
+		ScalarParameter Custom_Specular_Ramp_Row = -1.0 [
+			ParameterName="Custom Specular Ramp Row";
+			Group="11 - Specular";
+			SortPriority=3;
+			Description="当`Custom Specular Ramp`是多行图集时, 选择使用第几行(0为最上面一行).\r\n负数表示取贴图的垂直中心行, 也就是单条Ramp贴图的默认行为.\r\n\r\n\r\nSelects which row of a multi-row `Custom Specular Ramp` atlas to use (0 = top row).\r\nA negative value samples the texture's vertical center, which is the behaviour for single-strip ramps.";
 		];
 		ChannelMaskParameter Specular_Ramp_Offset_Channel = float4(0.0, 0.0, 1.0, 0.0) [
 			ParameterName="Specular Ramp Offset Channel";
@@ -1267,7 +1291,32 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SortPriority=70,
 				ParameterName="Debug Tangent"
 			);
-		float Diffuse_Ramp_Index = Diffuse_Color_Ramp_Index;
+		#Region "Diffuse Ramp Index"
+		// Custom ramp: ToonRampAtlas registers the (texture, row) pair into the dynamic ramp atlas at
+		// uniform-buffer fill time and returns its slice, so the material never hand-picks an index.
+		// The static switch keeps the legacy hand-authored index as the default, which is why existing
+		// material instances are untouched -- and the unused branch is culled at translation.
+		float Custom_Diffuse_Ramp_Slice =
+			UE.Expression(
+				Class="ToonRampAtlas",
+				OutputType="float1",
+				RampTexture=Custom_Diffuse_Ramp,
+				Row=Custom_Diffuse_Ramp_Row,
+				bSpecularRamp=false
+			);
+		float Diffuse_Ramp_Index =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float1",
+				True=Custom_Diffuse_Ramp_Slice,
+				False=Diffuse_Color_Ramp_Index,
+				Group="10 - Diffuse",
+				SortPriority=1,
+				ParameterName="Use Custom Diffuse Ramp",
+				DefaultValue=false
+			);
+		#EndRegion
+
 		#Region "Texture Sample"
 		float4 StaticSwitchParameter_47 = MF_ToonSampleLinear(Diffuse_Ramp_Offset_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_48 =
@@ -1300,7 +1349,29 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#EndRegion
 
 		float3 Specular_Color_1 = Multiply_16;
-		float Specular_Ramp_Index = Specular_Color_Ramp_Index;
+		#Region "Specular Ramp Index"
+		// Mirror of the diffuse path above, against the 32-slice specular atlas.
+		float Custom_Specular_Ramp_Slice =
+			UE.Expression(
+				Class="ToonRampAtlas",
+				OutputType="float1",
+				RampTexture=Custom_Specular_Ramp,
+				Row=Custom_Specular_Ramp_Row,
+				bSpecularRamp=true
+			);
+		float Specular_Ramp_Index =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float1",
+				True=Custom_Specular_Ramp_Slice,
+				False=Specular_Color_Ramp_Index,
+				Group="11 - Specular",
+				SortPriority=1,
+				ParameterName="Use Custom Specular Ramp",
+				DefaultValue=false
+			);
+		#EndRegion
+
 		#Region "Texture Sample"
 		float4 StaticSwitchParameter_50 = MF_ToonSampleLinear(Specular_Ramp_Offset_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_51 =
