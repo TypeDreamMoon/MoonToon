@@ -138,15 +138,4 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		FaceOverlayStencils = MF_MoonToonBaseInput(OutputIndex=6);
 		ToonDataD = MF_MoonToonBaseInput(OutputIndex=7);
 	}
-
-	Layout = {
-		Node(Var="Surface", X=544, Y=-48);
-		Node(Var="Attributes", X=992, Y=-48);
-		Node(Var="ToonDataA", X=544, Y=272);
-		Node(Var="ToonDataB", X=544, Y=352);
-		Node(Var="ToonDataC", X=544, Y=432);
-		Node(Var="FaceOverlay", X=544, Y=512);
-		Node(Var="FaceOverlayTuning", X=544, Y=592);
-		Node(Var="FaceOverlayStencils", X=544, Y=672);
-	}
 }

@@ -22,10 +22,4 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonMainLightDirection", Root="Plugin.
 
 		Result = Custom;
 	}
-
-	Layout = {
-		Node(Var="Custom", X=-64, Y=336);
-		Node(Var="Result", X=200, Y=300);
-	}
-
 }
