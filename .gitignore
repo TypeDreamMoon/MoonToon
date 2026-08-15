@@ -75,3 +75,6 @@ Plugins/**/Intermediate/*
 DerivedDataCache/*
 
 Plan/*
+
+# Hand-made asset backups taken before a risky edit
+Content/Backup/*
