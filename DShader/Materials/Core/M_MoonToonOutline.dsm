@@ -41,7 +41,14 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		Backend      = "Graph";
 		Domain       = "Surface";
 		ShadingModel = "Toon";
-		BlendMode    = "Opaque";
+
+		// Masked, not Opaque. The hull wraps whatever section it was drawn for, and on an imported
+		// character most of those sections are alpha-cut -- hair cards, lace, gauze. An opaque hull
+		// behind an alpha-cut surface fills every hole the cutout was there to make, which is what
+		// "透明的地方也是黑色一片" was. See UMoonToonOutlineSetupTool, which generates one instance
+		// per slot with that slot's own cutout copied in; with the stock instance (white opacity map)
+		// this costs one extra clip instruction and changes nothing.
+		BlendMode    = "Masked";
 
 		bOutputTranslucentVelocity = true;
 		bUsedWithSkeletalMesh      = true;
@@ -114,13 +121,72 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		#Region "Smoothed normal"
 		// The bake stores tangent-space smoothed normal * curvature, remapped to [0,1], across
 		// UV2.y | UV3.x | UV3.y -- see UMoonToonSmoothNormalTool::BakeSmoothedNormalAndCurvature.
+		//
+		// Read it defensively. Two states of those channels are NOT a smoothed normal, and the
+		// straight normalize() this used to be turned both of them into a wrecked hull:
+		//
+		//   * Never baked. The channels are 0, so v*2-1 is (-1,-1,-1), which normalizes perfectly
+		//     well -- that is the trap. Every vertex then extrudes along one fixed tangent-space
+		//     diagonal and the hull shears off the model. |v| is sqrt(3) here, and a real encode
+		//     can never exceed 1 (it is a unit normal scaled by curvature in [0,1]), so the length
+		//     alone tells them apart.
+		//   * Baked but degenerate. Zero curvature -- or one of the geometry-script lookups in the
+		//     bake tool returning nothing, which that tool does not check -- writes exactly
+		//     (0.5,0.5,0.5), which decodes to exactly (0,0,0). normalize() of that is 0 * rsqrt(0)
+		//     = NaN, the NaN lands in WorldPositionOffset, and every triangle touching such a
+		//     vertex rasterises as garbage. This is not theoretical: 5.1% of the wedges on
+		//     SK_星穹铁道—昔涟5 are exact zeros, and 0% on SK_Lin / SK_ww_yy -- which is precisely
+		//     the "only on some characters" in the bug report.
+		//
+		// So: normalize by hand with a floored denominator, which cannot produce NaN, and weight
+		// the result by whether the decoded length looks like a curvature at all.
 		float2 UV2 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
 		float2 UV3 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=3);
-		float3 SmoothNormalTS = normalize(float3(UV2.g, UV3.r, UV3.g) * 2.0 - 1.0);
-		float3 SmoothNormalWS = normalize(UE.Expression(Class="Transform", OutputType="float3", Input=SmoothNormalTS));
+
+		float3 BakedNormalRaw = (float3(UV2.g, UV3.r, UV3.g) * 2.0 - 1.0);
+		float BakedLenSq = dot(BakedNormalRaw, BakedNormalRaw);
+		float3 SmoothNormalTS = (BakedNormalRaw / sqrt(max(BakedLenSq, 0.000001)));
+
+		// Spaces spelled out rather than left to the node defaults: this decode is only correct as
+		// tangent -> world, and a silently different default would be invisible in the source.
+		float3 SmoothNormalWS =
+			UE.Expression(
+				Class="Transform",
+				OutputType="float3",
+				Input=SmoothNormalTS,
+				TransformSourceType="TRANSFORMSOURCE_Tangent",
+				TransformType="TRANSFORM_World"
+			);
 
 		float3 VertexNormalWS = UE.Expression(Class="VertexNormalWS", OutputType="float3");
-		float3 OffsetDir = lerp(VertexNormalWS, SmoothNormalWS, Use_Smooth_Normal);
+
+		// How much to trust the bake, per vertex. Three ways it can be untrustworthy, and the
+		// length alone only catches two of them.
+		//
+		//   lower edge: |v| ramps in over 0.01 .. 0.05, so the degenerate encode fades out instead
+		//               of switching. It is seamless because low curvature *means* flat, and on a
+		//               flat patch the smoothed normal already equals the vertex normal.
+		//   upper edge: |v| > ~1.1 is not a curvature-scaled unit vector, so the channel holds
+		//               something else (unbaked zeros, or another tool's data). Reject outright.
+		//   direction:  a smoothed normal is an average of the faces meeting at the vertex, so it
+		//               can approach 90 degrees from the vertex normal at a razor edge and can
+		//               never exceed it. Anything past 90 is not a smoothed normal, and extruding
+		//               along it drives the hull INTO the surface -- through it, on the open sheets
+		//               a skirt is made of. Measured on SK_星穹铁道—昔涟5: 21% of wedges past 90
+		//               degrees and 14% at 165-180, i.e. very nearly inverted. SK_Lin has 0.8% and
+		//               0.0%; SK_ww_yy 3.7% and 0.6%. Same root cause as the zero-length encodes --
+		//               the bake welds coincident geometry before averaging, and this mesh carries
+		//               17968 pairs of exactly coincident triangles, so the averages cancel.
+		float BakeAgreement = dot(SmoothNormalWS, VertexNormalWS);
+		float BakeWeight =
+			(smoothstep(0.0001, 0.0025, BakedLenSq)
+			 * step(BakedLenSq, 1.2)
+			 * saturate(BakeAgreement * 4.0));
+		float3 OffsetDirRaw = lerp(VertexNormalWS, SmoothNormalWS, (saturate(Use_Smooth_Normal) * BakeWeight));
+		// Floored again: the blend of two directions can cancel, and a zero here would re-introduce
+		// the NaN through the back door. Worst case the hull collapses onto the surface locally,
+		// which is a missing outline rather than a corrupted mesh.
+		float3 OffsetDir = (OffsetDirRaw / sqrt(max(dot(OffsetDirRaw, OffsetDirRaw), 0.000001)));
 		#EndRegion
 
 		#Region "Width"
@@ -166,10 +232,29 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 
 		Attributes.WorldPositionOffset = (OffsetDir * Width);
 
+		#Region "Cutout"
+		// The hull is cut by the surface opacity, not by what MF_MoonToonBaseInput left on
+		// OpacityMask -- that pin carries the SHADOW opacity (opacity folded through
+		// "Apply Opacity to Shadow" and then scaled by "Shadow Opacity"), which is a different
+		// quantity and would cut the hull to the shadow's silhouette rather than the surface's.
+		Attributes.OpacityMask = Base.Opacity;
+		#EndRegion
+
 		#Region "Outline colour"
-		// Read the surface's own main-light shadow tint so the outline sits in the same palette,
-		// then write the outline colour back over it -- the outline hull is lit by the toon model,
-		// so its shadow tint is what actually reaches the screen.
+		// "The surface" below means THIS material instance's own settings, not the section's.
+		//
+		// Worth being blunt about, because the naming invites the opposite reading: the outline is
+		// drawn from its own FMaterialRenderProxy (see FSkeletalMeshSceneProxy's outline batch), so
+		// MF_MoonToonBaseInput above is evaluated with the outline instance's parameters. Point the
+		// outline instance at the same Base Color Map / Shadow Color as the section and the
+		// derivation is real; leave it on the defaults and it resolves to one flat colour for the
+		// whole mesh, whatever the character underneath looks like.
+		//
+		// UMoonToonOutlineSetupTool generates one instance per slot and copies the cutout across.
+		// It deliberately does NOT copy the shading parameters -- those are shader permutations, and
+		// a hull is not lit like the surface it wraps -- so per-region colour still means setting
+		// Base Color Map on the generated instances by hand, or leaving
+		// "Blend Outline Color From Surface" at 0 and using a flat Outline Color.
 		float3 SurfaceShadowColor =
 			UE.Expression(
 				Class="MoonDecodeToonAttributes",
