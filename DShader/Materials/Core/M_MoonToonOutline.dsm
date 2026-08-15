@@ -224,7 +224,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				SortPriority=25,
 				Desc="X axis: camera distance to the character. Y axis: outline width. Generate with a Curve Atlas.",
 				Coordinates=float2(saturate(PixelDepth / Max_Distance), 0.5),
-				Texture=Path(Plugins.MooaToon, "Assets/OutlineWidthRamps/CA_OutlineWidthRamp"),
+				Texture=Path(Plugins.MoonToon, "Assets/OutlineWidthRamps/CA_OutlineWidthRamp"),
 				SamplerType="SAMPLERTYPE_LinearColor"
 			);
 		float Width = (Width_Ramp.r * Outline_Width * WidthMask);
