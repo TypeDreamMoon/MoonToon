@@ -257,12 +257,13 @@ namespace MoonToonMesh
 			TriangleCounts.FindOrAdd(MaterialIndex)++;
 		}
 
-		auto AddSection = [&OutSections, &TriangleCounts](int32 MaterialIndex, FName SlotName, const UMaterialInterface* Material)
+		auto AddSection = [&OutSections, &TriangleCounts](int32 MaterialIndex, FName SlotName, UMaterialInterface* Material)
 		{
 			FMoonToonSectionInfo& Info = OutSections.AddDefaulted_GetRef();
 			Info.MaterialIndex = MaterialIndex;
 			Info.SlotName = SlotName;
 			Info.MaterialName = Material ? Material->GetName() : TEXT("None");
+			Info.Material = Material;
 			Info.NumTriangles = TriangleCounts.FindRef(MaterialIndex);
 		};
 
