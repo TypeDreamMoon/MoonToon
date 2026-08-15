@@ -1,0 +1,106 @@
+// Distance-field facial shadow sampling, lifted out of MF_MoonToonBaseInput.
+//
+// The SDF map stores the light angle at which each pixel of the face flips into shadow, for one half
+// of the face; the other half is the same texture read with a mirrored U. Both halves come out of
+// here, and which one is which can be swapped when the map was authored the other way round.
+//
+// The "Is DFFacialShadow" feature gate deliberately stays in the caller: it selects between four
+// different things there, and duplicating a static switch across two functions to gate one of them
+// would make the panel row ambiguous about which node owns the default.
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Samples the distance-field facial shadow map for both halves of the face.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float SdfLeft;
+		float SdfRight;
+	}
+
+	Properties = {
+		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Distance Field Facial Shadow Map Channel";
+			Group="02 - Distance Field Facial Shadow";
+			MaskChannel=Red
+		];
+		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel_1 = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Distance Field Facial Shadow Map Channel";
+			Group="02 - Distance Field Facial Shadow";
+			MaskChannel=Red
+		];
+	}
+
+	Graph = {
+		float2 MaterialExpressionTextureCoordinate_2 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		#Region "Texture Sample"
+		float2 Multiply_19 = (float2(-1.0, 1.0) * MaterialExpressionTextureCoordinate_2);
+		float4 Distance_Field_Facial_Shadow_Map =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Distance Field Facial Shadow Map",
+				Group="02 - Distance Field Facial Shadow",
+				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
+				Coordinates=Multiply_19,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings",
+				MipValueMode="TMVM_MipLevel",
+				ConstMipValue=0
+			);
+		#EndRegion
+
+		float SampledFacialShadowSdfRight = Distance_Field_Facial_Shadow_Map_Channel(Input = Distance_Field_Facial_Shadow_Map.rgba);
+		float2 MaterialExpressionTextureCoordinate_2_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		#Region "Texture Sample"
+		float4 Distance_Field_Facial_Shadow_Map_1 =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Distance Field Facial Shadow Map",
+				Group="02 - Distance Field Facial Shadow",
+				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
+				Coordinates=MaterialExpressionTextureCoordinate_2_1,
+				Texture=Path(Plugins.MoonToon, "Textures/T_White_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
+				SamplerSource="SSM_Wrap_WorldGroupSettings",
+				MipValueMode="TMVM_MipLevel",
+				ConstMipValue=0
+			);
+		#EndRegion
+
+		float SampledFacialShadowSdfLeft = Distance_Field_Facial_Shadow_Map_Channel_1(Input = Distance_Field_Facial_Shadow_Map_1.rgba);
+
+		#Region "Distance Field Facial Shadow"
+		SdfLeft =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=SampledFacialShadowSdfRight,
+				False=SampledFacialShadowSdfLeft,
+				Group="02 - Distance Field Facial Shadow",
+				SortPriority=32,
+				ParameterName="Flip Left Right"
+			);
+		SdfRight =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=SampledFacialShadowSdfLeft,
+				False=SampledFacialShadowSdfRight,
+				Group="02 - Distance Field Facial Shadow",
+				SortPriority=32,
+				ParameterName="Flip Left Right"
+			);
+		#EndRegion
+	}
+}

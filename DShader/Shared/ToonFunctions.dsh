@@ -1,0 +1,245 @@
+// The engine and plugin material functions the MoonToon sources call.
+//
+// A VirtualFunction declares an asset that already exists; it generates nothing. They were copied
+// into every file that called them -- 193 lines of it in MF_MoonToonBaseInput alone, and a second
+// copy of MF_UVChannelSwitch in MF_ToonUV -- so a signature change had to be made in each place or
+// the odd one out failed at its call site instead of at the declaration.
+//
+// Import this instead. Declaring one that the importing file never calls costs nothing.
+
+VirtualFunction(Name="MF_MoonToonFeatureSelect")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonFeatureSelect");
+		Description = "Static toon feature selection; see Tools/gen_feature_functions.py.";
+	}
+
+	Inputs = {
+		opt float InToonKajiyaSecondaryStrandShift = 0.0;
+		opt float InToonKajiyaPrimaryStrandShift = 0.0;
+		opt float InHairHighlightMask = 0.0;
+		opt float3 InStockingsBodyColor = float3(0.0, 0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+		float ShadingFeatureID;
+		float4 DebugColor;
+	}
+}
+VirtualFunction(Name="AppendMany")
+{
+	Options = {
+		Asset = Path(Engine, "Functions/Engine_MaterialFunctions02/Utility/AppendMany");
+		Description = "Generated from /Engine/Functions/Engine_MaterialFunctions02/Utility/AppendMany.AppendMany";
+	}
+
+	Inputs = {
+		opt float R = 0.0;
+		opt float G = 0.0;
+		opt float B = 0.0;
+		opt float A = 0.0;
+	}
+
+	Outputs = {
+		float2 RG;
+		float3 RGB;
+		float4 RGBA;
+	}
+}
+VirtualFunction(Name="MF_UVChannelSwitch")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Utils/MF_UVChannelSwitch");
+		Description = "Generated from /MoonToon/MaterialFunctions/Utils/MF_UVChannelSwitch.MF_UVChannelSwitch";
+	}
+
+	Inputs = {
+		float UVChannelIndex [
+			Description="The UV channel index to output.";
+			SortPriority=100;
+		];
+	}
+
+	Outputs = {
+		float2 Result;
+	}
+}
+VirtualFunction(Name="MF_MoonMainLightDirection")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonMainLightDirection");
+		Description = "Generated from /MooaToon/MaterialFunctions/MF_MoonMainLightDirection.MF_MoonMainLightDirection";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float3 Result;
+	}
+}
+VirtualFunction(Name="FlattenNormal")
+{
+	Options = {
+		Asset = Path(Engine, "Functions/Engine_MaterialFunctions01/Texturing/FlattenNormal");
+		Description = "Generated from /Engine/Functions/Engine_MaterialFunctions01/Texturing/FlattenNormal.FlattenNormal";
+	}
+
+	Inputs = {
+		opt float3 Normal = float3(0, 0, 1);
+		opt float Flatness = 0.0;
+	}
+
+	Outputs = {
+		float3 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonUV")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonUV");
+	}
+
+	Inputs = {
+		opt float UVChannel = 0.0;
+		opt float4 ScaleOffset = float4(1.0, 1.0, 0.0, 0.0);
+	}
+
+	Outputs = {
+		float2 UV;
+	}
+}
+VirtualFunction(Name="MF_ToonEyeParallax")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonEyeParallax");
+	}
+
+	Inputs = {
+		float2 UV;
+	}
+
+	Outputs = {
+		float2 UVOut;
+	}
+}
+VirtualFunction(Name="MF_ToonSampleColor")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleColor");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonSampleLinear")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleLinear");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonSampleLinearMip0")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleLinearMip0");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonSampleNormal")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSampleNormal");
+	}
+
+	Inputs = {
+		Texture2D Tex;
+		opt float2 UV = float2(0.0, 0.0);
+	}
+
+	Outputs = {
+		float4 Result;
+	}
+}
+VirtualFunction(Name="MF_ToonMatcap")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonMatcap");
+	}
+
+	Inputs = {
+		float3 NormalTS;
+	}
+
+	Outputs = {
+		float4 MatcapData;
+	}
+}
+VirtualFunction(Name="MF_ToonSeeThroughOverlay")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSeeThroughOverlay");
+	}
+
+	Inputs = {
+		float3 BaseColor;
+	}
+
+	Outputs = {
+		float4 FaceOverlayData;
+		float4 FaceOverlayParams;
+		float4 FaceOverlayStencilIDs;
+	}
+}
+VirtualFunction(Name="MF_ToonHairHighlightMask")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonHairHighlightMask");
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float HairHighlightMask;
+	}
+}
+VirtualFunction(Name="MF_ToonDFFacialShadow")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonDFFacialShadow");
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float SdfLeft;
+		float SdfRight;
+	}
+}

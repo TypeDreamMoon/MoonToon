@@ -1,0 +1,86 @@
+// Hair highlight mask, lifted out of MF_MoonToonBaseInput.
+//
+// The mask is sampled through a UV whose V is pushed up and down by the main light's elevation, so
+// the highlight band travels across the hair as the light moves rather than staying painted on.
+//
+// NOTE, found while moving this: the nine parameters that drive that offset (AddOffset, DynMin,
+// DynMax, ElevMin, ElevMax, Curve, ClampMin, ClampMax, VSign) are grouped under
+// "02 - Distance Field Facial Shadow" in the instance panel, but the UV they produce is consumed
+// *here* -- the SDF facial shadow samples use a plain mirrored texture coordinate and never see it.
+// Their Group strings are kept exactly as they were, because moving a row in the panel is a change
+// somebody should ask for; the misfiling is now at least visible from the code that uses them.
+
+import "Shared/ToonFunctions.dsh";
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonHairHighlightMask", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Samples the hair highlight mask through a light-elevation driven UV offset.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+	}
+
+	Outputs = {
+		float HairHighlightMask;
+	}
+
+	Properties = {
+		ChannelMaskParameter Hair_Highlight_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Hair Highlight Mask Channel";
+			Group="03 - Hair Highlight Mask";
+			MaskChannel=Red
+		];
+		ScalarParameter AddOffset = 0.0 [Group="02 - Distance Field Facial Shadow"; SortPriority=60];
+		ScalarParameter DynMin = -0.01 [Group="02 - Distance Field Facial Shadow"; SortPriority=61];
+		ScalarParameter DynMax = 0.01 [Group="02 - Distance Field Facial Shadow"; SortPriority=62];
+		ScalarParameter ElevMin = -0.6 [Group="02 - Distance Field Facial Shadow"; SortPriority=63];
+		ScalarParameter ElevMax = 0.6 [Group="02 - Distance Field Facial Shadow"; SortPriority=64];
+		ScalarParameter Curve = 1.2 [Group="02 - Distance Field Facial Shadow"; SortPriority=65];
+		ScalarParameter ClampMin = -0.03 [Group="02 - Distance Field Facial Shadow"; SortPriority=66];
+		ScalarParameter ClampMax = 0.03 [Group="02 - Distance Field Facial Shadow"; SortPriority=67];
+		ScalarParameter VSign = 1.0 [Group="02 - Distance Field Facial Shadow"; SortPriority=68];
+	}
+
+	Graph = {
+		float2 MaterialExpressionTextureCoordinate_3 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
+		float3 MF_MoonMainLightDirection = MF_MoonMainLightDirection();
+		float2 Custom =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float2",
+				Code="float3 L = normalize(MainLightDirWS);\r\nfloat3 U = normalize(WorldUpWS);\r\n\r\n// 主光“上下”量（仰角）\r\nfloat elev = dot(L, U); // [-1,1]\r\n\r\n// 映射到自定义区间\r\nfloat a = min(ElevMin, ElevMax);\r\nfloat b = max(ElevMin, ElevMax);\r\nfloat t = saturate((elev - a) / max(1e-4, b - a));\r\nif (ElevMin > ElevMax) t = 1.0 - t;\r\n\r\n// 曲线\r\nt = pow(t, max(1e-3, Curve));\r\n\r\n// 动态偏移 + 手动偏移 + 总区间限制\r\nfloat dyn = lerp(DynMin, DynMax, t) * VSign;\r\nfloat offsetV = clamp(AddOffset + dyn, ClampMin, ClampMax);\r\n\r\nreturn UV + float2(0.0, offsetV);",
+				Description="Custom",
+				UV=MaterialExpressionTextureCoordinate_3,
+				MainLightDirWS=MF_MoonMainLightDirection,
+				WorldUpWS=float3(0.0, 0.0, 1.0),
+				AddOffset=AddOffset,
+				DynMin=DynMin,
+				DynMax=DynMax,
+				ElevMin=ElevMin,
+				ElevMax=ElevMax,
+				Curve=Curve,
+				ClampMin=ClampMin,
+				ClampMax=ClampMax,
+				VSign=VSign
+			);
+		#Region "Texture Sample"
+		float4 Hair_Highlight_Mask =
+			UE.Expression(
+				Class="TextureSampleParameter2D",
+				OutputType="float4",
+				OutputIndex=5,
+				ParameterName="Hair Highlight Mask",
+				Group="03 - Hair Highlight Mask",
+				SortPriority=5,
+				Coordinates=Custom,
+				Texture=Path(Engine, "EngineResources/Black"),
+				SamplerType="SAMPLERTYPE_Color"
+			);
+		#EndRegion
+
+		HairHighlightMask = Hair_Highlight_Mask_Channel(Input = Hair_Highlight_Mask.rgb);
+	}
+}
