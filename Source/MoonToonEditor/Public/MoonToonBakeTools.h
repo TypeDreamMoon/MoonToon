@@ -24,6 +24,7 @@ public:
 	virtual FText GetToolName() const override;
 	virtual FText GetToolDescription() const override;
 	virtual FText GetRunLabel() const override;
+	virtual FName GetToolIconName() const override { return TEXT("Icons.Normalize"); }
 	// Reimports when the build settings were wrong, and a reimport can change the material list.
 	virtual bool InvalidatesSectionList() const override { return true; }
 	virtual FString Run(const FMoonToonToolContext& Context) override;
@@ -53,6 +54,7 @@ public:
 	virtual FText GetToolName() const override;
 	virtual FText GetToolDescription() const override;
 	virtual FText GetRunLabel() const override;
+	virtual FName GetToolIconName() const override { return TEXT("Icons.ArrowRight"); }
 	// Reimports when the build settings were wrong, and a reimport can change the material list.
 	virtual bool InvalidatesSectionList() const override { return true; }
 	virtual FString Run(const FMoonToonToolContext& Context) override;
@@ -84,6 +86,7 @@ public:
 	virtual FText GetToolName() const override;
 	virtual FText GetToolDescription() const override;
 	virtual FText GetRunLabel() const override;
+	virtual FName GetToolIconName() const override { return TEXT("Icons.Settings"); }
 	// Reimports when the build settings were wrong, and a reimport can change the material list.
 	virtual bool InvalidatesSectionList() const override { return true; }
 	virtual FString Run(const FMoonToonToolContext& Context) override;

@@ -22,6 +22,7 @@ public:
 	virtual FText GetToolName() const override;
 	virtual FText GetToolDescription() const override;
 	virtual FText GetRunLabel() const override;
+	virtual FName GetToolIconName() const override { return TEXT("Icons.Details"); }
 	virtual bool IsDestructive() const override { return false; }
 	virtual FString Run(const FMoonToonToolContext& Context) override;
 
