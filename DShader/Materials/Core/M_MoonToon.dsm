@@ -40,21 +40,23 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 	}
 }
 
-VirtualFunction(Name="MF_MoonToonTranslucencyShadow")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonTranslucencyShadow");
-		Description = "Generated from /MoonToon/MaterialFunctions/MF_MoonToonTranslucencyShadow.MF_MoonToonTranslucencyShadow";
-	}
-
-	Inputs = {
-		MaterialAttributes In;
-	}
-
-	Outputs = {
-		MaterialAttributes Result;
-	}
-}
+// Retired along with the dithered-translucency call in Graph. Uncomment BOTH together if the old
+// look is ever needed again.
+// VirtualFunction(Name="MF_MoonToonTranslucencyShadow")
+// {
+// 	Options = {
+// 		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonTranslucencyShadow");
+// 		Description = "Generated from /MoonToon/MaterialFunctions/MF_MoonToonTranslucencyShadow.MF_MoonToonTranslucencyShadow";
+// 	}
+//
+// 	Inputs = {
+// 		MaterialAttributes In;
+// 	}
+//
+// 	Outputs = {
+// 		MaterialAttributes Result;
+// 	}
+// }
 
 Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 {
@@ -66,9 +68,21 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		ShadingModel = "Toon";
 		BlendMode    = "Opaque";
 
-		// Masked translucency is done with dither, which keeps the toon buffers sort-free.
-		DitherOpacityMask          = true;
+		// Real translucency (engine-side ToonTranslucent). A translucent MI of this base gets:
+		//   - per-pixel forward toon shading   (this setting -- ToonBxDF only runs per pixel here;
+		//     the default VolumetricNonDirectional never reaches it, and the engine logs a warning)
+		//   - single-layer coverage            (Moon_MeshPass_ToonTranslucentPrepass, automatic)
+		//   - inner lines composited after the fill, opacity-independent
+		//   - premultiplied specular so highlights outlive a thin body -- use BlendMode
+		//     AlphaComposite on the MI for that; plain Translucent fades highlights with the body
+		// Opacity is already routed from MF_MoonToonBaseInput ("Opacity" x "Opacity Map"), so a
+		// translucent MI needs no graph change -- only the blend-mode override.
+		TranslucencyLightingMode   = "SurfacePerPixelLighting";
 		bOutputTranslucentVelocity = true;
+
+		// Dithered masked translucency (the pre-ToonTranslucent approach) is retired -- see the
+		// commented-out MF_MoonToonTranslucencyShadow call in Graph below.
+		// DitherOpacityMask       = true;
 
 		bUsedWithSkeletalMesh = true;
 		bUsedWithMorphTargets = true;
@@ -102,8 +116,19 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 	Graph = {
 		MaterialAttributes Surface = MF_MoonToonBaseInput(OutputIndex=0);
 
-		// Dithered translucent shadow, so a masked material fakes translucency without sorting.
-		Attributes = MF_MoonToonTranslucencyShadow(Surface);
+		// Retired: dithered translucent shadow, which faked translucency on a MASKED material by
+		// turning the shadow into a dithered opacity mask. Superseded by real toon translucency
+		// (see Settings above). The dither could not do what that does -- it wrote full depth and
+		// velocity, so SSR/AO/DOF treated a "transparent" character as solid, it leaned on TSR
+		// history (noise and smear on fast motion or a cut), and it had no colour, only present or
+		// absent. MF_MoonToonTranslucencyShadow.dsf is kept, unreferenced, so an MI that still
+		// wants the old look can be rebuilt from it.
+		// Attributes = MF_MoonToonTranslucencyShadow(Surface);
+		//
+		// MF_MoonToonBaseInput already writes both channels: Attributes.Opacity for the translucent
+		// blend and Attributes.OpacityMask ("Shadow Opacity" x "Apply Opacity to Shadow") for the
+		// masked shadow, so passing Surface straight through keeps masked materials working.
+		Attributes = Surface;
 
 		ToonDataA = MF_MoonToonBaseInput(OutputIndex=1);
 		ToonDataB = MF_MoonToonBaseInput(OutputIndex=2);
