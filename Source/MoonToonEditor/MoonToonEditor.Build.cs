@@ -43,10 +43,17 @@ public class MoonToonEditor : ModuleRules
 				"RenderCore",
 				// The tools panel: IDetailsView renders each tool's UPROPERTYs, so no tool writes Slate.
 				"PropertyEditor",
+				// UMaterialEditingLibrary: the supported way to write a material instance and publish
+				// the change (dirty, rebuild, static permutation, viewport redraw).
+				"MaterialEditor",
 				// Nomad tab registration under the Window > Tools category.
 				"WorkspaceMenuStructure",
-				// Following the Content Browser selection.
+				// Following the Content Browser selection, and syncing it to a section's material.
 				"ContentBrowser",
+				// FPlatformApplicationMisc::ClipboardCopy, behind the panel's copy buttons.
+				"ApplicationCore",
+				// OpenColorPicker, for the vector parameters in the material editor pane.
+				"AppFramework",
 				// Mesh import-data read/write, MikkTSpace tangents, curvature. Lives in the engine
 				// plugin MoonToonScripts, which is EnabledByDefault.
 				"MoonToonEditorScripts",
