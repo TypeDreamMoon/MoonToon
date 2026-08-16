@@ -6,6 +6,15 @@
 // away and the material never enters the pass at all.
 //
 // Nine parameters and three packed float4s that nothing else in the base input touches.
+//
+// The mask exists because enrollment is per MATERIAL and eyes are not always their own section. A
+// VRM whose face, brows and eyes share one material has no way to say "this half re-draws through
+// hair and that half does not" -- the switch is all or nothing, and all of it is wrong. Masking the
+// OPACITY gets there instead: the material is enrolled in the pass, and the pixels the mask zeroes
+// write nothing when it runs. Per-pixel enrollment is not on the table; per-pixel opacity is the
+// same thing where it lands.
+
+import "Shared/ToonFunctions.dsh";
 
 ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="Plugin.MoonToon")
 {
@@ -19,6 +28,11 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		float3 BaseColor [
 			Description="The material's final albedo, taken BEFORE any debug switch so debug views never leak into the overlay.";
 		];
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0) [
+			Description="The three packed mask maps the base input sampled, already resolved. Which one this feature reads is Through Hair Mask Source.";
+		];
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 	}
 
 	Outputs = {
@@ -82,15 +96,39 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			SortPriority=41;
 			Description="Second accepted occluder CustomDepth stencil value. -1 = unused.";
 		];
+		ScalarParameter Through_Hair_Mask_Source = 0.0 [
+			ParameterName="Through Hair Mask Source";
+			Group="24 - See Through Overlay";
+			SortPriority=6;
+			Description="哪些像素参与眉透/瞳透, 读哪张打包遮罩图: 0 = 不遮罩(整个材质都参与), 1/2/3 = Global Mask Map 1/2/3, 通道由下面的选择器决定.\r\n为的是眼睛/眉毛和别的东西共用一个材质的情况(单 Section 的脸): 入列是按材质判定的, 开关一刀切, 这个遮罩才能在材质内部把范围划出来.\r\n注意它不是省下一次采样 —— 打包图本来就只采样一次, 这里只是从已有结果里挑一个通道. 相比自带一张贴图, 省下的是一次取样和一个贴图参数.\r\n\r\n\r\nWhich pixels take part in the through-hair re-draw, and which packed mask map to read: 0 is no mask (the whole material takes part), 1/2/3 are Global Mask Map 1/2/3, with the channel picked below.\r\nFor the case where eyes or brows share one material with everything else (a single-section face): enrollment is decided per material and the switch is all-or-nothing, so this is what draws the line inside it.\r\nNote this does not save a sample -- the packed map is sampled once anyway. What it saves against carrying its own texture is a fetch and a texture parameter.";
+		];
+		ChannelMaskParameter Through_Hair_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Through Hair Mask Channel";
+			Group="24 - See Through Overlay";
+			SortPriority=7;
+			MaskChannel=Red
+		];
 	}
 
 	Graph = {
+		#Region "See Through Overlay"
+		// No texture of its own: the packed maps were sampled once by the base input, and Source 0
+		// resolves to white so a material that never configured this multiplies by 1.
+		// Initialised rather than declared bare: a Graph local passed as an out argument is a shape
+		// this file has not proven, and white is the value that means "no mask" if it ever slipped.
+		float4 Through_Hair_Mask_Packed = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(GlobalMaskA, GlobalMaskB, GlobalMaskC, Through_Hair_Mask_Source, Through_Hair_Mask_Packed);
+		float Through_Hair_Mask_Value = Through_Hair_Mask_Channel(Input = Through_Hair_Mask_Packed);
+		#EndRegion
+
 		float3 Multiply_Overlay = (BaseColor * Through_Hair_Tint.rgb);
+		// The mask multiplies the OPACITY, which is also what carries enrollment: a masked-out pixel
+		// leaves the alpha at zero and the re-draw writes nothing there.
 		FaceOverlayData =
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=float4(Multiply_Overlay, Through_Hair_Opacity),
+				True=float4(Multiply_Overlay, (Through_Hair_Opacity * Through_Hair_Mask_Value)),
 				False=float4(0.0, 0.0, 0.0, 0.0),
 				Group="24 - See Through Overlay",
 				SortPriority=5,

@@ -58,6 +58,18 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Group="01 - Global Mask Map";
 			Description="用于存放各种线性数据的贴图, 每个通道存放什么数据可以根据你的项目需求定制.\r\n颜色空间: 线性.\r\n\r\n\r\nTexture used to store various linear data. What data is stored in each channel can be customized according to your project needs.\r\nColor space: linear.";
 		];
+		TextureObjectParameter Global_Mask_Map_2 = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Global Mask Map 2";
+			Group="01 - Global Mask Map";
+			SortPriority=10;
+			Description="第二张打包遮罩图, 结构和第一张完全一样: 一次采样, 四个通道各存一份遮罩.\r\n它存在的理由是四个通道不够分 —— 与其让每个新特征各自带一张只用一个通道的贴图, 不如多开一张共享的.\r\n关着的时候一次采样都不发生; 打开之后无论多少个特征读它, 整个材质只多一次取样.\r\nUV 沿用第一张的通道与缩放偏移(同一个模型的打包图没有理由用不同的 UV).\r\n\r\n\r\nA second packed mask map, identical in shape to the first: one sample, four channels, one mask each.\r\nIt exists because four channels run out -- rather than every new feature carrying its own texture to read one channel from, open another shared one.\r\nWith the switch off nothing is sampled; with it on the whole material pays one extra fetch no matter how many features read it.\r\nIt reuses the first map's UV channel and scale/offset: packed masks for the same model have no reason to sit on a different UV.";
+		];
+		TextureObjectParameter Global_Mask_Map_3 = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Global Mask Map 3";
+			Group="01 - Global Mask Map";
+			SortPriority=12;
+			Description="第三张打包遮罩图. 与第二张同理, 再多四个通道.\r\n\r\n\r\nA third packed mask map. Same as the second, for four more channels.";
+		];
 		TextureObjectParameter Base_Color_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
 			ParameterName="Base Color Map";
 			Group="10 - Diffuse";
@@ -459,6 +471,35 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#EndRegion
 
 		float4 Sampled_Global_Mask_Map = StaticSwitchParameter_2;
+		#Region "Global Mask Map"
+		// Maps 2 and 3 exist so a feature that needs one channel does not have to carry a whole
+		// texture parameter to get it. Each is sampled at most once for the entire material, behind
+		// its own switch, and every consumer picks a channel out of the result -- the same shape as
+		// map 1, which is what made map 1 cheap in the first place.
+		float4 Sampled_Global_Mask_Map_2 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=MF_ToonSampleLinear(Global_Mask_Map_2, Global_Mask_Map_UV).rgba,
+				False=float4(1.0, 1.0, 1.0, 1.0),
+				Group="01 - Global Mask Map",
+				SortPriority=11,
+				ParameterName="Enable Global Mask Map 2",
+				DefaultValue=false
+			);
+		float4 Sampled_Global_Mask_Map_3 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=MF_ToonSampleLinear(Global_Mask_Map_3, Global_Mask_Map_UV).rgba,
+				False=float4(1.0, 1.0, 1.0, 1.0),
+				Group="01 - Global Mask Map",
+				SortPriority=13,
+				ParameterName="Enable Global Mask Map 3",
+				DefaultValue=false
+			);
+		#EndRegion
+
 		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Sampled_Global_Mask_Map);
 		// Mask sample plus the light-elevation UV offset that scrolls it are in
 		// MF_ToonHairHighlightMask. See the note there about the nine offset parameters being filed
@@ -1409,9 +1450,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#Region "See Through Overlay"
 		// Base_Color_1 is the material's final albedo (base colour param x map x inner-outline),
 		// deliberately taken BEFORE the debug switches so debug views never leak into the overlay.
-		float4 Face_Overlay_Data = MF_ToonSeeThroughOverlay(Base_Color_1, OutputIndex=0);
-		float4 Face_Overlay_Params = MF_ToonSeeThroughOverlay(Base_Color_1, OutputIndex=1);
-		float4 Face_Overlay_Stencil_IDs = MF_ToonSeeThroughOverlay(Base_Color_1, OutputIndex=2);
+		float4 Face_Overlay_Data = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=0);
+		float4 Face_Overlay_Params = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=1);
+		float4 Face_Overlay_Stencil_IDs = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=2);
 		#EndRegion
 
 		Output = Attributes;
