@@ -209,6 +209,9 @@ VirtualFunction(Name="MF_ToonSeeThroughOverlay")
 
 	Inputs = {
 		float3 BaseColor;
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 	}
 
 	Outputs = {
@@ -258,4 +261,20 @@ VirtualFunction(Name="MF_ToonEyeHighlight")
 		float2 UVOut;
 		float4 DebugColor;
 	}
+}
+
+// Picks which packed mask map a consumer reads, from the ones the base input already sampled.
+//
+// The point of the indirection: a mask map is sampled ONCE for the whole material and every
+// consumer selects a channel out of the result. Giving each consumer its own texture parameter
+// instead would cost a fetch per consumer even when they all point at the same asset, because the
+// translator dedupes on generated code and two texture parameters generate two different uniform
+// slots (FHLSLMaterialTranslator::AddCodeChunkInner hashes the code, not the value).
+//
+// Index 0 is "no mask" and returns white, so a consumer that was never configured multiplies by 1
+// rather than by whatever happens to be in some other feature's channel.
+GraphFunction SelectGlobalMaskMap(in float4 MapA, in float4 MapB, in float4 MapC, in float MapIndex, out float4 Result)
+{
+	float4 Unmasked = float4(1.0, 1.0, 1.0, 1.0);
+	Result = lerp(lerp(lerp(Unmasked, MapA, saturate(MapIndex)), MapB, saturate(MapIndex - 1.0)), MapC, saturate(MapIndex - 2.0));
 }
