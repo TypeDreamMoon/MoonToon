@@ -227,6 +227,9 @@ VirtualFunction(Name="MF_ToonHairHighlightMask")
 	}
 
 	Inputs = {
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 	}
 
 	Outputs = {
