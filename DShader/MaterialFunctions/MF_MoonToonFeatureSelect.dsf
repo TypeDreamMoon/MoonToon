@@ -96,7 +96,9 @@ VirtualFunction(Name="MF_ToonFeature_HairHighlightMask")
 	}
 
 	Inputs = {
-		opt float InHighlightMask = 0.0;
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 	}
 
 	Outputs = {
@@ -211,10 +213,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 	}
 
 	Inputs = {
-		opt float InToonKajiyaSecondaryStrandShift = 0.0 [Description="Per-pixel value from a map; added to the matching parameter."];
-		opt float InToonKajiyaPrimaryStrandShift = 0.0 [Description="Per-pixel value from a map; added to the matching parameter."];
-		opt float InHairHighlightMask = 0.0 [Description="Per-pixel value from a map; added to the matching parameter."];
-		opt float3 InStockingsBodyColor = float3(0.0, 0.0, 0.0) [Description="Per-pixel value from a map; added to the matching parameter."];
+		opt float InToonKajiyaSecondaryStrandShift = 0.0 [Description="Per-pixel SecondaryShift from a map, added to the parameter."];
+		opt float InToonKajiyaPrimaryStrandShift = 0.0 [Description="Per-pixel PrimaryShift from a map, added to the parameter."];
+		opt float4 InGlobalMaskA = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 1, exactly as the base input sampled it. Read only if Hair Highlight Mask From Global Map is on."];
+		opt float4 InGlobalMaskB = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 2."];
+		opt float4 InGlobalMaskC = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 3."];
+		opt float3 InStockingsBodyColor = float3(0.0, 0.0, 0.0) [Description="Per-pixel BaseColor from a map, added to the parameter."];
 	}
 
 	Outputs = {
@@ -253,7 +257,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 					False = Is_DFFacialShadow(
 						True = MF_ToonFeature_DFFacialShadow(OutputIndex=0),
 						False = Is_HairHighlightMask(
-							True = MF_ToonFeature_HairHighlightMask(InHairHighlightMask, OutputIndex=0),
+							True = MF_ToonFeature_HairHighlightMask(InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, OutputIndex=0),
 							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=0),
 								False = Is_Stockings(
@@ -277,7 +281,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 					False = Is_DFFacialShadow(
 						True = MF_ToonFeature_DFFacialShadow(OutputIndex=1),
 						False = Is_HairHighlightMask(
-							True = MF_ToonFeature_HairHighlightMask(InHairHighlightMask, OutputIndex=1),
+							True = MF_ToonFeature_HairHighlightMask(InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, OutputIndex=1),
 							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=1),
 								False = Is_Stockings(
@@ -301,7 +305,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 					False = Is_DFFacialShadow(
 						True = MF_ToonFeature_DFFacialShadow(OutputIndex=2),
 						False = Is_HairHighlightMask(
-							True = MF_ToonFeature_HairHighlightMask(InHairHighlightMask, OutputIndex=2),
+							True = MF_ToonFeature_HairHighlightMask(InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, OutputIndex=2),
 							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=2),
 								False = Is_Stockings(

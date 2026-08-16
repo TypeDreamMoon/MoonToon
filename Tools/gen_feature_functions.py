@@ -191,9 +191,6 @@ PARAMS = {
 # declared and then never passed -- dead since it was written). Everything is input + parameter now,
 # which reproduces the old result whenever the parameter is at its 0 default.
 MAP_INPUTS = {
-    "HairHighlightMask": {
-        "Mask": ("InHighlightMask", "InHairHighlightMask"),
-    },
     "ToonKajiyaHair": {
         "PrimaryShift":   ("InPrimaryStrandShift", "InToonKajiyaPrimaryStrandShift"),
         "SecondaryShift": ("InSecondaryStrandShift", "InToonKajiyaSecondaryStrandShift"),
@@ -202,6 +199,41 @@ MAP_INPUTS = {
         "BaseColor": ("InBodyColor", "InStockingsBodyColor"),
     },
 }
+
+# Slots a feature computes for ITSELF by calling a shared function, instead of receiving the
+# finished value as a pin from the base input.
+#
+# The difference is where everything that produces the value lives. As a pin, the sampling happens
+# in MF_MoonToonBaseInput: its texture, its channel and its map selection are declared there, which
+# means they are on every material's panel and fetched by every material, whichever feature is
+# selected. Called from inside the feature, all of it sits behind the feature's own static switch --
+# GetVisibleMaterialParametersFromExpression does not descend the branch that was not taken, so the
+# rows disappear from the panel, and the translator culls the same branch, so the fetch disappears
+# with them. Which is the whole reason feature selection was made static.
+#
+# feature key -> {slot Name: (call expression, [inputs the call needs], header to import)}, where an
+# input is (type, function input name, selector input name, default literal, description).
+HELPERS = {
+    "HairHighlightMask": {
+        "Mask": (
+            "MF_ToonHairHighlightMask(GlobalMaskA, GlobalMaskB, GlobalMaskC)",
+            [("float4", "GlobalMaskA", "InGlobalMaskA", "float4(1.0, 1.0, 1.0, 1.0)",
+              "Packed mask map 1, exactly as the base input sampled it. Read only if Hair Highlight Mask From Global Map is on."),
+             ("float4", "GlobalMaskB", "InGlobalMaskB", "float4(1.0, 1.0, 1.0, 1.0)",
+              "Packed mask map 2."),
+             ("float4", "GlobalMaskC", "InGlobalMaskC", "float4(1.0, 1.0, 1.0, 1.0)",
+              "Packed mask map 3.")],
+            "Shared/ToonFunctions.dsh",
+        ),
+    },
+}
+
+
+def _zero(type_name):
+    return {"float": "0.0",
+            "float3": "float3(0.0, 0.0, 0.0)",
+            "float4": "float4(0.0, 0.0, 0.0, 0.0)"}[type_name]
+
 
 # Artist-facing description per slot. Keyed by slot Name, shared across features that reuse a slot
 # table (Kajiya / Toon Kajiya, Skin / SDF Face), then overridden per feature where the meaning
@@ -372,8 +404,9 @@ def emit(feature_key, tables):
     body = "\n".join("\tTBuffer.%s = %s;" % (slot, name) for (_, slot, name) in rows)
 
     maps = MAP_INPUTS.get(feature_key, {})
+    helpers = HELPERS.get(feature_key, {})
 
-    prop_lines, call_lines, input_lines = [], [], []
+    prop_lines, call_lines = [], []
     for i, (t, _, name) in enumerate(rows):
         pname, default = params[name]
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
@@ -385,15 +418,17 @@ def emit(feature_key, tables):
                           % (kind, pname, default, group, i, desc))
         expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")
         if name in maps:
-            fn_in = maps[name][0]
-            input_lines.append(
-                '\t\topt %s %s = %s [Description="Per-pixel %s from a map, added to the parameter."];'
-                % ("float3" if t == "float3" else "float", fn_in,
-                   "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0", name))
-            expr = "%s + %s" % (fn_in, expr)
+            expr = "%s + %s" % (maps[name][0], expr)
+        if name in helpers:
+            expr = "%s + %s" % (helpers[name][0], expr)
         call_lines.append("\t\t\t%s," % expr)
 
-    return """%s
+    input_lines = ['\t\topt %s %s = %s [Description="%s"];' % (t, fn_in, default, desc)
+                   for (t, fn_in, _, default, desc) in _feature_inputs(feature_key, tables)]
+
+    imports = "".join('\nimport "%s";\n' % spec[2] for spec in helpers.values())
+
+    return """%s%s
 Function %s(
 %s,
 \tout float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
@@ -435,7 +470,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_%s", Root="Plugin
 \t\t\tToonBufferA, ToonBufferB, ToonBufferC);
 \t}
 }
-""" % (HEADER, fn, args, id_macro, body, dsf_name, dsf_name,
+""" % (HEADER, imports, fn, args, id_macro, body, dsf_name, dsf_name,
        "\n".join(input_lines), "\n".join(prop_lines), fn, "\n".join(call_lines))
 
 
@@ -448,13 +483,19 @@ FALLBACK = "Default"
 
 
 def _feature_inputs(key, tables):
-    """[(type, function input name, selector input name)] in slot-table order."""
+    """[(type, function input, selector input, default literal, description)], slot-table order."""
     maps = MAP_INPUTS.get(key, {})
-    if not maps:
-        return []
-    order = [n for (_, _, n) in tables[FEATURES[key][2]] if n in maps]
-    return [("float3" if dict((n, t) for (t, _, n) in tables[FEATURES[key][2]])[n] == "float3"
-             else "float", maps[n][0], maps[n][1]) for n in order]
+    helpers = HELPERS.get(key, {})
+    ins = []
+    for (t, _, name) in tables[FEATURES[key][2]]:
+        if name in maps:
+            fn_in, sel_in = maps[name]
+            t = "float3" if t == "float3" else "float"
+            ins.append((t, fn_in, sel_in, _zero(t),
+                        "Per-pixel %s from a map, added to the parameter." % name))
+        if name in helpers:
+            ins.extend(helpers[name][1])
+    return ins
 
 
 def parse_feature_ids(path):
@@ -469,9 +510,8 @@ def emit_selector(tables, ids):
 
     def decl(k):
         ins = _feature_inputs(k, tables)
-        in_block = "\n".join('\t\topt %s %s = %s;'
-                             % (t, fn_in, "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0")
-                             for (t, fn_in, _) in ins)
+        in_block = "\n".join('\t\topt %s %s = %s;' % (t, fn_in, default)
+                             for (t, fn_in, _, default, _d) in ins)
         return ('VirtualFunction(Name="MF_ToonFeature_%s")\n'
                 "{\n"
                 "\tOptions = {\n"
@@ -486,13 +526,12 @@ def emit_selector(tables, ids):
     # Selector-level inputs: the union of every feature's map-driven slots, deduplicated.
     sel_inputs, seen = [], set()
     for k in FEATURES:
-        for (t, _, sel_in) in _feature_inputs(k, tables):
+        for (t, _, sel_in, default, desc) in _feature_inputs(k, tables):
             if sel_in not in seen:
                 seen.add(sel_in)
-                sel_inputs.append((t, sel_in))
-    sel_in_block = "\n".join(
-        '\t\topt %s %s = %s [Description="Per-pixel value from a map; added to the matching parameter."];'
-        % (t, n, "float3(0.0, 0.0, 0.0)" if t == "float3" else "0.0") for (t, n) in sel_inputs)
+                sel_inputs.append((t, sel_in, default, desc))
+    sel_in_block = "\n".join('\t\topt %s %s = %s [Description="%s"];' % (t, n, default, desc)
+                             for (t, n, default, desc) in sel_inputs)
 
     # Two spellings of one switch, as close as the languages allow. The DSL identifier has to be an
     # identifier, so it uses an underscore; the panel label is what an artist reads, so it uses a
@@ -512,7 +551,7 @@ def emit_selector(tables, ids):
         for i, k in enumerate(picks))
 
     def call(k, out_index):
-        args = "".join("%s, " % sel_in for (_, _, sel_in) in _feature_inputs(k, tables))
+        args = "".join("%s, " % sel_in for (_, _, sel_in, _d, _c) in _feature_inputs(k, tables))
         return "MF_ToonFeature_%s(%sOutputIndex=%d)" % (FEATURES[k][0], args, out_index)
 
     def chain(out_index, depth=0):

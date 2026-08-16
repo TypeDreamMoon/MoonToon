@@ -501,12 +501,13 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#EndRegion
 
 		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Sampled_Global_Mask_Map);
-		// Mask sample plus the light-elevation UV offset that scrolls it are in
-		// MF_ToonHairHighlightMask. See the note there about the nine offset parameters being filed
-		// under the SDF facial shadow group in the panel while being consumed here.
-		float Hair_Highlight_Mask_Texture = MF_ToonHairHighlightMask(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3);
-		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=3);
-		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=4);
+		// The hair highlight mask is NOT sampled here any more. MF_ToonFeature_HairHighlightMask
+		// calls MF_ToonHairHighlightMask itself, which puts the mask texture, its channel, its map
+		// selection and the nine light-elevation offsets behind the feature's own static switch --
+		// gone from the panel and out of the shader on every material that selected something else.
+		// All this passes is the three packed maps, which were sampled anyway.
+		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=3);
+		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=4);
 		#Region "Texture Sample"
 		float2 MF_UVChannelSwitch_1 = MF_UVChannelSwitch(Inner_Outline_Map_UV_Channel);
 		float4 Inner_Outline_Map =
@@ -1437,12 +1438,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		Attributes.MoonEncodedAttribute4 = MoonEncodeToonAttributes_4.rgba;
 		Attributes.CustomData1 = 1.0;
-		float4 MF_MoonToonBufferInput_1 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=0);
+		float4 MF_MoonToonBufferInput_1 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=0);
 		float4 ToonBufferA_1 = MF_MoonToonBufferInput_1;
-		float4 MF_MoonToonBufferInput_2 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=1);
+		float4 MF_MoonToonBufferInput_2 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=1);
 		float4 ToonBufferB_1 = MF_MoonToonBufferInput_2;
 		#Region "Toon Buffer"
-		float4 MF_MoonToonBufferInput_3 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=2);
+		float4 MF_MoonToonBufferInput_3 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=2);
 		#EndRegion
 
 		float4 ToonBufferC_1 = MF_MoonToonBufferInput_3;
