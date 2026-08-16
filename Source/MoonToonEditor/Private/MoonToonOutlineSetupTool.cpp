@@ -463,10 +463,14 @@ UMaterialInterface* UMoonToonOutlineSetupTool::GenerateSlotOutlineMaterial(
 		}
 	}
 
-	// The clip value is a base property, not a parameter, so it has to be carried across by hand
-	// -- and it matters: a hull cut at a different threshold than the surface leaves a fringe.
+	// The clip value is a base property, not a parameter, so it has to be carried across by hand --
+	// and deliberately NOT carried across unchanged. Cutting the hull at the surface's own threshold
+	// makes the two silhouettes coincide, which leaves nowhere for an outline to be; dilating the
+	// hull's cutout into the alpha falloff just outside the surface is what puts it back. See
+	// HullMaskDilation.
 	Instance->BasePropertyOverrides.bOverride_OpacityMaskClipValue = true;
-	Instance->BasePropertyOverrides.OpacityMaskClipValue = Source->GetOpacityMaskClipValue();
+	Instance->BasePropertyOverrides.OpacityMaskClipValue =
+		Source->GetOpacityMaskClipValue() * HullMaskDilation;
 
 	UMaterialEditingLibrary::UpdateMaterialInstance(Instance);
 	Instance->MarkPackageDirty();
