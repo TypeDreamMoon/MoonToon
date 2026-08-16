@@ -504,7 +504,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// Mask sample plus the light-elevation UV offset that scrolls it are in
 		// MF_ToonHairHighlightMask. See the note there about the nine offset parameters being filed
 		// under the SDF facial shadow group in the panel while being consumed here.
-		float Hair_Highlight_Mask_Texture = MF_ToonHairHighlightMask();
+		float Hair_Highlight_Mask_Texture = MF_ToonHairHighlightMask(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3);
 		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=3);
 		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Hair_Highlight_Mask_Texture, BodyBaseColor.rgb, OutputIndex=4);
 		#Region "Texture Sample"

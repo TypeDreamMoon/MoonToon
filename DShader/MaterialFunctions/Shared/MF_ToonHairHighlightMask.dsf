@@ -21,6 +21,11 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonHairHighlightMask", Root="P
 	}
 
 	Inputs = {
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0) [
+			Description="The three packed mask maps the base input sampled, already resolved. Which one this feature reads is Hair Highlight Mask Source, and only while Hair Highlight Mask From Global Map is on.";
+		];
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 	}
 
 	Outputs = {
@@ -32,6 +37,12 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonHairHighlightMask", Root="P
 			ParameterName="Hair Highlight Mask Channel";
 			Group="03 - Hair Highlight Mask";
 			MaskChannel=Red
+		];
+		ScalarParameter Hair_Highlight_Mask_Source = 1.0 [
+			ParameterName="Hair Highlight Mask Source";
+			Group="03 - Hair Highlight Mask";
+			SortPriority=2;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由 Hair Highlight Mask Channel 决定. 0 = 全白(等于没有高光带).\r\n只在`Hair Highlight Mask From Global Map`打开时参与; 关着的时候读的是本函数自带的 Hair Highlight Mask 贴图.\r\n\r\n注意一个取舍: 共享的是基础输入那一次采样, 而那次采样用的是 Global Mask Map UV, 不带这里的光照仰角 V 偏移. 也就是说走共享图的时候高光带不再跟着光上下移动, 上面那九个仰角参数对它失效 —— 换来的是不用再为它单独带一张贴图和一次取样.\r\n要保留移动就把开关关掉, 用自带贴图.\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by Hair Highlight Mask Channel. 0 is white, i.e. no highlight band at all.\r\nOnly used while `Hair Highlight Mask From Global Map` is on; with it off this function samples its own Hair Highlight Mask texture as before.\r\n\r\nMind the trade: what is shared is the base input's single sample, and that sample is taken through Global Mask Map UV, without the light-elevation V offset applied here. On the shared path the highlight band therefore stops travelling with the light and the nine elevation parameters do nothing for it -- in exchange for not carrying a texture and a fetch of its own.\r\nTurn the switch off to keep the travel.";
 		];
 		ScalarParameter AddOffset = 0.0 [Group="02 - Distance Field Facial Shadow"; SortPriority=60];
 		ScalarParameter DynMin = -0.01 [Group="02 - Distance Field Facial Shadow"; SortPriority=61];
@@ -81,6 +92,36 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonHairHighlightMask", Root="P
 			);
 		#EndRegion
 
-		HairHighlightMask = Hair_Highlight_Mask_Channel(Input = Hair_Highlight_Mask.rgb);
+		#Region "Hair Highlight Mask"
+		// Either its own texture, or a channel of a packed map the base input already sampled.
+		//
+		// The choice is a STATIC switch and not a source scalar like the see-through overlay's,
+		// because here the alternative is a texture fetch: a scalar select would leave that fetch in
+		// the shader on both paths, and not paying for it is the entire reason to read a shared map.
+		// With the switch on, the sample above is culled at translation; with it off, everything
+		// below it is.
+		//
+		// What the shared path gives up is the light-elevation UV: the base input samples the packed
+		// maps through Global Mask Map UV, so the band no longer travels with the light. That is
+		// documented on Hair Highlight Mask Source, and it is why this is a choice rather than a
+		// replacement.
+		float4 Global_Mask_Selected = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(GlobalMaskA, GlobalMaskB, GlobalMaskC, Hair_Highlight_Mask_Source, Global_Mask_Selected);
+		float4 Hair_Highlight_Mask_Packed =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=Global_Mask_Selected,
+				False=Hair_Highlight_Mask,
+				Group="03 - Hair Highlight Mask",
+				SortPriority=1,
+				ParameterName="Hair Highlight Mask From Global Map",
+				DefaultValue=false
+			);
+		#EndRegion
+
+		// Fed the full float4 rather than .rgb, so a mask packed into the alpha channel is reachable
+		// on both paths. Identical for the R/G/B selections every existing instance uses.
+		HairHighlightMask = Hair_Highlight_Mask_Channel(Input = Hair_Highlight_Mask_Packed);
 	}
 }
