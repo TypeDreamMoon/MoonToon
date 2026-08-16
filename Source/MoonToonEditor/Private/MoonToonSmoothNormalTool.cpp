@@ -334,7 +334,8 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalForLOD(UObject* Mesh, int32 LO
 		// honest fallback for "no smoothing information here" is the wedge's own normal, which in
 		// tangent space is exactly (0,0,1). Counted so the run can report how much of the mesh
 		// ended up on that path rather than leaving it to a later visual surprise.
-		int32 NumFallbackWedges = 0;
+		int32 NumLookupFailedWedges = 0;
+		int32 NumCurvatureFlooredWedges = 0;
 		const FVector TangentSpaceUp(0.0, 0.0, 1.0);
 		// Below this the encoded vector is too short to survive UV quantisation and normalize back
 		// to a direction, so it is treated as no information rather than as a very flat normal.
@@ -405,11 +406,15 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalForLOD(UObject* Mesh, int32 LO
 			{
 				Curvature = Curvatures.IsValidIndex(WedgeIndex) ? Curvatures[WedgeIndex] : 1.0f;
 			}
-			if (!bHasSmoothedNormal || Curvature < MinEncodedCurvature)
+			if (!bHasSmoothedNormal)
 			{
-				Curvature = FMath::Max(Curvature, MinEncodedCurvature);
-				++NumFallbackWedges;
+				++NumLookupFailedWedges;
 			}
+			else if (Curvature < MinEncodedCurvature)
+			{
+				++NumCurvatureFlooredWedges;
+			}
+			Curvature = FMath::Max(Curvature, MinEncodedCurvature);
 
 			const FVector Encoded = TangentSpaceNormal * Curvature * 0.5 + FVector(0.5);
 
@@ -418,13 +423,25 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalForLOD(UObject* Mesh, int32 LO
 			UV3s[WedgeIndex] = FVector2f(static_cast<float>(Encoded.Y), static_cast<float>(Encoded.Z));
 		}
 
-		if (NumFallbackWedges > 0)
+		// Two different outcomes, reported apart. Lumping them together was actively misleading:
+		// SK_ww_yy read as "24.3% baked as the vertex normal", when only 1.3% actually lost its
+		// direction and the rest kept a real smoothed normal that was merely too short to store.
+		if (NumLookupFailedWedges > 0)
 		{
 			UE_LOG(LogMoonToonSmoothNormal, Warning,
-				TEXT("[MoonToon] %s LOD%d: %d of %d wedges (%.1f%%) had no usable smoothed normal (flat, "
-					 "or the welded-mesh lookup missed) and were baked as the vertex normal instead."),
-				*Mesh->GetName(), LODIndex, NumFallbackWedges, NumWedges,
-				NumWedges > 0 ? 100.0f * NumFallbackWedges / NumWedges : 0.0f);
+				TEXT("[MoonToon] %s LOD%d: %d of %d wedges (%.1f%%) had no smoothed normal at all "
+					 "(the welded-mesh lookup missed) and fell back to the vertex normal."),
+				*Mesh->GetName(), LODIndex, NumLookupFailedWedges, NumWedges,
+				NumWedges > 0 ? 100.0f * NumLookupFailedWedges / NumWedges : 0.0f);
+		}
+		if (NumCurvatureFlooredWedges > 0)
+		{
+			UE_LOG(LogMoonToonSmoothNormal, Display,
+				TEXT("[MoonToon] %s LOD%d: %d of %d wedges (%.1f%%) were flat enough that the encoded "
+					 "length hit the floor. The direction is still the smoothed normal; only its stored "
+					 "magnitude was raised so the material does not discard it."),
+				*Mesh->GetName(), LODIndex, NumCurvatureFlooredWedges, NumWedges,
+				NumWedges > 0 ? 100.0f * NumCurvatureFlooredWedges / NumWedges : 0.0f);
 		}
 
 		UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LODIndex, Positions, VertexIndices, Normals,
