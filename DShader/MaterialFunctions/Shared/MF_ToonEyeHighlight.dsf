@@ -1,0 +1,190 @@
+// Anchors the painted eye highlight layer to the light, instead of leaving it nailed to the UV.
+//
+// An anime eye is several sheets of geometry -- iris, sclera, shadow, and a highlight sheet in
+// front carrying hand-painted catchlight art. The highlight sheet is the one with no relationship
+// to anything: turn the key light to the character's left and the catchlight stays exactly where it
+// was painted, which is the difference between an eye that is lit and a sticker that is drawn.
+//
+// This drives its UV from the main light direction in the eye's own tangent frame, so the catchlight
+// travels toward the source. Everything is measured in the same iris space MF_ToonEyeParallax uses,
+// through the same Center/Radius/Columns parameters, because the two sheets have to agree about
+// where the iris is or they come apart the moment either one moves.
+
+import "Shared/ToonFunctions.dsh";
+
+Function ToonEyeHighlight(
+	in float2 UV,
+	in float3 TangentLightDir,
+	in float3 TangentViewDir,
+	in float4 IrisCenterRadius,
+	in float Travel,
+	in float LightViewBlend,
+	in float ModeSelect,
+	in float RotateAmount,
+	in float AtlasColumns,
+	in float DebugView,
+	out float2 OutUV,
+	out float4 Debug)
+{
+	float Columns = max(AtlasColumns, 1.0);
+	float2 LocalUV = float2(frac(UV.x * Columns), UV.y);
+	float2 IrisRadius = max(abs(IrisCenterRadius.zw), 1e-4);
+	float2 P = (LocalUV - 0.5 - IrisCenterRadius.xy) / IrisRadius;
+
+	// Where the highlight wants to sit. Both vectors point away from the surface -- the light one is
+	// View.AtmosphereLightDirection, which is the direction TO the light -- so their xy in tangent
+	// space already reads as "which way the source is, seen from this eye".
+	float3 LightDir = normalize(TangentLightDir);
+	float3 ViewDir = normalize(TangentViewDir);
+	float2 Drive = lerp(LightDir.xy, ViewDir.xy, saturate(LightViewBlend));
+
+	float2 SamplePoint = P;
+	float WasClamped = 0.0;
+
+	if (ModeSelect < 0.5)
+	{
+		// Translate: the catchlight slides toward the source and stops at the iris rim rather than
+		// wandering onto the sclera.
+		SamplePoint = P - Drive * Travel;
+		float Reach = length(SamplePoint);
+		WasClamped = step(1.0, Reach);
+		SamplePoint = SamplePoint / max(Reach, 1.0);
+	}
+	else
+	{
+		// Rotate: the catchlight orbits the iris centre instead of sliding across it. A star or a
+		// crescent translated reads as the art coming unstuck; rotated, it reads as the eye turning
+		// to the light. RotateAmount 1 follows the source's azimuth exactly.
+		float Angle = atan2(Drive.y, Drive.x) * RotateAmount;
+		float SinA = sin(Angle);
+		float CosA = cos(Angle);
+		SamplePoint = float2(P.x * CosA + P.y * SinA, P.y * CosA - P.x * SinA);
+	}
+
+	// Back to UV space, undoing the atlas fold exactly as the parallax does.
+	float2 Offset = (P - SamplePoint) * IrisRadius / float2(Columns, 1.0);
+	OutUV = UV - Offset;
+
+	// ---- debug -------------------------------------------------------------------------------
+	// Drawn from the values above, and self-sufficient on purpose: it draws its own iris ring, so
+	// the highlight sheet can be aligned with the parallax switched off entirely.
+	Debug = float4(0.0, 0.0, 0.0, 0.0);
+	if (DebugView >= 0.5)
+	{
+		float Radius01 = length(P);
+#if PIXELSHADER
+		float LinePx = fwidth(Radius01) * 1.5 + 1e-6;
+#else
+		float LinePx = 0.01;
+#endif
+		float Rim = 1.0 - smoothstep(0.0, LinePx, abs(Radius01 - 1.0));
+		// A dot where the centre of the painted art has ended up: direction and distance of the
+		// travel, in one mark. Amber normally, red once the rim clamp is holding it.
+		float2 Landing = P - SamplePoint;
+		float Marker = 1.0 - smoothstep(0.05, 0.08, length(P - Landing));
+		float3 Colour = float3(0.1, 1.0, 0.2) * Rim
+		              + lerp(float3(1.0, 0.85, 0.2), float3(1.0, 0.15, 0.0), WasClamped) * Marker;
+		Debug = float4(Colour, saturate(Rim + Marker));
+	}
+}
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonEyeHighlight", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Moves the painted eye highlight toward the main light, in iris space.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+		float2 UV [
+			Description="The UV to move -- the global UV, downstream of the parallax stage.";
+		];
+	}
+
+	Outputs = {
+		float2 UVOut;
+		float4 DebugColor;
+	}
+
+	Properties = {
+		ScalarParameter Eye_Highlight_Travel = 0.15 [
+			ParameterName="Eye Highlight Travel";
+			Group="07 - Eye Highlight";
+			SortPriority=1;
+			Description="高光跟着光源走多远, 单位是虹膜半径. 0 = 不动(和以前一样钉死在 UV 上).\r\n0.1~0.2 通常就够: 这一层是画好的美术资源, 走太远会露出它不是真反射.\r\n位移会被夹在虹膜圆盘内, 不会滑到眼白上.\r\n\r\n\r\nHow far the catchlight follows the source, in iris radii. 0 leaves it nailed to the UV as before.\r\n0.1-0.2 is usually enough: this layer is painted art, and travelling too far exposes that it is not a real reflection.\r\nThe offset is clamped inside the iris disc, so it never wanders onto the sclera.";
+		];
+		ScalarParameter Eye_Highlight_Light_View_Blend = 0.0 [
+			ParameterName="Eye Highlight Light/View Blend";
+			Group="07 - Eye Highlight";
+			SortPriority=2;
+			Description="0 = 完全跟主光(像光源的反射, 转灯时最明显), 1 = 完全跟视线(像环境反射, 转头时最明显).\r\n中间值最像手绘 —— 两者都沾一点, 谁也不明显地主导.\r\n\r\n\r\n0 follows the main light (reads as a reflection of the key, most visible when the light turns), 1 follows the view (reads as an environment reflection, most visible when the head turns).\r\nSomething in between looks the most hand-drawn: a bit of each, neither obviously in charge.";
+		];
+		ScalarParameter Eye_Highlight_Mode = 0.0 [
+			ParameterName="Eye Highlight Mode";
+			Group="07 - Eye Highlight";
+			SortPriority=3;
+			Description="0 = 平移(圆形光斑用这个), 1 = 绕虹膜中心旋转(星形/月牙形用这个).\r\n形状有方向性的高光平移会显得从眼睛上脱开, 旋转才像眼睛转向了光.\r\n\r\n\r\n0 translates (for round catchlights), 1 rotates about the iris centre (for stars and crescents).\r\nA shaped highlight that translates reads as the art coming unstuck; rotating reads as the eye turning to the light.";
+		];
+		ScalarParameter Eye_Highlight_Rotate_Amount = 1.0 [
+			ParameterName="Eye Highlight Rotate Amount";
+			Group="07 - Eye Highlight";
+			SortPriority=4;
+			Description="旋转模式下跟随光源方位角的比例. 1 = 完全跟随, 0.5 = 跟一半, 负数 = 反向跟随.\r\n平移模式下这个参数不参与计算.\r\n\r\n\r\nHow much of the source's azimuth the rotation follows. 1 tracks it exactly, 0.5 tracks half of it, negative tracks it backwards.\r\nUnused in translate mode.";
+		];
+		ScalarParameter Eye_Highlight_Debug_View = 0.0 [
+			ParameterName="Eye Highlight Debug View";
+			Group="07 - Eye Highlight";
+			SortPriority=10;
+			Description="0 = 关, 1 = 画虹膜环 + 一个标记高光落点的圆点(红色 = 被虹膜边缘夹住了).\r\n需要基础输入里的`Enable Eye Parallax Debug`打开才显示. 它自带虹膜环, 所以视差整个关掉也能用来对齐这一层.\r\n\r\n\r\n0 off, 1 draws the iris ring plus a dot marking where the highlight has landed (red once the rim clamp is holding it).\r\nNeeds `Enable Eye Parallax Debug` in the base input to be visible. It draws its own ring, so this layer can be aligned with the parallax switched off entirely.";
+		];
+		VectorParameter Eye_Iris_Center_Radius = float4(0.0, 0.0, 0.5, 0.5) [
+			ParameterName="Eye Iris Center and Radius";
+			Group="06 - Eye Parallax";
+			SortPriority=2;
+			Description="xy = 虹膜中心相对单眼 UV 中心的偏移, zw = 虹膜半径(可以不等, 用来做椭圆眼).\r\n半径决定了效果的作用范围: 圆盘之外位移为零, 所以眼白和眼眶不会跟着动.\r\n\r\n\r\nxy offsets the iris centre from the middle of one eye's UV square; zw is its radius, per axis so an elliptical eye still works.\r\nThe radius is the extent of the whole effect: outside that disc the offset is zero, so the sclera and the lids stay put.";
+		];
+		ScalarParameter Eye_Atlas_Columns = 2.0 [
+			ParameterName="Eye Atlas Columns";
+			Group="06 - Eye Parallax";
+			SortPriority=5;
+			Description="一张贴图里横向排了几只眼睛. VRM / MMD 常见的左右眼并排就是 2, 单眼一张贴图填 1.\r\n填错的表现: 填 1 而实际是并排, 虹膜中心会落在两眼之间; 填 2 而实际是单眼, 眼睛中间会出现一条接缝.\r\n\r\n\r\nHow many eyes sit side by side across the texture. The VRM / MMD layout with both eyes in one map is 2; one eye per texture is 1.\r\nGetting it wrong shows: 1 on a side-by-side map puts the iris centre between the eyes, and 2 on a single-eye map puts a seam down the middle.";
+		];
+	}
+
+	Graph = {
+		// Same tangent frame as the parallax, so both sheets read the eye the same way.
+		float3 LightWS = MF_MoonMainLightDirection();
+		float3 LightTS =
+			UE.Expression(
+				Class="Transform",
+				OutputType="float3",
+				Input=LightWS,
+				TransformSourceType="TRANSFORMSOURCE_World",
+				TransformType="TRANSFORM_Tangent"
+			);
+		float3 ViewWS = UE.CameraVectorWS();
+		float3 ViewTS =
+			UE.Expression(
+				Class="Transform",
+				OutputType="float3",
+				Input=ViewWS,
+				TransformSourceType="TRANSFORMSOURCE_World",
+				TransformType="TRANSFORM_Tangent"
+			);
+
+		ToonEyeHighlight(
+			UV,
+			LightTS,
+			ViewTS,
+			Eye_Iris_Center_Radius,
+			Eye_Highlight_Travel,
+			Eye_Highlight_Light_View_Blend,
+			Eye_Highlight_Mode,
+			Eye_Highlight_Rotate_Amount,
+			Eye_Atlas_Columns,
+			Eye_Highlight_Debug_View,
+			UVOut,
+			DebugColor);
+	}
+}

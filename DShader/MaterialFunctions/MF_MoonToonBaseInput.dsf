@@ -530,9 +530,25 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				ParameterName="Enable Eye Parallax",
 				DefaultValue=false
 			);
+		// Highlight anchoring runs downstream of the parallax so the two compose: the highlight
+		// sheet can sit at its own (usually small, usually negative) parallax depth AND follow the
+		// key light. A material is normally one sheet or the other, so both switches off is the
+		// common case and costs nothing.
+		float2 Eye_Highlight_UV = MF_ToonEyeHighlight(Global_UV_Selected, OutputIndex=0);
+		float2 Global_UV_Anchored =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float2",
+				True=Eye_Highlight_UV,
+				False=Global_UV_Selected,
+				Group="07 - Eye Highlight",
+				SortPriority=0,
+				ParameterName="Enable Eye Highlight Anchor",
+				DefaultValue=false
+			);
 		#EndRegion
 
-		float2 Global_UV = Global_UV_Selected;
+		float2 Global_UV = Global_UV_Anchored;
 		#Region "Texture Sample"
 		float4 StaticSwitchParameter_5 = MF_ToonSampleColor(Base_Color_Map, Global_UV).rgba;
 		#EndRegion
@@ -552,11 +568,15 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// The second call to MF_ToonEyeParallax is on purpose: with this switch off the branch is
 		// culled, so the debug half of that function never reaches the shader at all.
 		float4 Eye_Parallax_Debug = MF_ToonEyeParallax(Add_2, OutputIndex=1);
+		float4 Eye_Highlight_Debug = MF_ToonEyeHighlight(Global_UV_Selected, OutputIndex=1);
+		// Composited by coverage, in order. Each function draws only its own view numbers and
+		// returns zero alpha otherwise, so exactly one of them is ever on screen.
+		float3 Eye_Debug_Over_Art = lerp(Base_Color_1, Eye_Parallax_Debug.rgb, Eye_Parallax_Debug.a);
 		float3 Base_Color_Debugged =
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float3",
-				True=lerp(Base_Color_1, Eye_Parallax_Debug.rgb, Eye_Parallax_Debug.a),
+				True=lerp(Eye_Debug_Over_Art, Eye_Highlight_Debug.rgb, Eye_Highlight_Debug.a),
 				False=Base_Color_1,
 				Group="06 - Eye Parallax",
 				SortPriority=9,
