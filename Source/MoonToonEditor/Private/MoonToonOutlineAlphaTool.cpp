@@ -600,8 +600,9 @@ FString UMoonToonOutlineAlphaTool::Run(const FMoonToonToolContext& Context)
 
 				if (!bFastPathDone)
 				{
-					UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LOD, Positions, VertexIndices, Normals,
-						Tangents, Binormals, Colors, UV0s, UV1s, UV2s, UV3s);
+					// Vertex colour only. Writing the UV channels back from here would undo the two
+					// tangent bakes exactly the way they used to undo this taper.
+					MoonToonMesh::WriteMeshChannels(Mesh, LOD, nullptr, nullptr, nullptr, nullptr, &Colors);
 				}
 			}
 		}

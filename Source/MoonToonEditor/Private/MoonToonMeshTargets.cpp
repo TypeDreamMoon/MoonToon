@@ -12,6 +12,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
+#include "MoonToonEditorBPLibrary.h"
 #include "RawMesh.h"
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #include "Rendering/SkeletalMeshLODRenderData.h"
@@ -378,5 +379,33 @@ namespace MoonToonMesh
 		FMoonToonLODFaces Faces;
 		GetFaces(Mesh, LODIndex, Faces);
 		return BuildWedgeMask(Faces, MaterialIndices, NumWedges);
+	}
+}
+
+void MoonToonMesh::WriteMeshChannels(
+	UObject* Mesh,
+	int32 LODIndex,
+	TArray<FVector2f>* UV0s,
+	TArray<FVector2f>* UV1s,
+	TArray<FVector2f>* UV2s,
+	TArray<FVector2f>* UV3s,
+	TArray<FColor>* Colors)
+{
+	// Positions, normals, tangents, binormals and the wedge indices are never passed: no tool in the
+	// panel authors them, and handing them back is what makes an unrelated channel a casualty of a
+	// read-modify-write. The native setters null-check every channel independently.
+	if (USkeletalMesh* SkeletalMesh = Cast<USkeletalMesh>(Mesh))
+	{
+		UMoonToonEditorBPLibrary::MoonSetSkeletalMeshData(
+			SkeletalMesh, LODIndex,
+			/*Positions*/nullptr, /*VertexIndices*/nullptr, /*Normals*/nullptr,
+			/*Tangents*/nullptr, /*Binormals*/nullptr, Colors, UV0s, UV1s, UV2s, UV3s);
+	}
+	else if (UStaticMesh* StaticMesh = Cast<UStaticMesh>(Mesh))
+	{
+		UMoonToonEditorBPLibrary::MoonSetStaticMeshData(
+			StaticMesh, LODIndex,
+			/*Positions*/nullptr, /*VertexIndices*/nullptr, /*Normals*/nullptr,
+			/*Tangents*/nullptr, /*Binormals*/nullptr, Colors, UV0s, UV1s, UV2s, UV3s);
 	}
 }
