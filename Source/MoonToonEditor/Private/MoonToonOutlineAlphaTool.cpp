@@ -77,48 +77,48 @@ namespace
 		return Axis;
 	}
 
-	/** Per-vertex signal in 0..1, plus how many islands contributed. */
+	/** Per-wedge signal in 0..1, plus how many islands contributed. */
 	struct FSignalResult
 	{
-		TArray<float> PerVertex;
+		TArray<float> PerWedge;
 		int32 NumIslands = 0;
 		int32 NumSkippedIslands = 0;
 	};
 
 	/**
-	 * Splits the masked geometry into connected islands and measures, per vertex, how far along each
-	 * island's principal axis it sits -- 0 at the root end, 1 at the tip end.
+	 * Splits the masked geometry into UV shells and measures, per wedge, how far along each shell's
+	 * principal axis it sits -- 0 at the root end, 1 at the tip end.
+	 *
+	 * Shells, not connected geometry. The connectivity used to be built in point space after welding
+	 * every pair of points sharing a position. That weld is necessary on its own terms -- import data
+	 * stores one point per UV or normal seam, so without it a single hair card shatters into pieces --
+	 * but it cannot tell "two halves of one card" from "two different cards that happen to touch".
+	 * Hair cards touch at the scalp, so on SK_ww_yy the entire bangs section welded into ONE island
+	 * and the per-island PCA degenerated into a single global axis: the taper then ran across the
+	 * whole hairdo instead of root-to-tip along each strand.
+	 *
+	 * Cards are separate in UV even where they touch in 3D, which makes the shell the right unit.
+	 * Walking wedges gets it for free: two wedges only merge when the UV is continuous between them,
+	 * which keeps a card whole and still splits it from its neighbour.
 	 */
 	FSignalResult ComputeIslandAxisSignal(
 		const TArray<FVector3f>& Positions,
 		const TArray<int32>& VertexIndices,
+		const TArray<FVector2f>& UV0s,
 		const FMoonToonLODFaces& Faces,
 		const FMoonToonWedgeMask& Mask,
 		int32 MinIslandVertices,
 		EMoonToonIslandOrientation Orientation)
 	{
+		const int32 NumWedges = VertexIndices.Num();
+
 		FSignalResult Result;
-		Result.PerVertex.Init(0.0f, Positions.Num());
+		Result.PerWedge.Init(0.0f, NumWedges);
 
-		// Weld by exact position first. Import data routinely stores several points at one location
-		// (one per UV or normal seam); without this every card would shatter into many islands.
-		FUnionFind Islands(Positions.Num());
-		TMap<FVector3f, int32> PositionToFirstVertex;
-		PositionToFirstVertex.Reserve(Positions.Num());
-		for (int32 VertexIndex = 0; VertexIndex < Positions.Num(); ++VertexIndex)
-		{
-			if (const int32* Existing = PositionToFirstVertex.Find(Positions[VertexIndex]))
-			{
-				Islands.Union(*Existing, VertexIndex);
-			}
-			else
-			{
-				PositionToFirstVertex.Add(Positions[VertexIndex], VertexIndex);
-			}
-		}
+		FUnionFind Islands(NumWedges);
 
-		// Then connect through faces, but only faces the section filter includes -- otherwise a hair
-		// card touching the scalp would merge into the head and lose its own axis.
+		// Connect through faces, but only faces the section filter includes -- otherwise a hair card
+		// touching the scalp would merge into the head and lose its own axis.
 		for (const FIntVector& Face : Faces.Wedges)
 		{
 			const bool bIncluded =
@@ -132,30 +132,59 @@ namespace
 			{
 				continue;
 			}
-			Islands.Union(VertexIndices[Face.X], VertexIndices[Face.Y]);
-			Islands.Union(VertexIndices[Face.X], VertexIndices[Face.Z]);
+			Islands.Union(Face.X, Face.Y);
+			Islands.Union(Face.X, Face.Z);
 		}
 
-		// Gather members, restricted to vertices that an included wedge actually references.
-		TSet<int32> UsedVertices;
-		for (int32 WedgeIndex = 0; WedgeIndex < VertexIndices.Num(); ++WedgeIndex)
+		// Then merge the duplicate wedges that are NOT a seam: same point, same UV. This is the part
+		// the old position weld was really there for -- a normal seam duplicates the point but leaves
+		// the UV alone, so those halves rejoin, while a UV seam keeps the two cards apart.
+		constexpr float UVQuantum = 1.0f / 65536.0f;
+		TMap<TPair<int32, FIntPoint>, int32> SeamlessKeyToWedge;
+		SeamlessKeyToWedge.Reserve(NumWedges);
+		for (int32 WedgeIndex = 0; WedgeIndex < NumWedges; ++WedgeIndex)
 		{
-			if (Mask.Contains(WedgeIndex))
+			if (!Mask.Contains(WedgeIndex) || !UV0s.IsValidIndex(WedgeIndex))
 			{
-				UsedVertices.Add(VertexIndices[WedgeIndex]);
+				continue;
+			}
+			const FIntPoint QuantizedUV(
+				FMath::RoundToInt(UV0s[WedgeIndex].X / UVQuantum),
+				FMath::RoundToInt(UV0s[WedgeIndex].Y / UVQuantum));
+			const TPair<int32, FIntPoint> Key(VertexIndices[WedgeIndex], QuantizedUV);
+			if (const int32* Existing = SeamlessKeyToWedge.Find(Key))
+			{
+				Islands.Union(*Existing, WedgeIndex);
+			}
+			else
+			{
+				SeamlessKeyToWedge.Add(Key, WedgeIndex);
 			}
 		}
 
 		TMap<int32, TArray<int32>> IslandMembers;
-		for (int32 VertexIndex : UsedVertices)
+		for (int32 WedgeIndex = 0; WedgeIndex < NumWedges; ++WedgeIndex)
 		{
-			IslandMembers.FindOrAdd(Islands.Find(VertexIndex)).Add(VertexIndex);
+			if (Mask.Contains(WedgeIndex))
+			{
+				IslandMembers.FindOrAdd(Islands.Find(WedgeIndex)).Add(WedgeIndex);
+			}
 		}
 
 		for (const TPair<int32, TArray<int32>>& Island : IslandMembers)
 		{
 			const TArray<int32>& Members = Island.Value;
-			if (Members.Num() < MinIslandVertices)
+
+			// Sized in distinct points rather than in wedges, so Min Island Vertices keeps meaning
+			// what it meant while this walked points -- a wedge count would be roughly three times
+			// larger and would quietly stop skipping the fragments it was set to skip.
+			TSet<int32> DistinctPoints;
+			DistinctPoints.Reserve(Members.Num());
+			for (int32 WedgeIndex : Members)
+			{
+				DistinctPoints.Add(VertexIndices[WedgeIndex]);
+			}
+			if (DistinctPoints.Num() < MinIslandVertices)
 			{
 				++Result.NumSkippedIslands;
 				// Left at 0, i.e. treated as root: a stray fragment keeps full width rather than
@@ -165,16 +194,16 @@ namespace
 			++Result.NumIslands;
 
 			FVector3f Centroid = FVector3f::ZeroVector;
-			for (int32 VertexIndex : Members)
+			for (int32 WedgeIndex : Members)
 			{
-				Centroid += Positions[VertexIndex];
+				Centroid += Positions[VertexIndices[WedgeIndex]];
 			}
 			Centroid /= static_cast<float>(Members.Num());
 
 			FVector3f Covariance[3] = { FVector3f::ZeroVector, FVector3f::ZeroVector, FVector3f::ZeroVector };
-			for (int32 VertexIndex : Members)
+			for (int32 WedgeIndex : Members)
 			{
-				const FVector3f D = Positions[VertexIndex] - Centroid;
+				const FVector3f D = Positions[VertexIndices[WedgeIndex]] - Centroid;
 				Covariance[0] += FVector3f(D.X * D.X, D.X * D.Y, D.X * D.Z);
 				Covariance[1] += FVector3f(D.Y * D.X, D.Y * D.Y, D.Y * D.Z);
 				Covariance[2] += FVector3f(D.Z * D.X, D.Z * D.Y, D.Z * D.Z);
@@ -184,9 +213,9 @@ namespace
 
 			float MinProjection = TNumericLimits<float>::Max();
 			float MaxProjection = TNumericLimits<float>::Lowest();
-			for (int32 VertexIndex : Members)
+			for (int32 WedgeIndex : Members)
 			{
-				const float Projection = (Positions[VertexIndex] - Centroid) | Axis;
+				const float Projection = (Positions[VertexIndices[WedgeIndex]] - Centroid) | Axis;
 				MinProjection = FMath::Min(MinProjection, Projection);
 				MaxProjection = FMath::Max(MaxProjection, Projection);
 			}
@@ -204,9 +233,9 @@ namespace
 			{
 				double NearRadius = 0.0, FarRadius = 0.0;
 				int32 NearCount = 0, FarCount = 0;
-				for (int32 VertexIndex : Members)
+				for (int32 WedgeIndex : Members)
 				{
-					const FVector3f D = Positions[VertexIndex] - Centroid;
+					const FVector3f D = Positions[VertexIndices[WedgeIndex]] - Centroid;
 					const float Projection = D | Axis;
 					const float Normalized = (Projection - MinProjection) / Span;
 					const float Radius = (D - Axis * Projection).Size();
@@ -226,11 +255,11 @@ namespace
 				bPositiveEndIsTip = (Orientation == EMoonToonIslandOrientation::PositiveEnd);
 			}
 
-			for (int32 VertexIndex : Members)
+			for (int32 WedgeIndex : Members)
 			{
-				const float Projection = (Positions[VertexIndex] - Centroid) | Axis;
+				const float Projection = (Positions[VertexIndices[WedgeIndex]] - Centroid) | Axis;
 				const float Normalized = (Projection - MinProjection) / Span;
-				Result.PerVertex[VertexIndex] = bPositiveEndIsTip ? Normalized : (1.0f - Normalized);
+				Result.PerWedge[WedgeIndex] = bPositiveEndIsTip ? Normalized : (1.0f - Normalized);
 			}
 		}
 
@@ -374,17 +403,16 @@ FString UMoonToonOutlineAlphaTool::Run(const FMoonToonToolContext& Context)
 			if (Signal == EMoonToonAlphaSignal::IslandAxis)
 			{
 				const FSignalResult IslandSignal = ComputeIslandAxisSignal(
-					Positions, VertexIndices, Faces, Mask, MinIslandVertices, IslandOrientation);
+					Positions, VertexIndices, UV0s, Faces, Mask, MinIslandVertices, IslandOrientation);
 
 				for (int32 WedgeIndex = 0; WedgeIndex < NumWedges; ++WedgeIndex)
 				{
-					const int32 VertexIndex = VertexIndices[WedgeIndex];
-					if (IslandSignal.PerVertex.IsValidIndex(VertexIndex))
+					if (IslandSignal.PerWedge.IsValidIndex(WedgeIndex))
 					{
-						WedgeSignal[WedgeIndex] = IslandSignal.PerVertex[VertexIndex];
+						WedgeSignal[WedgeIndex] = IslandSignal.PerWedge[WedgeIndex];
 					}
 				}
-				SignalNote = FString::Printf(TEXT("%d island(s), %d skipped as too small"),
+				SignalNote = FString::Printf(TEXT("%d UV shell(s), %d skipped as too small"),
 					IslandSignal.NumIslands, IslandSignal.NumSkippedIslands);
 			}
 			else if (Signal == EMoonToonAlphaSignal::UVAxis)
