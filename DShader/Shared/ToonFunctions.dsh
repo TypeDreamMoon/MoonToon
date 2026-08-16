@@ -244,3 +244,18 @@ VirtualFunction(Name="MF_ToonDFFacialShadow")
 		float SdfRight;
 	}
 }
+VirtualFunction(Name="MF_ToonEyeHighlight")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonEyeHighlight");
+	}
+
+	Inputs = {
+		float2 UV;
+	}
+
+	Outputs = {
+		float2 UVOut;
+		float4 DebugColor;
+	}
+}
