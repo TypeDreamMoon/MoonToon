@@ -11,6 +11,7 @@
 #include "Factories/MaterialInstanceConstantFactoryNew.h"
 #include "IAssetTools.h"
 #include "MaterialEditingLibrary.h"
+#include "MaterialShared.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/PackageName.h"
@@ -414,7 +415,12 @@ UMaterialInterface* UMoonToonOutlineSetupTool::GenerateSlotOutlineMaterial(
 	else if (Instance->Parent != OutlineMaterialTemplate)
 	{
 		// Re-running after the template was changed should retarget, not leave a stale parent behind.
+		// The update context is mandatory for a re-parent, not decoration -- see
+		// UMoonToonMaterialLibrary::SetParentOnInstances for what draws with a stale shader map
+		// pointer otherwise.
+		FMaterialUpdateContext UpdateContext;
 		Instance->SetParentEditorOnly(OutlineMaterialTemplate);
+		UpdateContext.AddMaterialInstance(Instance);
 	}
 
 	// Masked, and cut by the section's own alpha. Without the override the hull is opaque and fills

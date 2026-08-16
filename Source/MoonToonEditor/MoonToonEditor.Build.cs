@@ -41,6 +41,9 @@ public class MoonToonEditor : ModuleRules
 				"RawMesh",
 				// FRenderCommandFence, for the release-patch-reinit dance in PatchVertexAlphaLive.
 				"RenderCore",
+				// GMaxRHIShaderPlatform -- the default argument of FMaterialUpdateContext's constructor,
+				// so every re-parent site needs it even though none of them names a shader platform.
+				"RHI",
 				// The tools panel: IDetailsView renders each tool's UPROPERTYs, so no tool writes Slate.
 				"PropertyEditor",
 				// UMaterialEditingLibrary: the supported way to write a material instance and publish

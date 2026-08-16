@@ -12,6 +12,7 @@
 #include "Factories/MaterialInstanceConstantFactoryNew.h"
 #include "IAssetTools.h"
 #include "MaterialEditingLibrary.h"
+#include "MaterialShared.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/PackageName.h"
@@ -542,63 +543,84 @@ FString UMoonToonMaterialLibrary::SetParentOnInstances(
 	FString Report = FString::Printf(TEXT("Set parent to %s\n\n"), *NewParent->GetName());
 	int32 NumChanged = 0;
 
-	for (UMaterialInstanceConstant* Instance : Targets)
 	{
-		// A material cannot be its own ancestor; the engine would recurse forever resolving values.
-		if (Instance == NewParent || NewParent->IsDependent(Instance))
+		// Every re-parent must happen inside an update context, or the editor dies on the next draw.
+		//
+		// SetParentEditorOnly ends at InitStaticPermutation: it recompiles THIS instance's shader map
+		// and tells nobody. Everything else that renders through it -- child instances, the content
+		// browser's transient thumbnail instance, an open material instance editor's preview -- is
+		// still holding the old shader map by pointer in its uniform expression cache, and the render
+		// thread checks that pointer on every draw (FMaterialShader::GetShaderBindings, "checkf
+		// UniformExpressionCache should be up to date"). Shader compilation pumps Slate, so a redraw
+		// inside the loop is not hypothetical.
+		//
+		// The context is what closes the window from both ends: the constructor drops every
+		// component's render state and flushes the rendering thread, so nothing can draw while the
+		// hierarchy is half-moved; the destructor walks every instance depending on what we touched
+		// and recaches its uniform expressions before the render states come back. Same shape as the
+		// engine's own re-parent (UMaterialEditorInstanceConstant::PostEditChangeProperty): open the
+		// context, set Parent, clear the overrides that no longer resolve, close it.
+		FMaterialUpdateContext UpdateContext;
+
+		for (UMaterialInstanceConstant* Instance : Targets)
 		{
-			Report += FString::Printf(TEXT("  %-40s SKIPPED -- that parent descends from this instance\n"), *Instance->GetName());
-			continue;
-		}
-
-		const UMaterialInterface* OldParent = Instance->Parent;
-		if (OldParent == NewParent)
-		{
-			Report += FString::Printf(TEXT("  %-40s already had this parent\n"), *Instance->GetName());
-			continue;
-		}
-
-		Instance->SetParentEditorOnly(NewParent);
-		++NumChanged;
-
-		// Now that the parent moved, whatever the instance still overrides is either carried over or
-		// orphaned. Name both, because "my override stopped doing anything" is the failure mode of a
-		// re-parent and it is otherwise completely silent.
-		TArray<TPair<EMaterialParameterType, FMaterialParameterInfo>> Overrides;
-		CollectOverrides(Instance, Overrides);
-
-		TArray<FString> Orphans;
-		int32 NumKept = 0;
-		for (const TPair<EMaterialParameterType, FMaterialParameterInfo>& Override : Overrides)
-		{
-			if (MoonToonMaterial::ExistsInParent(Instance, Override.Key, Override.Value))
+			// A material cannot be its own ancestor; the engine would recurse forever resolving values.
+			if (Instance == NewParent || NewParent->IsDependent(Instance))
 			{
-				++NumKept;
+				Report += FString::Printf(TEXT("  %-40s SKIPPED -- that parent descends from this instance\n"), *Instance->GetName());
+				continue;
 			}
-			else
+
+			const UMaterialInterface* OldParent = Instance->Parent;
+			if (OldParent == NewParent)
 			{
-				Orphans.Add(FString::Printf(TEXT("%s (%s)"), *Override.Value.Name.ToString(), TypeName(Override.Key)));
-				if (bClearOrphanedOverrides)
+				Report += FString::Printf(TEXT("  %-40s already had this parent\n"), *Instance->GetName());
+				continue;
+			}
+
+			Instance->SetParentEditorOnly(NewParent);
+			UpdateContext.AddMaterialInstance(Instance);
+			++NumChanged;
+
+			// Now that the parent moved, whatever the instance still overrides is either carried over or
+			// orphaned. Name both, because "my override stopped doing anything" is the failure mode of a
+			// re-parent and it is otherwise completely silent.
+			TArray<TPair<EMaterialParameterType, FMaterialParameterInfo>> Overrides;
+			CollectOverrides(Instance, Overrides);
+
+			TArray<FString> Orphans;
+			int32 NumKept = 0;
+			for (const TPair<EMaterialParameterType, FMaterialParameterInfo>& Override : Overrides)
+			{
+				if (MoonToonMaterial::ExistsInParent(Instance, Override.Key, Override.Value))
 				{
-					MoonToonMaterial::ClearOverride(Instance, Override.Key, Override.Value);
+					++NumKept;
+				}
+				else
+				{
+					Orphans.Add(FString::Printf(TEXT("%s (%s)"), *Override.Value.Name.ToString(), TypeName(Override.Key)));
+					if (bClearOrphanedOverrides)
+					{
+						MoonToonMaterial::ClearOverride(Instance, Override.Key, Override.Value);
+					}
 				}
 			}
-		}
 
-		Report += FString::Printf(TEXT("  %-40s %s -> %s, %d override(s) kept"),
-			*Instance->GetName(),
-			OldParent ? *OldParent->GetName() : TEXT("<none>"),
-			*NewParent->GetName(),
-			NumKept);
+			Report += FString::Printf(TEXT("  %-40s %s -> %s, %d override(s) kept"),
+				*Instance->GetName(),
+				OldParent ? *OldParent->GetName() : TEXT("<none>"),
+				*NewParent->GetName(),
+				NumKept);
 
-		if (Orphans.Num() > 0)
-		{
-			Report += FString::Printf(TEXT(", %d %s: %s"),
-				Orphans.Num(),
-				bClearOrphanedOverrides ? TEXT("cleared") : TEXT("now dead"),
-				*FString::Join(Orphans, TEXT(", ")));
+			if (Orphans.Num() > 0)
+			{
+				Report += FString::Printf(TEXT(", %d %s: %s"),
+					Orphans.Num(),
+					bClearOrphanedOverrides ? TEXT("cleared") : TEXT("now dead"),
+					*FString::Join(Orphans, TEXT(", ")));
+			}
+			Report += TEXT("\n");
 		}
-		Report += TEXT("\n");
 	}
 
 	MoonToonMaterial::FinishEdits(Targets);
@@ -663,6 +685,13 @@ FString UMoonToonMaterialLibrary::InsertCharacterMasters(
 	int32 NumPromoted = 0;
 	int32 NumSwitchesLeft = 0;
 
+	// Inserting a master re-parents live instances, so it needs the same update context
+	// SetParentOnInstances explains: a moved Parent silently invalidates the shader map pointer every
+	// dependent proxy has cached, and only this destructor recaches them. It is held to the end of the
+	// function rather than to the end of the loop so that FinishEdits -- which redraws viewports --
+	// still runs with render states down.
+	FMaterialUpdateContext UpdateContext;
+
 	for (const TPair<UMaterialInterface*, TArray<UMaterialInstanceConstant*>>& Group : Groups)
 	{
 		UMaterialInterface* GroupParent = Group.Key;
@@ -703,6 +732,7 @@ FString UMoonToonMaterialLibrary::InsertCharacterMasters(
 			++NumMasters;
 		}
 		Touched.Add(Master);
+		UpdateContext.AddMaterialInstance(Master);
 
 		for (UMaterialInstanceConstant* Child : Children)
 		{
@@ -712,6 +742,7 @@ FString UMoonToonMaterialLibrary::InsertCharacterMasters(
 			}
 			Child->SetParentEditorOnly(Master);
 			Touched.Add(Child);
+			UpdateContext.AddMaterialInstance(Child);
 			++NumReparented;
 		}
 
