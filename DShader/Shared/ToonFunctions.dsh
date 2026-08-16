@@ -14,10 +14,15 @@ VirtualFunction(Name="MF_MoonToonFeatureSelect")
 		Description = "Static toon feature selection; see Tools/gen_feature_functions.py.";
 	}
 
+	// Mirrors the Inputs block the generator writes into MF_MoonToonFeatureSelect.dsf, in the same
+	// order -- these are positional. Change one and this has to follow, or the call site fails with
+	// an arity error rather than anything that names the real problem.
 	Inputs = {
 		opt float InToonKajiyaSecondaryStrandShift = 0.0;
 		opt float InToonKajiyaPrimaryStrandShift = 0.0;
-		opt float InHairHighlightMask = 0.0;
+		opt float4 InGlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 InGlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 InGlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 		opt float3 InStockingsBodyColor = float3(0.0, 0.0, 0.0);
 	}
 

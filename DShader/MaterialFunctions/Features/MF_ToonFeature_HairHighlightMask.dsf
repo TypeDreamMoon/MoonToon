@@ -5,6 +5,8 @@
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_HairHighlightMask(
 	in float Mask,
 	in float Intensity,
@@ -33,7 +35,9 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 	}
 
 	Inputs = {
-		opt float InHighlightMask = 0.0 [Description="Per-pixel Mask from a map, added to the parameter."];
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 1, exactly as the base input sampled it. Read only if Hair Highlight Mask From Global Map is on."];
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 2."];
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 3."];
 	}
 
 	Outputs = {
@@ -51,7 +55,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 
 	Graph = {
 		ToonFeatureWrite_HairHighlightMask(
-			InHighlightMask + In_Hair_HighlightMask,
+			MF_ToonHairHighlightMask(GlobalMaskA, GlobalMaskB, GlobalMaskC) + In_Hair_HighlightMask,
 			In_Hair_HighlightMaskIntensity,
 			In_Hair_HighlightMaskShadowIntensity,
 			In_Hair_HighlightViewAnchorBlend,
