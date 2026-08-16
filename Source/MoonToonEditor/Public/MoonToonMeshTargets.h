@@ -144,6 +144,28 @@ namespace MoonToonMesh
 		int32 LODIndex,
 		const TArray<float>& PointAlpha);
 
+	/**
+	 * Writes back only the channels passed; every other channel on the asset is left alone.
+	 *
+	 * The obvious spelling -- read all eleven channels, mutate one, write all eleven back -- turns
+	 * every tool into a round-trip for data it does not own, and a round-trip is only harmless while
+	 * it is lossless. It is not: SK_ww_yy's vertex colour went from a hand-authored 38..255
+	 * outline-width taper to a uniform 255 across a single Bake Smooth Normal run, and that bake
+	 * touches nothing but UV2 and UV3. Losing that alpha is losing the hair taper, which is what
+	 * drives outline width per vertex.
+	 *
+	 * The native setters already skip a null channel, so this is only about giving the tools a way to
+	 * say what they own. Pass null for everything else.
+	 */
+	MOONTOONEDITOR_API void WriteMeshChannels(
+		UObject* Mesh,
+		int32 LODIndex,
+		TArray<FVector2f>* UV0s = nullptr,
+		TArray<FVector2f>* UV1s = nullptr,
+		TArray<FVector2f>* UV2s = nullptr,
+		TArray<FVector2f>* UV3s = nullptr,
+		TArray<FColor>* Colors = nullptr);
+
 	MOONTOONEDITOR_API int32 GetNumLODs(UObject* Mesh);
 
 	/** Reads one LOD's face data. False when the LOD has no import data at all (a generated LOD). */

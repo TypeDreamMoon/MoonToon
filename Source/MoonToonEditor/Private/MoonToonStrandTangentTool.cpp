@@ -556,8 +556,8 @@ namespace
 
 		if (NumWritten > 0)
 		{
-			UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LOD, Positions, VertexIndices, Normals,
-				Tangents, Binormals, Colors, UV0s, UV1s, UV2s, UV3s);
+			// UV1 and UV2 only -- this bake owns UV1.xy + UV2.x, same channels as face-forward.
+			MoonToonMesh::WriteMeshChannels(Mesh, LOD, nullptr, &UV1s, &UV2s);
 		}
 
 		OutLines.Add(FString::Printf(
@@ -675,8 +675,8 @@ FString UMoonToonStrandTangentTool::Run(const FMoonToonToolContext& Context)
 					}
 				}
 
-				UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LOD, Positions, VertexIndices, Normals,
-					Tangents, Binormals, Colors, UV0s, UV1s, UV2s, UV3s);
+				// UV1 and UV2 only -- see above.
+				MoonToonMesh::WriteMeshChannels(Mesh, LOD, nullptr, &UV1s, &UV2s);
 				Lines.Add(FString::Printf(TEXT("  %s LOD%d: restored %d wedges from %s"),
 					*Mesh->GetName(), LOD, BackupWedges, *BackupPath));
 			}

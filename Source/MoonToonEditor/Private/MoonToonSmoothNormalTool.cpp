@@ -444,8 +444,9 @@ void UMoonToonSmoothNormalTool::BakeSmoothedNormalForLOD(UObject* Mesh, int32 LO
 				NumWedges > 0 ? 100.0f * NumCurvatureFlooredWedges / NumWedges : 0.0f);
 		}
 
-		UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LODIndex, Positions, VertexIndices, Normals,
-			Tangents, Binormals, Colors, UV0s, UV1s, UV2s, UV3s);
+		// UV2 and UV3 only. This bake owns nothing else, and writing back a channel it merely read is
+		// how a hand-authored vertex-colour taper disappeared -- see MoonToonMesh::WriteMeshChannels.
+		MoonToonMesh::WriteMeshChannels(Mesh, LODIndex, nullptr, nullptr, &UV2s, &UV3s);
 	}
 }
 
@@ -500,7 +501,8 @@ void UMoonToonSmoothNormalTool::BakeFaceForwardForLOD(
 			}
 		}
 
-		UMoonToonEditorBPLibrary::MoonSetMeshData(Mesh, LODIndex, Positions, VertexIndices, Normals,
-			Tangents, Binormals, Colors, UV0s, UV1s, UV2s, UV3s);
+		// UV1 and UV2 only -- face-forward owns UV1.xy + UV2.x, and UV2.y belongs to the
+		// smoothed-normal bake, which is why UV2.y is carried across untouched above.
+		MoonToonMesh::WriteMeshChannels(Mesh, LODIndex, nullptr, &UV1s, &UV2s);
 	}
 }
