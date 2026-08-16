@@ -127,6 +127,23 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Classification")
 	bool bCopySectionOpacity = true;
 
+	/**
+	 * How much lower the hull's opacity-mask threshold sits than the section's, as a multiplier.
+	 *
+	 * Copying the section's clip value verbatim looks right and is not: the hull then cuts at exactly
+	 * the same texels as the surface, so the two silhouettes coincide and no outline can appear
+	 * between them. It matters most on hair, whose visible shape comes from the alpha cutout rather
+	 * than from the card's geometric edge -- the outline could only show along the card border, which
+	 * is fully transparent and clipped away too, so hair ends up with almost no outline at all.
+	 *
+	 * A lower threshold dilates the hull's cutout into the alpha falloff just outside the surface,
+	 * which is exactly where the outline belongs. 1.0 restores the coincident-cut behaviour; 0
+	 * ignores the cutout entirely and gives a fully opaque hull.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Classification",
+		meta = (EditCondition = "bCopySectionOpacity", ClampMin = "0.0", ClampMax = "1.0"))
+	float HullMaskDilation = 0.1f;
+
 	// --- Write --------------------------------------------------------------------------------
 
 	/**
