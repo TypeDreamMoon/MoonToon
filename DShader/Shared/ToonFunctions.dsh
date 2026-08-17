@@ -227,6 +227,22 @@ VirtualFunction(Name="MF_ToonSeeThroughOverlay")
 		float4 FaceOverlayStencilIDs;
 	}
 }
+VirtualFunction(Name="MF_ToonStockingsSheenMask")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonStockingsSheenMask");
+	}
+
+	Inputs = {
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
+	}
+
+	Outputs = {
+		float SheenMask;
+	}
+}
 VirtualFunction(Name="MF_ToonHairHighlightMask")
 {
 	Options = {

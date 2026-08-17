@@ -130,7 +130,10 @@ VirtualFunction(Name="MF_ToonFeature_Stockings")
 	}
 
 	Inputs = {
-		opt float InDensity = 1.0;
+		opt float InThickness = 1.0;
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 		opt float3 InSkinColor = float3(0.0, 0.0, 0.0);
 	}
 
@@ -147,7 +150,10 @@ VirtualFunction(Name="MF_ToonFeature_NPRStockings")
 	}
 
 	Inputs = {
-		opt float InDensity = 1.0;
+		opt float InThickness = 1.0;
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
 		opt float3 InSkinColor = float3(0.0, 0.0, 0.0);
 	}
 
@@ -236,7 +242,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 		opt float4 InGlobalMaskA = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 1, exactly as the base input sampled it. Read only if Hair Highlight Mask From Global Map is on."];
 		opt float4 InGlobalMaskB = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 2."];
 		opt float4 InGlobalMaskC = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 3."];
-		opt float InStockingsThickness = 1.0 [Description="Per-pixel thickness multiplier from a map, applied to the denier value BEFORE the opacity curve."];
+		opt float InStockingsThickness = 1.0 [Description="Per-pixel thickness multiplier from a map, applied to the denier value BEFORE the opacity curve. 1 = full denier, 0.5 = half."];
 		opt float3 InStockingsSkinColor = float3(0.0, 0.0, 0.0) [Description="Per-pixel SkinColor from a map, added to the parameter."];
 	}
 
@@ -281,9 +287,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=0),
 								False = Is_Stockings(
-									True = MF_ToonFeature_Stockings(InStockingsThickness, InStockingsSkinColor, OutputIndex=0),
+									True = MF_ToonFeature_Stockings(InStockingsThickness, InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, InStockingsSkinColor, OutputIndex=0),
 									False = Is_NPRStockings(
-										True = MF_ToonFeature_NPRStockings(InStockingsThickness, InStockingsSkinColor, OutputIndex=0),
+										True = MF_ToonFeature_NPRStockings(InStockingsThickness, InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, InStockingsSkinColor, OutputIndex=0),
 										False = Is_Eye(
 											True = MF_ToonFeature_Eye(OutputIndex=0),
 											False = Is_ClothVelvet(
@@ -307,9 +313,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=1),
 								False = Is_Stockings(
-									True = MF_ToonFeature_Stockings(InStockingsThickness, InStockingsSkinColor, OutputIndex=1),
+									True = MF_ToonFeature_Stockings(InStockingsThickness, InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, InStockingsSkinColor, OutputIndex=1),
 									False = Is_NPRStockings(
-										True = MF_ToonFeature_NPRStockings(InStockingsThickness, InStockingsSkinColor, OutputIndex=1),
+										True = MF_ToonFeature_NPRStockings(InStockingsThickness, InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, InStockingsSkinColor, OutputIndex=1),
 										False = Is_Eye(
 											True = MF_ToonFeature_Eye(OutputIndex=1),
 											False = Is_ClothVelvet(
@@ -333,9 +339,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 							False = Is_Skin(
 								True = MF_ToonFeature_Skin(OutputIndex=2),
 								False = Is_Stockings(
-									True = MF_ToonFeature_Stockings(InStockingsThickness, InStockingsSkinColor, OutputIndex=2),
+									True = MF_ToonFeature_Stockings(InStockingsThickness, InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, InStockingsSkinColor, OutputIndex=2),
 									False = Is_NPRStockings(
-										True = MF_ToonFeature_NPRStockings(InStockingsThickness, InStockingsSkinColor, OutputIndex=2),
+										True = MF_ToonFeature_NPRStockings(InStockingsThickness, InGlobalMaskA, InGlobalMaskB, InGlobalMaskC, InStockingsSkinColor, OutputIndex=2),
 										False = Is_Eye(
 											True = MF_ToonFeature_Eye(OutputIndex=2),
 											False = Is_ClothVelvet(

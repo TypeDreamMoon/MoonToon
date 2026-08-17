@@ -5,6 +5,8 @@
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_Stockings(
 	in float Density,
 	in float FresnelPower,
@@ -44,6 +46,9 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 
 	Inputs = {
 		opt float InThickness = 1.0 [Description="Per-pixel thickness multiplier from a map, applied to the denier value BEFORE the opacity curve. 1 = full denier, 0.5 = half."];
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0) [Description="The three packed mask maps the base input sampled, already resolved. Which one the weave mask reads is Stockings Sheen Mask Source."];
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 2."];
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0) [Description="Packed mask map 3."];
 		opt float3 InSkinColor = float3(0.0, 0.0, 0.0) [Description="Per-pixel SkinColor from a map, added to the parameter."];
 	}
 
@@ -67,12 +72,12 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 
 	Graph = {
 		// Denier -> opacity, half-life form. Denier is grams per 9000m of filament, i.e. how much
-		// fibre is in the way, so occlusion is Beer-Lambert in it: every extra 35D halves what still
-		// gets through. Written as pow(0.5, D/35) rather than exp(-D/50) because the language has no
-		// exp() and the half-life constant is the readable one -- 35 IS the half-opacity denier.
-		// Unbounded on purpose (no UIMax): 250D just saturates at 0.993 on its own.
-		// The thickness map scales denier BEFORE the curve, so a map value of 0.5 means "half as
-		// many filaments here", which is what a stretched knee actually is.
+		// fibre is in the way, so occlusion is Beer-Lambert in it: every extra 35D halves what
+		// still gets through. Written as pow(0.5, D/35) rather than exp(-D/50) because the
+		// language has no exp() and the half-life constant is the readable one -- 35 IS the
+		// half-opacity denier. Unbounded on purpose (no UIMax): 250D saturates at 0.993 by itself.
+		// The thickness map scales denier BEFORE the curve, so a map value of 0.5 means half as
+		// many filaments here, which is what a stretched knee actually is.
 		float StockingsOpacity = 1.0 - pow(0.5, max(InThickness * In_Stockings_Denier, 0.0) / 35.0);
 
 		ToonFeatureWrite_Stockings(
@@ -80,7 +85,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 			In_Stockings_FresnelPower,
 			In_Stockings_TransStrength,
 			In_Stockings_TransDistortion,
-			In_Stockings_SpecIntensity,
+			MF_ToonStockingsSheenMask(GlobalMaskA, GlobalMaskB, GlobalMaskC) * In_Stockings_SpecIntensity,
 			In_Stockings_ShadowStrength,
 			In_Stockings_GrazingDarken,
 			InSkinColor + In_Stockings_SkinColorRGB.rgb,

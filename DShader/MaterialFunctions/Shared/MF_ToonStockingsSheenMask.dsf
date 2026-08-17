@@ -1,0 +1,59 @@
+// The stocking's weave, as a mask on the sheen. Called by MF_ToonFeature_Stockings and its NPR twin,
+// not by the base input -- everything here therefore sits behind the feature's static switch, so the
+// rows are absent from a material that picked another feature and the fetch is culled with them.
+//
+// Why the sheen and not the albedo: a knit reads as a knit because of how it CATCHES LIGHT, not
+// because the yarn is a different colour from the gaps. The albedo side already varies -- the
+// fabric colour is the material's Base Color, so a weave texture there works today -- but the
+// specular had no per-pixel structure at all, which is what made the surface read as plastic.
+//
+// It costs no feature slot: this modulates the existing Specular Intensity rather than occupying a
+// channel of its own, and the stockings payload is full at 11/11.
+
+import "Shared/ToonFunctions.dsh";
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonStockingsSheenMask", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Resolves the stockings weave/sheen mask from one channel of one packed global mask map.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+		opt float4 GlobalMaskA = float4(1.0, 1.0, 1.0, 1.0) [
+			Description="The three packed mask maps the base input sampled, already resolved. Which one this reads is Stockings Sheen Mask Source.";
+		];
+		opt float4 GlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
+		opt float4 GlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
+	}
+
+	Outputs = {
+		float SheenMask;
+	}
+
+	Properties = {
+		ScalarParameter Stockings_Sheen_Mask_Source = 0.0 [
+			ParameterName="Stockings Sheen Mask Source";
+			Group="38 - Feature: Stockings";
+			SortPriority=20;
+			Description="织纹遮罩读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由 Stockings Sheen Mask Channel 决定. 0 = 全白, 高光没有逐像素结构(默认, 等于这个功能关着).\r\n\r\n这张遮罩乘在 Stockings Spec Intensity 上, 所以它画的是'哪里反光强' —— 针织的纱线走向、菱形网眼、提花纹样都放这里. 丝袜自身的颜色仍然走材质的 Base Color, 两者是分开的: 颜色贴图管'什么颜色', 这张管'怎么反光'.\r\n\r\n共用的是基础输入那一次采样, 不额外带贴图也不额外取样.";
+		];
+		ChannelMaskParameter Stockings_Sheen_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Stockings Sheen Mask Channel";
+			Group="38 - Feature: Stockings";
+			SortPriority=21;
+			MaskChannel=Red;
+			Description="上面那张图里, 织纹遮罩占哪个通道.";
+		];
+	}
+
+	Graph = {
+		// Index 0 returns white, which is why an unconfigured material is an exact no-op: the mask
+		// multiplies into Specular Intensity, and 1 leaves the slider alone.
+		float4 Global_Mask_Selected = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(GlobalMaskA, GlobalMaskB, GlobalMaskC, Stockings_Sheen_Mask_Source, Global_Mask_Selected);
+		// Full float4, so a mask packed into alpha is reachable like any other channel.
+		SheenMask = Stockings_Sheen_Mask_Channel(Input = Global_Mask_Selected);
+	}
+}

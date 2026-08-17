@@ -66,7 +66,7 @@ FEATURES = {
 # of the two functions is ever compiled in, so there is no ambiguity to resolve at runtime -- what an
 # artist gets is a PBR/NPR toggle that keeps their tuning instead of two parallel sets of sliders.
 STOCKINGS_PARAMS = {
-    "Density":                 ("In_Stockings_Density", "1.0"),
+    "Density":                 ("In_Stockings_Denier", "30.0"),
     "FresnelPower":            ("In_Stockings_FresnelPower", "0.0"),
     "TransmissionStrength":    ("In_Stockings_TransStrength", "0.0"),
     "TransmissionDistortion":  ("In_Stockings_TransDistortion", "0.2"),  # NEW
@@ -215,11 +215,15 @@ MAP_INPUTS = {
         "SecondaryShift": ("InSecondaryStrandShift", "InToonKajiyaSecondaryStrandShift"),
     },
     "Stockings": {
-        "Density":   ("InDensity", "InStockingsDensity", "*"),
+        "Density":   ("InThickness", "InStockingsThickness", "*",
+                      "Per-pixel thickness multiplier from a map, applied to the denier value BEFORE the "
+                      "opacity curve. 1 = full denier, 0.5 = half."),
         "SkinColor": ("InSkinColor", "InStockingsSkinColor"),
     },
     "NPRStockings": {
-        "Density":   ("InDensity", "InStockingsDensity", "*"),
+        "Density":   ("InThickness", "InStockingsThickness", "*",
+                      "Per-pixel thickness multiplier from a map, applied to the denier value BEFORE the "
+                      "opacity curve. 1 = full denier, 0.5 = half."),
         "SkinColor": ("InSkinColor", "InStockingsSkinColor"),
     },
 }
@@ -250,7 +254,53 @@ HELPERS = {
             "Shared/ToonFunctions.dsh",
         ),
     },
+    "Stockings": {
+        "SpecularIntensity": (
+            "MF_ToonStockingsSheenMask(GlobalMaskA, GlobalMaskB, GlobalMaskC)",
+            [("float4", "GlobalMaskA", "InGlobalMaskA", "float4(1.0, 1.0, 1.0, 1.0)",
+              "The three packed mask maps the base input sampled, already resolved. Which one the weave mask reads is Stockings Sheen Mask Source."),
+             ("float4", "GlobalMaskB", "InGlobalMaskB", "float4(1.0, 1.0, 1.0, 1.0)",
+              "Packed mask map 2."),
+             ("float4", "GlobalMaskC", "InGlobalMaskC", "float4(1.0, 1.0, 1.0, 1.0)",
+              "Packed mask map 3.")],
+            "Shared/ToonFunctions.dsh",
+            "*",
+        ),
+    },
 }
+# Both stocking ids share one parameter set, so they share the weave mask too.
+HELPERS["NPRStockings"] = HELPERS["Stockings"]
+
+
+
+# Slots whose value is an EXPRESSION over the parameter and the map input, emitted as a local in the
+# Graph block instead of being passed straight through.
+#
+# MAP_INPUTS can only combine the two with "+" or "*", and HELPERS can only delegate to a shared
+# function. Neither can say "the material parameter is a REAL-WORLD denier and the slot is the
+# opacity that implies", which needs a curve between the authored number and the 8-bit slot. Keeping
+# it here rather than in the generated .dsf is the whole point: that file says GENERATED at the top,
+# so a curve written into it directly is wiped by the next run of this script.
+#
+# feature key -> {slot Name: (local name, expression, comment lines)}; the expression may reference
+# {param} and {map}.
+DERIVED = {
+    "Stockings": {
+        "Density": (
+            "StockingsOpacity",
+            "1.0 - pow(0.5, max({map} * {param}, 0.0) / 35.0)",
+            ["Denier -> opacity, half-life form. Denier is grams per 9000m of filament, i.e. how much",
+             "fibre is in the way, so occlusion is Beer-Lambert in it: every extra 35D halves what",
+             "still gets through. Written as pow(0.5, D/35) rather than exp(-D/50) because the",
+             "language has no exp() and the half-life constant is the readable one -- 35 IS the",
+             "half-opacity denier. Unbounded on purpose (no UIMax): 250D saturates at 0.993 by itself.",
+             "The thickness map scales denier BEFORE the curve, so a map value of 0.5 means half as",
+             "many filaments here, which is what a stretched knee actually is."],
+        ),
+    },
+}
+# The two ids share one parameter set, so they share the derivation too.
+DERIVED["NPRStockings"] = DERIVED["Stockings"]
 
 
 def _zero(type_name):
@@ -308,9 +358,11 @@ DESC_COMMON = {
 # Shared by both stocking ids, which share their parameters. Wording stays id-neutral for that
 # reason -- the same tooltip has to be true whether the material is shading PBR or NPR.
 STOCKINGS_DESC = {
-    "Density":               "丝袜密度: 0 = 完全透出腿部肤色, 1 = 完全是布料本身的颜色(材质的 Base Color). "
-                             "参考旦数刻度: 20D 薄透, 30D 半透, 250D 不透. "
-                             "逐像素贴图会乘在这个滑条上 —— 膝盖脚跟被撑薄所以密度低, 袜口和脚尖加固区密度高.",
+    "Density":               "丝袜旦数(D), 直接填现实规格: 10D 极薄, 20D 薄透, 30D 半透, 40~70D 半不透, "
+                             "80~120D 不透, 250D 完全不透. 换算成遮蔽率走半衰期曲线 1-pow(0.5, D/35) —— 35D 是半透点, "
+                             "每再加 35D 剩余透光减半, 所以数字可以一直往上加不需要上限. 0 = 没有丝袜. "
+                             "旦数同时驱动三件事: 遮蔽率、透射量、以及高光锐度(薄的更亮更锐, 厚的更哑). "
+                             "逐像素厚度贴图乘在旦数上 —— 膝盖脚跟被撑薄所以旦数低, 袜口和脚尖加固区旦数高.",
     "FresnelPower":          "掠射角衰减的幂次. 越大, 变暗只发生在更接近边缘的地方.",
     "TransmissionStrength":  "背光透射强度 —— 光从腿后面穿过丝袜到达眼睛的量.",
     "TransmissionDistortion":"背光透射的法线扭曲量(DICE GDC 2011 的 Distortion). 0 = 只有光正对着镜头背面时才透光; "
@@ -455,8 +507,9 @@ def emit(feature_key, tables):
 
     maps = MAP_INPUTS.get(feature_key, {})
     helpers = HELPERS.get(feature_key, {})
+    derived = DERIVED.get(feature_key, {})
 
-    prop_lines, call_lines = [], []
+    prop_lines, call_lines, pre_lines = [], [], []
     for i, (t, _, name) in enumerate(rows):
         pname, default = params[name]
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
@@ -467,10 +520,21 @@ def emit(feature_key, tables):
         prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d; Description="%s"];'
                           % (kind, pname, default, group, i, desc))
         expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")
-        if name in maps:
-            expr = "%s %s %s" % (maps[name][0], _map_op(maps, name), expr)
-        if name in helpers:
-            expr = "%s + %s" % (helpers[name][0], expr)
+        if name in derived:
+            local, tmpl, comment = derived[name]
+            if pre_lines:
+                pre_lines.append("")
+            pre_lines.extend("\t\t// %s" % c for c in comment)
+            pre_lines.append("\t\tfloat %s = %s;"
+                             % (local, tmpl.format(param=expr,
+                                                   map=maps[name][0] if name in maps else "1.0")))
+            expr = local
+        else:
+            if name in maps:
+                expr = "%s %s %s" % (maps[name][0], _map_op(maps, name), expr)
+            if name in helpers:
+                hop = helpers[name][3] if len(helpers[name]) > 3 else "+"
+                expr = "%s %s %s" % (helpers[name][0], hop, expr)
         call_lines.append("\t\t\t%s," % expr)
 
     input_lines = ['\t\topt %s %s = %s [Description="%s"];' % (t, fn_in, default, desc)
@@ -515,13 +579,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_%s", Root="Plugin
 \t}
 
 \tGraph = {
-\t\t%s(
+%s\t\t%s(
 %s
 \t\t\tToonBufferA, ToonBufferB, ToonBufferC);
 \t}
 }
 """ % (HEADER, imports, fn, args, id_macro, body, dsf_name, dsf_name,
-       "\n".join(input_lines), "\n".join(prop_lines), fn, "\n".join(call_lines))
+       "\n".join(input_lines), "\n".join(prop_lines),
+       ("\n".join(pre_lines) + "\n\n") if pre_lines else "", fn,
+       "\n".join(call_lines))
 
 
 SELECT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -543,8 +609,11 @@ def _feature_inputs(key, tables):
             op = _map_op(maps, name)
             t = "float3" if t == "float3" else "float"
             verb = "multiplied into" if op == "*" else "added to"
-            ins.append((t, fn_in, sel_in, _map_identity(t, op),
-                        "Per-pixel %s from a map, %s the parameter." % (name, verb)))
+            # A derived slot's map does not feed the slot directly, so the generic sentence
+            # would describe the wrong quantity -- those entries carry their own.
+            desc = (maps[name][3] if len(maps[name]) > 3
+                    else "Per-pixel %s from a map, %s the parameter." % (name, verb))
+            ins.append((t, fn_in, sel_in, _map_identity(t, op), desc))
         if name in helpers:
             ins.extend(helpers[name][1])
     return ins
