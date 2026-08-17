@@ -157,9 +157,33 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			ParameterName="Global Mask Map UV Channel";
 			Group="01 - Global Mask Map";
 		];
+		// The SKIN under the stocking, not the stocking itself -- the fabric's own colour is the
+		// material's Base Color. Both stocking features interpolate between the two by Density.
 		TextureSampleParameter2D BodyBaseColor = Path(Engine, "EngineResources/DefaultTexture") [
 			SamplerType="SAMPLERTYPE_Color";
 			Group="05 - Stockings";
+			SortPriority=0;
+			Description="丝袜下面透出来的腿部皮肤颜色. 丝袜自身的颜色走材质的 Base Color, 两者由 Density 混合.";
+		];
+		// Where the knit is stretched thin and where it piles up. Multiplied into In_Stockings_Density,
+		// so white (the default) leaves the slider in charge and the map only says where it varies.
+		//
+		// This is the input a single-layer, single-section stocking cannot fake: one constant density
+		// for a whole leg is what makes the effect read as painted on. Paint it dark at the knee, the
+		// heel and the widest part of the thigh (stretched = fewer fibres per pixel = more skin), and
+		// light at the welt, the toe and the heel reinforcement.
+		// Pinned to the shared world sampler group rather than taking a sampler slot of its own: UE
+		// caps a material at 16, MF_ToonSampleLinear exists to keep the other maps off that budget,
+		// and a density mask has no sampler settings worth spending one on. It cannot go through
+		// MF_ToonSampleLinear itself because that needs Global_UV, which this graph does not compute
+		// until well after MF_MoonToonFeatureSelect is called.
+		TextureSampleParameter2D Stockings_Thickness_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+			ParameterName="Stockings Thickness Map";
+			SamplerType="SAMPLERTYPE_LinearColor";
+			SamplerSource="SSM_Wrap_WorldGroupSettings";
+			Group="05 - Stockings";
+			SortPriority=1;
+			Description="逐像素厚度倍率(拉伸图), 乘在旦数上再过遮蔽曲线 —— 不是直接乘遮蔽率, 所以 0.5 的含义是'这里只有一半的纤维', 和被撑薄的膝盖对得上. 白 = 就是滑条那个旦数. 0.5 = 折半(30D 处按 15D 算). 黑 = 该处没有丝袜, 完全透出肤色.";
 		];
 		// See Through Overlay (眉透/瞳透): when enabled, the renderer re-draws this material after
 		// lighting wherever it is occluded by same-actor toon hair, blending
@@ -506,8 +530,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// selection and the nine light-elevation offsets behind the feature's own static switch --
 		// gone from the panel and out of the shader on every material that selected something else.
 		// All this passes is the three packed maps, which were sampled anyway.
-		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=3);
-		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=4);
+		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=3);
+		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=4);
 		#Region "Texture Sample"
 		float2 MF_UVChannelSwitch_1 = MF_UVChannelSwitch(Inner_Outline_Map_UV_Channel);
 		float4 Inner_Outline_Map =
@@ -1438,12 +1462,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		Attributes.MoonEncodedAttribute4 = MoonEncodeToonAttributes_4.rgba;
 		Attributes.CustomData1 = 1.0;
-		float4 MF_MoonToonBufferInput_1 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=0);
+		float4 MF_MoonToonBufferInput_1 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=0);
 		float4 ToonBufferA_1 = MF_MoonToonBufferInput_1;
-		float4 MF_MoonToonBufferInput_2 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=1);
+		float4 MF_MoonToonBufferInput_2 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=1);
 		float4 ToonBufferB_1 = MF_MoonToonBufferInput_2;
 		#Region "Toon Buffer"
-		float4 MF_MoonToonBufferInput_3 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, BodyBaseColor.rgb, OutputIndex=2);
+		float4 MF_MoonToonBufferInput_3 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=2);
 		#EndRegion
 
 		float4 ToonBufferC_1 = MF_MoonToonBufferInput_3;

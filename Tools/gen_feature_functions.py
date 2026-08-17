@@ -41,6 +41,12 @@ FEATURES = {
                           "MOON_TOON_SLOTS_SKIN",                "36 - Feature: Skin"),
     "Stockings":         ("Stockings",         "MOON_SHADING_FEATURE_ID_PBR_STOCKINGS",
                           "MOON_TOON_SLOTS_PBR_STOCKINGS",       "38 - Feature: Stockings"),
+    # Same slots, same parameter NAMES, same panel group as Stockings -- only the lighting path
+    # differs (ToonBxDF sends this id through the diffuse ramp and the per-light cel band). Sharing
+    # the names is what makes the switch non-destructive: tick the other box and every tuned value
+    # is still there, because there is only one set of parameters underneath both.
+    "NPRStockings":      ("NPRStockings",      "MOON_SHADING_FEATURE_ID_NPR_STOCKINGS",
+                          "MOON_TOON_SLOTS_NPR_STOCKINGS",       "38 - Feature: Stockings"),
     "Eye":               ("Eye",               "MOON_SHADING_FEATURE_ID_EYE",
                           "MOON_TOON_SLOTS_EYE",                 "39 - Feature: Eye"),
     "ClothVelvet":       ("ClothVelvet",       "MOON_SHADING_FEATURE_ID_CLOTH_VELVET",
@@ -53,6 +59,22 @@ FEATURES = {
     # modifier that composes with every feature, not a 14th mutually exclusive one -- as a feature,
     # ticking it turned skin/hair shading OFF. It is authored in MF_MoonToonBaseInput under
     # "44 - Matcap" and rides ToonFeatureRT4. Group 43 is retired with the feature.
+}
+
+# The two stocking ids share ONE set of material parameters, by name. UE resolves same-named
+# parameters across material functions to a single row, and the static feature switch means only one
+# of the two functions is ever compiled in, so there is no ambiguity to resolve at runtime -- what an
+# artist gets is a PBR/NPR toggle that keeps their tuning instead of two parallel sets of sliders.
+STOCKINGS_PARAMS = {
+    "Density":                 ("In_Stockings_Density", "1.0"),
+    "FresnelPower":            ("In_Stockings_FresnelPower", "0.0"),
+    "TransmissionStrength":    ("In_Stockings_TransStrength", "0.0"),
+    "TransmissionDistortion":  ("In_Stockings_TransDistortion", "0.2"),  # NEW
+    "SpecularIntensity":       ("In_Stockings_SpecIntensity", "0.0"),
+    "ShadowStrength":          ("In_Stockings_ShadowStrength", "0.0"),
+    "GrazingDarkenStrength":   ("In_Stockings_GrazingDarken", "0.0"),
+    "SkinColor":               ("In_Stockings_SkinColorRGB", "float4(0.0, 0.0, 0.0, 0.0)"),
+    "GrazingSpecBoost":        ("In_Stockings_GrazingSpecBoost", "0.0"),
 }
 
 # slot Name (from the engine table) -> (material parameter name, default literal).
@@ -127,17 +149,8 @@ PARAMS = {
         "SpecShadowStrength":      ("In_Skin_SpecShadowStrength", "0.0"),
         "WarmTintStrength":        ("In_Skin_WarmTintStrength", "0.0"),
     },
-    "Stockings": {
-        "Density":                 ("In_Stockings_Density", "0.0"),
-        "FresnelPower":            ("In_Stockings_FresnelPower", "0.0"),
-        "TransmissionStrength":    ("In_Stockings_TransStrength", "0.0"),
-        "RoughnessScale":          ("In_Stockings_RoughnessScale", "1.0"),
-        "SpecularIntensity":       ("In_Stockings_SpecIntensity", "0.0"),
-        "ShadowStrength":          ("In_Stockings_ShadowStrength", "0.0"),
-        "GrazingDarkenStrength":   ("In_Stockings_GrazingDarken", "0.0"),
-        "BaseColor":               ("In_Stockings_BodyColorRGB", "float4(0.0, 0.0, 0.0, 0.0)"),
-        "GrazingSpecBoost":        ("In_Stockings_GrazingSpecBoost", "0.0"),
-    },
+    "Stockings":    STOCKINGS_PARAMS,
+    "NPRStockings": STOCKINGS_PARAMS,
     "Eye": {
         "DiffuseWrapStrength":     ("In_Eye_DiffuseWrapStrength", "0.0"),
         "LimbalDarkenStrength":    ("In_Eye_LimbalDarkenStrength", "0.0"),
@@ -184,19 +197,30 @@ PARAMS = {
 }
 
 # Slots that can also be driven per-pixel from a map, on top of their constant parameter.
-# feature key -> {slot Name: (function input name, selector input name)}
+# feature key -> {slot Name: (function input name, selector input name[, combine op])}
 #
 # The old writer took these as pins and the constant was either added to them (Toon Kajiya's strand
 # shifts) or missing entirely (the hair highlight mask, whose In_Hair_HighlightMask parameter was
 # declared and then never passed -- dead since it was written). Everything is input + parameter now,
 # which reproduces the old result whenever the parameter is at its 0 default.
+#
+# The combine op defaults to "+", where the map is an offset and an unconnected pin (0) is inert.
+# "*" makes the map a modulation instead: the parameter is the overall level and the map is where it
+# varies, which is the right shape for a density/denier map -- an unconnected pin reads 1 and the
+# slider alone still works. _feature_inputs picks the pin's default to match, so the identity of the
+# op and the identity of the default can never disagree.
 MAP_INPUTS = {
     "ToonKajiyaHair": {
         "PrimaryShift":   ("InPrimaryStrandShift", "InToonKajiyaPrimaryStrandShift"),
         "SecondaryShift": ("InSecondaryStrandShift", "InToonKajiyaSecondaryStrandShift"),
     },
     "Stockings": {
-        "BaseColor": ("InBodyColor", "InStockingsBodyColor"),
+        "Density":   ("InDensity", "InStockingsDensity", "*"),
+        "SkinColor": ("InSkinColor", "InStockingsSkinColor"),
+    },
+    "NPRStockings": {
+        "Density":   ("InDensity", "InStockingsDensity", "*"),
+        "SkinColor": ("InSkinColor", "InStockingsSkinColor"),
     },
 }
 
@@ -235,6 +259,22 @@ def _zero(type_name):
             "float4": "float4(0.0, 0.0, 0.0, 0.0)"}[type_name]
 
 
+def _one(type_name):
+    return {"float": "1.0",
+            "float3": "float3(1.0, 1.0, 1.0)",
+            "float4": "float4(1.0, 1.0, 1.0, 1.0)"}[type_name]
+
+
+def _map_op(maps, name):
+    """Combine op for a map-driven slot, defaulting to '+'."""
+    return maps[name][2] if len(maps[name]) > 2 else "+"
+
+
+def _map_identity(type_name, op):
+    """The pin default that makes an unconnected map a no-op under `op`."""
+    return _one(type_name) if op == "*" else _zero(type_name)
+
+
 # Artist-facing description per slot. Keyed by slot Name, shared across features that reuse a slot
 # table (Kajiya / Toon Kajiya, Skin / SDF Face), then overridden per feature where the meaning
 # differs. Shown as the tooltip in the material instance panel.
@@ -265,6 +305,24 @@ DESC_COMMON = {
     "WarmTintStrength":        "散射的暖色偏移强度. 越大散射越偏红.",
 }
 
+# Shared by both stocking ids, which share their parameters. Wording stays id-neutral for that
+# reason -- the same tooltip has to be true whether the material is shading PBR or NPR.
+STOCKINGS_DESC = {
+    "Density":               "丝袜密度: 0 = 完全透出腿部肤色, 1 = 完全是布料本身的颜色(材质的 Base Color). "
+                             "参考旦数刻度: 20D 薄透, 30D 半透, 250D 不透. "
+                             "逐像素贴图会乘在这个滑条上 —— 膝盖脚跟被撑薄所以密度低, 袜口和脚尖加固区密度高.",
+    "FresnelPower":          "掠射角衰减的幂次. 越大, 变暗只发生在更接近边缘的地方.",
+    "TransmissionStrength":  "背光透射强度 —— 光从腿后面穿过丝袜到达眼睛的量.",
+    "TransmissionDistortion":"背光透射的法线扭曲量(DICE GDC 2011 的 Distortion). 0 = 只有光正对着镜头背面时才透光; "
+                             "调大以后小腿侧面这种'夹角大、布料厚'的地方也会透出来, 通常 0.1~0.3.",
+    "SpecularIntensity":     "高光总强度.",
+    "ShadowStrength":        "漫反射受阴影影响的程度.",
+    "GrazingDarkenStrength": "掠射角变暗强度, 做出丝袜边缘收深的效果.",
+    "SkinColor":             "透出来的皮肤颜色 —— 注意是腿, 不是丝袜. 丝袜自身的颜色用材质的 Base Color. "
+                             "全黑 = 未授权, 此时回退成布料色(Density 的混合变成空操作, 但吸收/透射/高光照常).",
+    "GrazingSpecBoost":      "掠射角高光增益, 做出边缘的一圈亮光.",
+}
+
 DESC = {
     "Default": {
         "MultiBandCelEnable": "大于 0.5 时跳过硬明暗交界, 改由 Diffuse Ramp 贴图自己定义几阶、阶在哪. 0 = 保持原本的二值 cel.",
@@ -280,17 +338,8 @@ DESC = {
         "ShadowIntensity": "天使环在阴影中保留多少. 0 = 阴影里完全消失, 1 = 不受阴影影响.",
         "ViewAnchorBlend": "0 = 天使环锚定在光照角度(旧行为); 1 = 锚定在视角, 环会跟着相机走, 更接近手绘动画的做法.",
     },
-    "Stockings": {
-        "Density":               "丝袜密度. 越大越不透, 底色与肤色的混合越偏向底色.",
-        "FresnelPower":          "掠射角衰减的幂次. 越大, 变暗只发生在更接近边缘的地方.",
-        "TransmissionStrength":  "背光透射强度.",
-        "RoughnessScale":        "高光粗糙度倍数.",
-        "SpecularIntensity":     "高光总强度.",
-        "ShadowStrength":        "漫反射受阴影影响的程度.",
-        "GrazingDarkenStrength": "掠射角变暗强度, 做出丝袜边缘收深的效果.",
-        "BaseColor":             "丝袜自身的底色. 全黑 = 未授权, 此时回退到材质的 Base Color.",
-        "GrazingSpecBoost":      "掠射角高光增益, 做出边缘的一圈亮光.",
-    },
+    "Stockings": STOCKINGS_DESC,
+    "NPRStockings": STOCKINGS_DESC,
     "Eye": {
         "DiffuseWrapStrength":    "眼球漫反射的 wrap 强度, 让受光过渡更柔和.",
         "LimbalDarkenStrength":   "角膜缘变暗强度 —— 视角越偏, 眼球边缘越深.",
@@ -354,6 +403,7 @@ DEBUG_COLORS = {
     "HairHighlightMask": "float4(1.0, 0.0, 0.0, 1.0)",
     "Skin":              "float4(1.0, 1.0, 0.0, 1.0)",
     "Stockings":         "float4(1.0, 0.0, 1.0, 1.0)",
+    "NPRStockings":      "float4(1.0, 0.5, 1.0, 1.0)",
     "Eye":               "float4(0.0, 1.0, 1.0, 1.0)",
     "ClothVelvet":       "float4(0.5, 1.0, 0.5, 1.0)",
     "ToonMetal":         "float4(1.0, 0.5, 0.5, 1.0)",
@@ -418,7 +468,7 @@ def emit(feature_key, tables):
                           % (kind, pname, default, group, i, desc))
         expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")
         if name in maps:
-            expr = "%s + %s" % (maps[name][0], expr)
+            expr = "%s %s %s" % (maps[name][0], _map_op(maps, name), expr)
         if name in helpers:
             expr = "%s + %s" % (helpers[name][0], expr)
         call_lines.append("\t\t\t%s," % expr)
@@ -489,10 +539,12 @@ def _feature_inputs(key, tables):
     ins = []
     for (t, _, name) in tables[FEATURES[key][2]]:
         if name in maps:
-            fn_in, sel_in = maps[name]
+            fn_in, sel_in = maps[name][0], maps[name][1]
+            op = _map_op(maps, name)
             t = "float3" if t == "float3" else "float"
-            ins.append((t, fn_in, sel_in, _zero(t),
-                        "Per-pixel %s from a map, added to the parameter." % name))
+            verb = "multiplied into" if op == "*" else "added to"
+            ins.append((t, fn_in, sel_in, _map_identity(t, op),
+                        "Per-pixel %s from a map, %s the parameter." % (name, verb)))
         if name in helpers:
             ins.extend(helpers[name][1])
     return ins
