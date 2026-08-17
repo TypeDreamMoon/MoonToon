@@ -23,7 +23,9 @@ VirtualFunction(Name="MF_MoonToonFeatureSelect")
 		opt float4 InGlobalMaskA = float4(1.0, 1.0, 1.0, 1.0);
 		opt float4 InGlobalMaskB = float4(1.0, 1.0, 1.0, 1.0);
 		opt float4 InGlobalMaskC = float4(1.0, 1.0, 1.0, 1.0);
-		opt float3 InStockingsBodyColor = float3(0.0, 0.0, 0.0);
+		// Density is MULTIPLIED into its parameter, so its identity is 1, not 0.
+		opt float InStockingsDensity = 1.0;
+		opt float3 InStockingsSkinColor = float3(0.0, 0.0, 0.0);
 	}
 
 	Outputs = {
