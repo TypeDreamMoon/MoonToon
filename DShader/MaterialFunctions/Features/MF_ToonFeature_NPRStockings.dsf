@@ -1,0 +1,86 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One toon feature, one material function. It declares only its own slots, so a material instance
+// that selected a different feature never shows these parameters -- that pruning is why feature
+// selection had to become static.
+
+Function ToonFeatureWrite_NPRStockings(
+	in float Density,
+	in float FresnelPower,
+	in float TransmissionStrength,
+	in float TransmissionDistortion,
+	in float SpecularIntensity,
+	in float ShadowStrength,
+	in float GrazingDarkenStrength,
+	in float3 SkinColor,
+	in float GrazingSpecBoost,
+	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ShadingFeatureID = MOON_SHADING_FEATURE_ID_NPR_STOCKINGS;
+	TBuffer.FeatureInputScalarA = Density;
+	TBuffer.FeatureInputScalarB = FresnelPower;
+	TBuffer.FeatureInputScalarC = TransmissionStrength;
+	TBuffer.FeatureInputScalarD = TransmissionDistortion;
+	TBuffer.FeatureInputScalarE = SpecularIntensity;
+	TBuffer.FeatureInputScalarF = ShadowStrength;
+	TBuffer.FeatureInputScalarG = GrazingDarkenStrength;
+	TBuffer.FeatureInputVector.xyz = SkinColor;
+	TBuffer.FeatureInputVector.w = GrazingSpecBoost;
+
+	EncodeToonBuffer(TBuffer, TBufferA, TBufferB, TBufferC);
+}
+
+ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_NPRStockings", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the NPRStockings toon feature parameters into ToonBufferA/B/C.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Features";
+	}
+
+	Inputs = {
+		opt float InThickness = 1.0 [Description="Per-pixel thickness multiplier from a map, applied to the denier value BEFORE the opacity curve. 1 = full denier, 0.5 = half."];
+		opt float3 InSkinColor = float3(0.0, 0.0, 0.0) [Description="Per-pixel SkinColor from a map, added to the parameter."];
+	}
+
+	Outputs = {
+		float4 ToonBufferA;
+		float4 ToonBufferB;
+		float4 ToonBufferC;
+	}
+
+	Properties = {
+		ScalarParameter In_Stockings_Denier = 30.0 [Group="38 - Feature: Stockings"; SortPriority=0; Description="丝袜旦数(D), 直接填现实规格: 10D 极薄, 20D 薄透, 30D 半透, 40~70D 半不透, 80~120D 不透, 250D 完全不透. 换算成遮蔽率走半衰期曲线 1-pow(0.5, D/35) —— 35D 是半透点, 每再加 35D 剩余透光减半, 所以数字可以一直往上加不需要上限. 0 = 没有丝袜. 旦数同时驱动三件事: 遮蔽率、透射量、以及高光锐度(薄的更亮更锐, 厚的更哑). 逐像素厚度贴图乘在旦数上 —— 膝盖脚跟被撑薄所以旦数低, 袜口和脚尖加固区旦数高."];
+		ScalarParameter In_Stockings_FresnelPower = 0.0 [Group="38 - Feature: Stockings"; SortPriority=1; Description="掠射角衰减的幂次. 越大, 变暗只发生在更接近边缘的地方."];
+		ScalarParameter In_Stockings_TransStrength = 0.0 [Group="38 - Feature: Stockings"; SortPriority=2; Description="背光透射强度 —— 光从腿后面穿过丝袜到达眼睛的量."];
+		ScalarParameter In_Stockings_TransDistortion = 0.2 [Group="38 - Feature: Stockings"; SortPriority=3; Description="背光透射的法线扭曲量(DICE GDC 2011 的 Distortion). 0 = 只有光正对着镜头背面时才透光; 调大以后小腿侧面这种'夹角大、布料厚'的地方也会透出来, 通常 0.1~0.3."];
+		ScalarParameter In_Stockings_SpecIntensity = 0.0 [Group="38 - Feature: Stockings"; SortPriority=4; Description="高光总强度."];
+		ScalarParameter In_Stockings_ShadowStrength = 0.0 [Group="38 - Feature: Stockings"; SortPriority=5; Description="漫反射受阴影影响的程度."];
+		ScalarParameter In_Stockings_GrazingDarken = 0.0 [Group="38 - Feature: Stockings"; SortPriority=6; Description="掠射角变暗强度, 做出丝袜边缘收深的效果."];
+		VectorParameter In_Stockings_SkinColorRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="38 - Feature: Stockings"; SortPriority=7; Description="透出来的皮肤颜色 —— 注意是腿, 不是丝袜. 丝袜自身的颜色用材质的 Base Color. 全黑 = 未授权, 此时回退成布料色(Density 的混合变成空操作, 但吸收/透射/高光照常)."];
+		ScalarParameter In_Stockings_GrazingSpecBoost = 0.0 [Group="38 - Feature: Stockings"; SortPriority=8; Description="掠射角高光增益, 做出边缘的一圈亮光."];
+	}
+
+	Graph = {
+		// Same denier -> opacity curve as the PBR sibling; see MF_ToonFeature_Stockings.dsf for why
+		// it is a half-life pow rather than an exp. Both ids read the same FToonStockingsParams, so
+		// the two must stay byte-identical in what they pack or a PBR/NPR toggle would shift opacity.
+		float StockingsOpacity = 1.0 - pow(0.5, max(InThickness * In_Stockings_Denier, 0.0) / 35.0);
+
+		ToonFeatureWrite_NPRStockings(
+			StockingsOpacity,
+			In_Stockings_FresnelPower,
+			In_Stockings_TransStrength,
+			In_Stockings_TransDistortion,
+			In_Stockings_SpecIntensity,
+			In_Stockings_ShadowStrength,
+			In_Stockings_GrazingDarken,
+			InSkinColor + In_Stockings_SkinColorRGB.rgb,
+			In_Stockings_GrazingSpecBoost,
+			ToonBufferA, ToonBufferB, ToonBufferC);
+	}
+}
