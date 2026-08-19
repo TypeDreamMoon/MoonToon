@@ -20,41 +20,47 @@ import sys
 
 SLOT_TABLE = r"F:\UnrealEngine\UE_Moon\Engine\Shaders\Shared\MoonToonFeatureSlots.h"
 ID_TABLE = os.path.join(os.path.dirname(SLOT_TABLE), "MoonToonShadingFeatureDefinitions.h")
+REGISTRY = os.path.join(os.path.dirname(SLOT_TABLE), "MoonToonFeatureRegistry.h")
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "..", "DShader", "MaterialFunctions", "Features")
 
-# feature key -> (dsf name, MOON_SHADING_FEATURE_ID_*, slot-table macro, parameter group)
+# feature key -> (dsf name, MOON_SHADING_FEATURE_ID_*, parameter group)
+#
+# Which slot table each id reads is NOT stated here -- it comes from the engine's feature registry
+# (MoonToonFeatureRegistry.h: id -> module -> slot table), so this file and the shader cannot
+# disagree about it. What IS stated here is the material-facing metadata the engine has no opinion
+# about: the .dsf name, the id, and the panel group.
 FEATURES = {
     "Default":           ("Default",           "MOON_SHADING_FEATURE_ID_DEFAULT",
-                          "MOON_TOON_SLOTS_DEFAULT",             "31 - Feature: Default"),
+                          "31 - Feature: Default"),
     "PBRSpecular":       ("PBRSpecular",       "MOON_SHADING_FEATURE_ID_PBR_SPECULAR",
-                          "MOON_TOON_SLOTS_PBR_SPECULAR",        "32 - Feature: PBR Specular"),
+                          "32 - Feature: PBR Specular"),
     "KajiyaHair":        ("KajiyaHair",        "MOON_SHADING_FEATURE_ID_KAJIYA_HAIR_SPECULAR",
-                          "MOON_TOON_SLOTS_KAJIYA_HAIR",         "34 - Feature: Hair Kajiya Kay"),
+                          "34 - Feature: Hair Kajiya Kay"),
     "ToonKajiyaHair":    ("ToonKajiyaHair",    "MOON_SHADING_FEATURE_ID_TOON_KAJIYA_HAIR_SPECULAR",
-                          "MOON_TOON_SLOTS_KAJIYA_HAIR",         "35 - Feature: Hair Toon Kajiya Kay"),
+                          "35 - Feature: Hair Toon Kajiya Kay"),
     "DFFacialShadow":    ("DFFacialShadow",    "MOON_SHADING_FEATURE_ID_DISTANCE_FIELD_FACIAL_SHADOW",
-                          "MOON_TOON_SLOTS_SKIN",                "37 - Feature: SDF Face"),
+                          "37 - Feature: SDF Face"),
     "HairHighlightMask": ("HairHighlightMask", "MOON_SHADING_FEATURE_ID_HAIR_HIGHLIGHT_MASK",
-                          "MOON_TOON_SLOTS_HAIR_HIGHLIGHT_MASK", "33 - Feature: Hair Highlight Mask"),
+                          "33 - Feature: Hair Highlight Mask"),
     "Skin":              ("Skin",              "MOON_SHADING_FEATURE_ID_SKIN",
-                          "MOON_TOON_SLOTS_SKIN",                "36 - Feature: Skin"),
+                          "36 - Feature: Skin"),
     "Stockings":         ("Stockings",         "MOON_SHADING_FEATURE_ID_PBR_STOCKINGS",
-                          "MOON_TOON_SLOTS_PBR_STOCKINGS",       "38 - Feature: Stockings"),
+                          "38 - Feature: Stockings"),
     # Same slots, same parameter NAMES, same panel group as Stockings -- only the lighting path
     # differs (ToonBxDF sends this id through the diffuse ramp and the per-light cel band). Sharing
     # the names is what makes the switch non-destructive: tick the other box and every tuned value
     # is still there, because there is only one set of parameters underneath both.
     "NPRStockings":      ("NPRStockings",      "MOON_SHADING_FEATURE_ID_NPR_STOCKINGS",
-                          "MOON_TOON_SLOTS_NPR_STOCKINGS",       "38 - Feature: Stockings"),
+                          "38 - Feature: Stockings"),
     "Eye":               ("Eye",               "MOON_SHADING_FEATURE_ID_EYE",
-                          "MOON_TOON_SLOTS_EYE",                 "39 - Feature: Eye"),
+                          "39 - Feature: Eye"),
     "ClothVelvet":       ("ClothVelvet",       "MOON_SHADING_FEATURE_ID_CLOTH_VELVET",
-                          "MOON_TOON_SLOTS_CLOTH_VELVET",        "40 - Feature: Cloth Velvet"),
+                          "40 - Feature: Cloth Velvet"),
     "ToonMetal":         ("ToonMetal",         "MOON_SHADING_FEATURE_ID_TOON_METAL",
-                          "MOON_TOON_SLOTS_TOON_METAL",          "41 - Feature: Metal"),
+                          "41 - Feature: Metal"),
     "EmissiveInk":       ("EmissiveInk",       "MOON_SHADING_FEATURE_ID_TOON_EMISSIVE_INK",
-                          "MOON_TOON_SLOTS_TOON_EMISSIVE_INK",   "42 - Feature: Emissive Ink"),
+                          "42 - Feature: Emissive Ink"),
     # No Matcap entry. A matcap is additive on top of the lighting result (MToon 1.0), so it is a
     # modifier that composes with every feature, not a 14th mutually exclusive one -- as a feature,
     # ticking it turned skin/hair shading OFF. It is authored in MF_MoonToonBaseInput under
@@ -490,9 +496,60 @@ def parse_slot_tables(path):
     return tables
 
 
+def parse_registry(path):
+    """(modules, features) from the engine's MoonToonFeatureRegistry.h.
+
+    modules:  Module -> MOON_TOON_SLOTS_* macro
+    features: IdName -> Module   (IdName is the MOON_SHADING_FEATURE_ID_ suffix)
+    """
+    src = open(path, encoding="utf-8").read()
+
+    def rows(list_macro):
+        # Line-scanned rather than one big regex: the table is a backslash-continued #define, and a
+        # regex for that has to spell "backslash then newline", which is exactly the kind of escape
+        # that silently loses a character on the way into a generator script. (It did.)
+        collected, collecting = [], False
+        for line in src.splitlines():
+            if not collecting and re.match(r"\s*#define\s+%s\(X\)" % list_macro, line):
+                collecting = True
+            if collecting:
+                collected.append(line)
+                if not line.rstrip().endswith("\\"):
+                    break
+        if not collected:
+            raise SystemExit("%s: %s not found" % (os.path.basename(path), list_macro))
+        return re.findall(r"X\(\s*(\w+)\s*,\s*(\w+)\s*\)", "\n".join(collected))
+
+    return dict(rows("MOON_TOON_MODULE_LIST")), dict(rows("MOON_TOON_FEATURE_LIST"))
+
+
+_REGISTRY = None
+
+
+def registry():
+    global _REGISTRY
+    if _REGISTRY is None:
+        _REGISTRY = parse_registry(os.path.normpath(REGISTRY))
+    return _REGISTRY
+
+
+def slot_table_for(feature_key):
+    """The MOON_TOON_SLOTS_* macro this feature reads, resolved through the engine registry."""
+    modules, features = registry()
+    id_name = FEATURES[feature_key][1][len("MOON_SHADING_FEATURE_ID_"):]
+    if id_name not in features:
+        raise SystemExit("%s: id %s is not in MOON_TOON_FEATURE_LIST -- add it to the registry"
+                         % (feature_key, id_name))
+    module = features[id_name]
+    if module not in modules:
+        raise SystemExit("registry: MOON_TOON_FEATURE_LIST routes %s to module %s, which is not in "
+                         "MOON_TOON_MODULE_LIST" % (id_name, module))
+    return modules[module]
+
+
 def emit(feature_key, tables):
-    dsf_name, id_macro, table_macro, group = FEATURES[feature_key]
-    rows = tables[table_macro]
+    dsf_name, id_macro, group = FEATURES[feature_key]
+    rows = tables[slot_table_for(feature_key)]
     params = PARAMS[feature_key]
 
     missing = [n for (_, _, n) in rows if n not in params]
@@ -603,7 +660,7 @@ def _feature_inputs(key, tables):
     maps = MAP_INPUTS.get(key, {})
     helpers = HELPERS.get(key, {})
     ins = []
-    for (t, _, name) in tables[FEATURES[key][2]]:
+    for (t, _, name) in tables[slot_table_for(key)]:
         if name in maps:
             fn_in, sel_in = maps[name][0], maps[name][1]
             op = _map_op(maps, name)
@@ -668,7 +725,7 @@ def emit_selector(tables, ids):
         '[ParameterName="%s"; Group="30 - Shading Feature (pick one)"; SortPriority=%d; '
         'Description="启用 %s 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. '
         '勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];'
-        % (switch_id(k), switch_label(k), i, FEATURES[k][3].split(": ")[-1])
+        % (switch_id(k), switch_label(k), i, FEATURES[k][2].split(": ")[-1])
         for i, k in enumerate(picks))
 
     def call(k, out_index):
@@ -751,11 +808,58 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonFeatureSelect", Root="Plugin.M
 """ % (decls, sel_in_block, props, body)
 
 
+# Ids that deliberately have no material function. Stating them is the whole point: the cross-check
+# below fails on any id that exists engine-side but has no .dsf, so a feature cannot be added to the
+# registry and then silently left unauthorable -- which is how MATCAP stayed dead for months.
+FEATURES_WITHOUT_FUNCTION = {
+    "EYEBROW": "reserved and inert; routes to the Default module and has no parameters of its own",
+}
+
+
+def check_registry_agreement():
+    """The engine registry and this generator must describe the same set of features.
+
+    Direction matters, so both are checked: an id with no .dsf is unauthorable, and a .dsf for an id
+    the engine does not know is a material function nothing can ever select.
+    """
+    modules, features = registry()
+    authored = {FEATURES[k][1][len("MOON_SHADING_FEATURE_ID_"):]: k for k in FEATURES}
+    problems = []
+
+    for id_name in sorted(features):
+        if id_name not in authored and id_name not in FEATURES_WITHOUT_FUNCTION:
+            problems.append("id %s is in MOON_TOON_FEATURE_LIST but has no FEATURES entry "
+                            "(add one, or list it in FEATURES_WITHOUT_FUNCTION with a reason)" % id_name)
+    for id_name, key in sorted(authored.items()):
+        if id_name not in features:
+            problems.append("FEATURES[%r] uses id %s, which is not in MOON_TOON_FEATURE_LIST"
+                            % (key, id_name))
+    for id_name in sorted(FEATURES_WITHOUT_FUNCTION):
+        if id_name not in features:
+            problems.append("FEATURES_WITHOUT_FUNCTION lists %s, which is not in MOON_TOON_FEATURE_LIST"
+                            % id_name)
+        if id_name in authored:
+            problems.append("%s is both authored in FEATURES and listed as function-less" % id_name)
+
+    routed = set(features.values())
+    for module in sorted(modules):
+        if module not in routed:
+            problems.append("module %s is in MOON_TOON_MODULE_LIST but no id routes to it" % module)
+
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
                     help="fail if any generated file differs from what is on disk")
     opts = ap.parse_args()
+
+    problems = check_registry_agreement()
+    if problems:
+        for problem in problems:
+            print("registry/generator disagree: %s" % problem)
+        return 1
 
     tables = parse_slot_tables(SLOT_TABLE)
     out_dir = os.path.normpath(OUT_DIR)
