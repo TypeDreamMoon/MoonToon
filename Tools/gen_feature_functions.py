@@ -816,6 +816,55 @@ FEATURES_WITHOUT_FUNCTION = {
 }
 
 
+def parse_bloom_weight_list(path):
+    """The ids in MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT (a one-argument X-macro list)."""
+    src = open(path, encoding="utf-8").read()
+    collected, collecting = [], False
+    for line in src.splitlines():
+        if not collecting and re.match(r"\s*#define\s+MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT\(X\)", line):
+            collecting = True
+        if collecting:
+            collected.append(line)
+            if not line.rstrip().endswith("\\"):
+                break
+    if not collected:
+        raise SystemExit("%s: MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT not found" % os.path.basename(path))
+    return re.findall(r"X\(\s*(\w+)\s*\)", "\n".join(collected))
+
+
+def check_bloom_weight_list(tables):
+    """The bloom-weight list must be exactly the features whose slot table names a BloomWeight slot.
+
+    The list has to exist -- ten features write FeatureInputVector.w and only two mean "bloom weight"
+    by it, so it cannot be derived from the layout alone -- but it does not have to be trusted.
+    """
+    listed = set(parse_bloom_weight_list(os.path.normpath(REGISTRY)))
+    modules, features = registry()
+    actual = set()
+    for id_name, module in features.items():
+        if id_name in FEATURES_WITHOUT_FUNCTION:
+            # An id no material can select cannot carry an authored bloom weight, so it is not
+            # expected in the list even though the module it routes to has the slot. EYEBROW is the
+            # case: it shades as Default and so inherits Default's BloomWeight slot, but there is no
+            # "Is Eyebrow" switch, so nothing can ever write it -- which is why the old
+            # `FeatureId == 0 || FeatureId == 1` excluded it too. Making it authorable removes it
+            # from this set, and the check then demands it be listed.
+            continue
+        rows = tables.get(modules.get(module), [])
+        if any(name == "BloomWeight" for (_, _, name) in rows):
+            actual.add(id_name)
+
+    problems = []
+    for id_name in sorted(listed - actual):
+        problems.append("MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT lists %s, but its slot table has no "
+                        "BloomWeight slot" % id_name)
+    for id_name in sorted(actual - listed):
+        problems.append("%s has a BloomWeight slot but is missing from "
+                        "MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT (ToonBlur.usf would ignore it)"
+                        % id_name)
+    return problems
+
+
 def check_registry_agreement():
     """The engine registry and this generator must describe the same set of features.
 
@@ -855,13 +904,13 @@ def main():
                     help="fail if any generated file differs from what is on disk")
     opts = ap.parse_args()
 
-    problems = check_registry_agreement()
+    tables = parse_slot_tables(SLOT_TABLE)
+
+    problems = check_registry_agreement() + check_bloom_weight_list(tables)
     if problems:
         for problem in problems:
             print("registry/generator disagree: %s" % problem)
         return 1
-
-    tables = parse_slot_tables(SLOT_TABLE)
     out_dir = os.path.normpath(OUT_DIR)
     os.makedirs(out_dir, exist_ok=True)
 
