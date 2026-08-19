@@ -609,6 +609,78 @@ P1 能用,是因为那是纯粹的展开搬家。P2 的 tint 收拢按定义会�
 和 P1a 那次是同一类问题。**结论:凡是要落地带反斜杠的文本,一律先 `cat > 片段文件 <<'EOF'` 写成纯文本,
 再用 Python 读文件拼接 —— 不要让反斜杠经过 Python 字符串字面量。**
 
+## P3 ✅ 完成 2026-08-19 —— hook 契约 + 派发器 + Skin 模块
+
+引擎 `456eedee`,插件 `52bb12c`。
+
+**做了什么**
+
+1. **`FToonShadeContext`**(新 `ToonShadeContext.ush`)—— 模块能看到的全部,以及仅此而已。
+   **分三阶段填充**,因为数据流卡死:band input 喂 ramp 采样 → ramp 采样定下阴影 → BxDF context
+   在漫反射之后才建。每阶段的字段注明了哪个 hook 可读;阶段 2/3 的字段在其阶段前是**零而不是未定义**。
+2. **三个 hook**:`BandInput` / `Diffuse` / `Specular`。Diffuse 返回 (Albedo, DiffuseScale, Additive),
+   主干合成 `Lambert(Albedo) * LightBanded * Scale + Additive` —— Additive 在乘法**之后**,
+   因为散射和透射不是 lambert。
+3. **`FToonFeaturePolicy` 只装"主干替模块决定的事"**,今天只有一个字段(装哪个已解析的阴影)。
+4. **`ToonFeatureDispatch.ush`** 四个 switch 全从 `MOON_TOON_MIGRATED_FEATURE_LIST` 展开。
+5. **Skin 是第一个模块**,并把 DFF 一起带走(注册表早就说了两个 id 都走 Skin)。
+
+**与计划的偏差(两处,都是有意的)**
+
+- **计划写 4 个 hook,只做了 3 个。** Tangent 没做:`GetToonWorldTangent` 内部已经自己分派 Kajiya,
+  此刻加一层"只有一种实现"的 hook 是脚手架。它跟 KajiyaHair 模块一起来(P4 #8),那才是第一个需要它的。
+- **policy 只有 1 个字段,不是计划的 6 个。** `bUsesDiffuseRamp` / `bUsesCelBand` 必须跟 Stockings 一起来:
+  在 P3 加上它们,主干就会去查一个对**所有未迁移 id(含 PBR 丝袜)仍是默认值**的 policy,直接shade 错。
+  `bMultiBandCel` 是 Default 从槽位读的,`bHasBloomWeight` 已经是 ToonBlur 用的独立注册表谓词。
+
+**验收(四条,逐条实测)**
+
+- **接线证明(机器判定)。** 模块体按 `Ctx.` 映射还原(`Ctx.L` → `AreaLight.DiffuseL` 等)、
+  legacy 的纯别名局部内联后,与它们的来源分支做记号流比对:
+  `Skin_Specular` 87 记号、`Default_Specular` 55、`Skin_BandInput` 12,**全部 MATCH**。
+- **主干 diff 恰好是那 10 步**,未迁移 id 的 legacy 链**一字未动**(`git diff` 逐条核对)。
+- **1,324 个 shader 编译,0 个 `error X####`。**
+- **跨改动像素 A/B。** 见下,这次学到东西了。
+
+### A/B 方法:第一次做跨改动的画面对照,踩了两个坑
+
+shader 改动没法像 cvar 那样同会话 A/B,只能"拍改后 → `git stash -u` → 重启拍改前 → `stash pop`"。
+
+**坑 1:场景自己在动。** 第一轮 mean 差 9.3,而同会话噪声底只有 0.31 —— 差异图显示是
+**Ultra Dynamic Sky 在两次启动之间推进了**(云在动、太阳在转),连带把角色受光也改了。
+**解法:两次都跑同一个脚本,删掉 UDS 换成固定方向光 + 天光,并关掉体积云/大气。**
+之后天空区域差异 **0.0000**,证明场景真的可复现了。
+
+**坑 2:`git stash` 把文件换行改成了 CRLF。** pop 回来后 6 个文件全部与备份 `cmp` 不同 ——
+内容逐字节相同,只是 LF→CRLF(仓库里其它 Toon 文件都是 LF)。**教训:stash/pop 跨 autocrlf
+往返之后要核对换行**,我是先把 6 个文件备份到 scratchpad 才敢 stash 的,值得保留这个习惯。
+
+**最终判据不是"差异够小",而是"差异落在我改不到的地方":**
+
+| 区域 | 同会话噪声 | 改前 vs 改后 |
+| --- | --- | --- |
+| 天空(固定光后无变化) | 0.0000 | **0.0000** |
+| **角色(toon,我改的)** | 0.47 | **1.51** |
+| **纯地面(非 toon,ToonBxDF 根本不跑)** | 0.52 | **3.24** |
+
+地面差异是角色的**两倍多**,而 `ToonBxDF` 对地面一行都不执行。32× 放大的差异图上,
+角色是暗的、地面是 Lumen 屏幕探针的摩尔纹。**我改得到的表面,比我改不到的表面动得更少。**
+残差是 Lumen/GI 时序收敛,不是着色改动。
+
+> 这条口径值得写进 v3 §3:跨改动 A/B 时,**场景里放一个改动证明影响不到的对照面**,
+> 比追求"差异接近零"更有用 —— 后者在有 GI 的场景里做不到,前者是可证伪的。
+
+### 生成器:迁移清单必须与 id 映射一致
+
+`MOON_TOON_MIGRATED_FEATURE_LIST` 是**会自我消解的脚手架**,但它重述了 FEATURE_LIST 的一部分,
+正是这个生成器存在的理由所要防的漂移。`check_migrated_list` 两个方向都查,并在两张表相等时
+**打印一条"可以删了"** —— 不会自报终点的脚手架容易永远留着。
+故障注入两条都验了:把 SKIN 在清单里路由到 Default → 报模块冲突;塞一个不存在的 id → 报缺失。
+
+**第一次注入测试自己有 bug**:`str.replace` 把两张表里的同名行**一起**改了,于是它们仍然一致、
+校验当然不报错。改成只在 `MOON_TOON_MIGRATED_FEATURE_LIST` 之后的文本里替换才测出来。
+**教训:故障注入要先确认注入到了目标位置。**
+
 ## P1b ⏳ 待做 —— 删除 `EMoonToonShadingFeature`
 
 单独一个提交,因为它是 v3 里**唯一要重编 C++ 的改动**(其余全是 shader + Python)。
