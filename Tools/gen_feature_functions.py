@@ -816,20 +816,58 @@ FEATURES_WITHOUT_FUNCTION = {
 }
 
 
-def parse_bloom_weight_list(path):
-    """The ids in MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT (a one-argument X-macro list)."""
+def macro_body(path, macro):
+    """The text of one X-macro list in the registry, continuation lines included."""
     src = open(path, encoding="utf-8").read()
     collected, collecting = [], False
     for line in src.splitlines():
-        if not collecting and re.match(r"\s*#define\s+MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT\(X\)", line):
+        if not collecting and re.match(r"\s*#define\s+" + macro + r"\(X\)", line):
             collecting = True
         if collecting:
             collected.append(line)
             if not line.rstrip().endswith("\\"):
                 break
     if not collected:
-        raise SystemExit("%s: MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT not found" % os.path.basename(path))
-    return re.findall(r"X\(\s*(\w+)\s*\)", "\n".join(collected))
+        raise SystemExit("%s: %s not found" % (os.path.basename(path), macro))
+    return "\n".join(collected)
+
+
+def parse_bloom_weight_list(path):
+    """The ids in MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT (a one-argument X-macro list)."""
+    return re.findall(r"X\(\s*(\w+)\s*\)", macro_body(path, "MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT"))
+
+
+def parse_migrated_list(path):
+    """id -> module for MOON_TOON_MIGRATED_FEATURE_LIST (a two-argument X-macro list)."""
+    return dict(re.findall(r"X\(\s*(\w+)\s*,\s*(\w+)\s*\)",
+                           macro_body(path, "MOON_TOON_MIGRATED_FEATURE_LIST")))
+
+
+def check_migrated_list():
+    """The migration frontier must agree with the mapping it is a subset of.
+
+    MOON_TOON_MIGRATED_FEATURE_LIST restates part of MOON_TOON_FEATURE_LIST so the ToonBxDF hook
+    dispatchers can be generated while some features still shade through the legacy if/else chain.
+    Restating invites drift, so it is checked rather than trusted: every listed id must exist, and
+    must name the same module. When the two lists become equal the frontier has done its job, and
+    saying so here is how that moment gets noticed instead of the scaffolding living forever.
+    """
+    migrated = parse_migrated_list(os.path.normpath(REGISTRY))
+    _, features = registry()
+
+    problems = []
+    for id_name, module in sorted(migrated.items()):
+        if id_name not in features:
+            problems.append("MOON_TOON_MIGRATED_FEATURE_LIST names %s, which is not in "
+                            "MOON_TOON_FEATURE_LIST" % id_name)
+        elif features[id_name] != module:
+            problems.append("MOON_TOON_MIGRATED_FEATURE_LIST routes %s to module %s, but "
+                            "MOON_TOON_FEATURE_LIST routes it to %s"
+                            % (id_name, module, features[id_name]))
+    if not problems and set(migrated) == set(features):
+        print("note: every feature has a module now -- MOON_TOON_MIGRATED_FEATURE_LIST and the "
+              "legacy chain in ToonShadingModel.ush can both be deleted (v3 P4 complete)")
+    return problems
 
 
 def check_bloom_weight_list(tables):
@@ -906,7 +944,7 @@ def main():
 
     tables = parse_slot_tables(SLOT_TABLE)
 
-    problems = check_registry_agreement() + check_bloom_weight_list(tables)
+    problems = check_registry_agreement() + check_bloom_weight_list(tables) + check_migrated_list()
     if problems:
         for problem in problems:
             print("registry/generator disagree: %s" % problem)
