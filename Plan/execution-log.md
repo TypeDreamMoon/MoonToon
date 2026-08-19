@@ -493,3 +493,71 @@ toon 载荷没有别的入口。正确的去处是把每灯那半挂到 `FAreaLi
 参数,而且已经带着 `FToonLight` —— 但 `FRect` / `FCapsule` 在 deferred lighting 之外还有十几处
 构造点,那些地方会把新字段留成未初始化,而今天它们拿到的是 `InitToonLightContext()` 的默认值。
 那是另一件事,得配自己的测试。
+
+---
+---
+
+# v3 执行日志
+
+计划:`refactor-plan-v3.md`(注册表 + hook 派发 + Modifier 轴)。轴规则:`axes.md`。
+
+## P0 ✅ 完成 2026-08-19 —— spike PASS,枚举可删
+
+详见 `P0-v3-result.md`。两句话:
+
+- **spike PASS,0 诊断。** `case MOON_SHADING_FEATURE_ID_##ID:` 写在函数体内、同一张表在同一 TU
+  展开多次、`##ID` 一行用两次 —— 全过。粘出来的记号会被**重新扫描**,落地是 `case 6 :` 而不是宏名。
+  退化方案不启用。
+- **`EMoonToonShadingFeature` 活资产零引用。** 全库 23058 个 `.uasset` 二进制扫描,唯一命中是
+  `Content/Project/` 下 2026-08-10 的重构前遗留副本(只被 `test` 目录里一个 MI 间接引用)。
+  → P1 删除。
+
+v2 的 `ppdrv` 驱动没保留,重写了一份(scratchpad `p0spike/`)。v2 记的两个坑还在:
+`-msse4.2` 必须给,`STB_LCG_NEXT` 要自己补,外加文件 buffer 的 16 字节 padding。
+
+## P1a ✅ 完成 2026-08-19 —— 注册表 + 展开 + 生成器校验
+
+引擎提交 `6c2fcb17`。插件提交见下。
+
+**做了什么**
+
+1. 新建 `Engine/Shaders/Shared/MoonToonFeatureRegistry.h`:`MOON_TOON_MODULE_LIST`(10 个模块 →
+   槽位表)+ `MOON_TOON_FEATURE_LIST`(14 个 id → 模块)。别名从此是表里的事实,不再是某个 `if` 的性质。
+2. `ToonFeatureParams.ush` 的 10 行手抄 → `MOON_TOON_MODULE_LIST(MOON_TOON_DEFINE_FEATURE_PARAMS)`。
+3. `MoonToonFeatureSlots.h` 头注释指向注册表。
+4. `gen_feature_functions.py`:`FEATURES` 删掉槽位表那一列,改由注册表 id → 模块 → 槽位表推导;
+   新增 `check_registry_agreement()` 双向校验 + `FEATURES_WITHOUT_FUNCTION` 白名单。
+
+**验收(全部实测)**
+
+- 预处理**记号流相同**:1092 : 1092。
+- `gen_feature_functions.py --check` **exit=0**,14 个生成文件逐字节零 diff。
+- **故障注入证明校验抓得住错**(校验通不过才有意义):
+  - 往注册表塞一个 `OIL_FILM` id → `id OIL_FILM is in MOON_TOON_FEATURE_LIST but has no FEATURES entry`
+  - 塞一个没人路由到的 `OilFilm` 模块 → `module OilFilm is in MOON_TOON_MODULE_LIST but no id routes to it`
+
+### 计划的验收口径改了一处,理由记下来
+
+v3 P1 原文写的是"**逐字节相同**"。做不到,而且不该做到:一次列表展开会把十条声明放到**同一行**,
+而原来是十行。**改成"记号流相同"** —— 去掉 `#line`、注释、折叠空白之后逐记号比对。
+HLSL 在字符串和预处理指令之外对空白不敏感,所以记号流相同就是零行为变化,而且同样是机器判定。
+后续 P2 沿用这个口径。
+
+### 一个自找的坑,记下来防止再犯
+
+生成器里那个"匹配反斜杠续行的 `#define` 块"的正则,写进脚本时**丢了一个反斜杠**
+(`[^\n]*\n` 而不是 `[^\n]*\\n`),结果两张表都解析成空。表现是 `id DEFAULT is not in
+MOON_TOON_FEATURE_LIST` —— 看起来像注册表写错了,其实是解析器错了。
+**改成逐行扫描,不再依赖那个转义。** 教训:多层引用(heredoc → Python 字面量 → 正则)里的反斜杠,
+能不用就不用。
+
+## P1b ⏳ 待做 —— 删除 `EMoonToonShadingFeature`
+
+单独一个提交,因为它是 v3 里**唯一要重编 C++ 的改动**(其余全是 shader + Python)。
+
+静态证据已齐:ripgrep 全 `Engine/Source/Runtime` 扫描,**没有任何文件 include 那个头,也没有任何
+代码用那个符号** —— 它纯粹靠 UHT 扫描生成反射,给材质编辑器的 Enumeration 下拉用。
+删掉之后那个遗留资产的 `Enumeration` 指针变空,面板从下拉退回数字输入,**不影响着色**。
+
+**没做的原因:验不了。** 要重编 `UnrealEditor-Engine.dll` 才算数,而验收口径就是"编译通过"。
+留给下一次能跑构建的时候。
