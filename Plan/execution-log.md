@@ -681,6 +681,162 @@ shader 改动没法像 cvar 那样同会话 A/B,只能"拍改后 → `git stash 
 校验当然不报错。改成只在 `MOON_TOON_MIGRATED_FEATURE_LIST` 之后的文本里替换才测出来。
 **教训:故障注入要先确认注入到了目标位置。**
 
+## P4 ✅ 完成 2026-08-19 —— 九个模块全部搬出主干,legacy 链删除
+
+引擎 `ad693f2c` / `4ff2b249` / `667d8f18` / `2eafc90e`,插件 `a8e7cd2`。
+
+**`ToonShadingModel.ush` 857 → 481 行**,而且里面**不再出现任何 feature 名字** —— 只剩主干。
+
+**分批(与计划的"每模块一提交"有出入,见下)**
+
+| 提交 | 模块 | 特殊点 |
+| --- | --- | --- |
+| `ad693f2c` | Eye / Cloth / Metal / Ink | 形状相同,一起走;band-input 链整个收成一次无条件调用 |
+| `4ff2b249` | HairHighlightMask / PBRSpecular | 只有高光;上下文新增 `bHasAnisotropy` |
+| `667d8f18` | KajiyaHair(两个 id) | 新增第四个 hook `Tangent`;`GetToonWorldTangent` 拆成 `GetToonTangentFrame` + 模块 |
+| `2eafc90e` | Stockings(两个 id) | policy 新增 `bCelShaded`;删 legacy 链 + 脚手架 |
+
+**与计划的偏差:批次而非逐模块提交。** 计划写"每模块一提交",实际是 4 个提交带 9 个模块。
+理由:每个模块的**接线证明是独立的**(见下),bisect 到提交只能缩小到批次,再靠证明缩小到模块 —— 
+而按模块提交会让工具轮次翻三倍却不增加可验证性。四个提交仍然各自可回滚。
+
+**验收**
+
+- **接线证明**:每个模块体按 `Ctx.` 映射还原 + legacy 别名局部内联后与来源分支做记号流比对。
+  Eye 76 / Cloth 11 / Metal 81 / Ink 79 / HairMask 61 / PBRSpecular 53 / Stockings 125 记号,
+  加三个 band input,**全部 MATCH**。归一化器每加一条规则都回归跑一遍前面的批次。
+- **Kajiya 例外,说清楚**:它把两条分支合成一个函数,是**重构不是搬移**,记号证明不直接适用。
+  我按 id 特化模块后比对,残差只剩声明语句和一个上提局部的顺序,最终**手工逐因子核对**:
+  两条路径的乘积展开后与旧分支逐项相同(非 toon 路径的白色 tint 是精确乘 1),
+  `HairSpecularShadow` 两边都是 `lerp(1, SurfaceShadow, Kajiya.ShadowStrength)`。
+- ppdrv 两套 permutation 全程 0 诊断;`--check` exit=0。
+
+### 画面 A/B:通过,但我中途下过一个错误结论
+
+窗口布局在两次会话之间变了(1501×1241 → 1010×1241),P3 的旧基线没法直接比。
+做法:`git checkout <P3 提交> -- Engine/Shaders/Private/Toon ...` 回退 shader、重编、在**当前布局**下拍基线,
+再 `git checkout HEAD --` 恢复。比 stash 好的一点是不经过 autocrlf 往返(P3 那次被换行符坑过)。
+
+**结果(确定性场景,固定方向光 + 天光,关体积云/大气):**
+
+| 区域 | 同构建噪声 | 跨构建差异 | 比值 |
+| --- | --- | --- | --- |
+| 天空(确定性对照) | 0.0000 | **0.0000** | — |
+| 角色带(toon,我改的) | 0.898 | 1.618 | **1.80** |
+| 接触阴影带 | 0.949 | 1.604 | 1.69 |
+| 纯地面(非 toon,ToonBxDF 不执行) | 1.180 | 2.321 | **1.97** |
+
+**改不到的地面比值最高,角色带最低。** 与 P3 同一形态:残差是 Lumen/GI 跨启动收敛差异。
+
+**中途的错误结论,值得记下来。** 我先按固定阈值统计"差异 > 12 的像素",得到:
+4415 个热点像素里 **97% 在角色上**,且变亮(luma 116→140),据此判断"P4 确实改了某处 toon 着色",
+还开始逐个 feature 排查。**这是错的。**
+
+问题在于用**固定阈值**统计**异方差**数据:轮廓像素本身噪声就是平坦区的 3 倍
+(高对比边界,任何时序差异都被放大),所以它们越过固定阈值的概率天然高得多。
+换成**噪声归一化比值**之后真相就出来了:
+
+| | 同构建噪声 | 跨构建 | 比值 |
+| --- | --- | --- | --- |
+| 轮廓像素 | 1.58 | 2.95 | 1.87 |
+| 平坦内部 | 0.58 | 1.12 | 1.93 |
+
+比值几乎相同 —— 跨构建差异只是同构建噪声的**均匀 ~1.9 倍放大**(两次独立的收敛历史 vs 相邻两帧),
+不是任何局部的着色改变。
+
+> **口径升级(补进 v3 §3 的 L4c)**:对照面 A/B 的判据必须是**噪声归一化比值**,不能是固定阈值下的
+> 像素计数。固定阈值会把"高对比区域"误报成"改动区域"。同时保留"改不到的对照面"这一条 ——
+> 两者结合才是可证伪的。
+
+顺带排除过的一个假设:把 P3 图按 ±1 像素平移后再比,(0,0) 仍然最优(1.29% vs 8.4%),
+所以差异不是亚像素几何位移。
+
+### 抓到一个真 bug:悬空的 `else`
+
+删掉两条 Kajiya 分支后,外层 `else { MaxSpecularValue; else {...} }` 留下了一个**没有 `if` 的 `else`**。
+**预处理器看不见它**(不是预处理错误),ppdrv 照样 0 诊断,但 HLSL 编不过 —— 
+也就是说 `b112c001` 那个提交是坏的。
+
+修法:补上并 **amend 那个提交**(`667d8f18`),不在历史里留一个明知编不过的版本。
+并给手术脚本加了结构守卫:**每个 `else` 之前(跳过空行和注释)必须是 `}`**。
+
+> 教训:`drop_arm` 这类"按大括号配对删一条分支"的工具,删的是**分支**,留下的是**链**。
+> 删完要检查链本身还成立 —— 预处理器不管语法,只有编译器管,而编译一次要 4 分钟。
+
+### 三次踩同一个坑:注册表里两张表有同名行
+
+`X(EYE, Eye)` / `X(SKIN, Skin)` 这类行在 `MOON_TOON_FEATURE_LIST` 和
+`MOON_TOON_MIGRATED_FEATURE_LIST` 里**字面相同**。于是:
+
+1. 故障注入测试用 `str.replace` 改"迁移清单",实际把两张表都改了 → 它们仍然一致,校验当然不报错;
+2. 加迁移条目时锚点 `count == 1` 断言失败;
+3. "是否已应用"的守卫 `"X(EYE," not in s` 匹配到了 FEATURE_LIST 里的那行。
+
+**结论:凡是编辑这个注册表,一律先 `i = s.index("#define <目标宏>")` 切出 `tail`,
+所有断言和替换都只在 `tail` 上做。** 已经三次了,写进这里。
+
+### 反斜杠又被吃了一次(第三次)
+
+给迁移清单加条目时,续行反斜杠在 bash heredoc → Python 字面量这条路上变成了字面 `\n`,
+整个宏被压成一行。**日志里已经记过两次的教训这次真的照做了**:带反斜杠的文本先
+`cat > 片段文件 <<'FRAG'` 落成纯文本,再用 Python 读文件拼接 —— 之后三个批次都没再出问题。
+
+### 第二个 ppdrv 看不见的错误:先用后声明
+
+Kajiya 那步把 tangent 改成 hook 调用,而调用点是 `ToonBxDF` 的**第一条语句** —— 在
+`const uint ShadingFeatureID` 声明之前。**355 条 shader 编译错误**,全部级联自这一条:
+
+```
+ToonShadingModel.ush(58,44): error: use of undeclared identifier 'ShadingFeatureID'
+```
+
+后面那一大片 Lumen `Internal Error!` 是编译 worker 因同一个坏文件崩掉,不是独立问题。
+
+**这是同一个缺口第二次漏。** 悬空 `else` 那次我加的守卫只查 `else`;这次是声明序。
+两者的共同点:**ppdrv 是预处理器,不做语法和作用域检查**,它照样把坏代码输出出来。
+
+修法:把 `ShadingFeatureID` 声明挪到第一个使用者(tangent hook)之前,并加
+**声明序检查** `decl_order.py` —— 对 ToonBxDF 和全部模块文件扫描"某个局部在其声明行之前被用到"。
+**先对提交里那个坏版本做故障注入验证它抓得到**:
+
+```
+buggy.ush   1 PROBLEM(S)
+    line 58 uses 'ShadingFeatureID', declared on line 74
+```
+
+正是编译器报的那一行,而且不用等四分钟启动编辑器。13 个文件全过。修复提交 `90b7823`。
+
+> **口径升级**:ppdrv 0 诊断**不等于**能编译。它能证明的只有"宏展开正确、include 图成立"。
+> 语法、作用域、类型全部要等真编译。P5 起,凡是动 `ToonBxDF` 结构的改动,
+> 提交前必须跑 `decl_order.py` + 悬空 `else` 守卫,并且**尽量把真编译提前**。
+
+### 一次操作失误
+
+重编前我用 `taskkill /F` 关掉了**两个** UnrealEditor 进程,而其中一个是先前就在跑的
+(启动时 `Get-Process` 就返回两个 pid)。应该先用 bridge 端口认出自己那个实例、再 `quit_editor` 优雅退出。
+**规则:多实例环境下,只按日志里的 `Listening on 127.0.0.1:<port>` 认自己的进程,不按进程名批量杀。**
+
+### 脚手架按设计自我消解
+
+`MOON_TOON_MIGRATED_FEATURE_LIST` 是临时的迁移前沿,`check_migrated_list` 在两张表相等时
+**主动打印"可以删了"**。P4 收尾时它真的打印了:
+
+```
+note: every feature has a module now -- MOON_TOON_MIGRATED_FEATURE_LIST and the legacy
+chain in ToonShadingModel.ush can both be deleted (v3 P4 complete)
+```
+
+于是同一个提交里:派发器从迁移清单改读 `MOON_TOON_FEATURE_LIST`、`ToonFeature_HasModule` 删除、
+迁移清单删除、`check_migrated_list` 删除、legacy 链删除。**不会自报终点的脚手架容易永远留着**,
+这次验证了这个做法有效。
+
+### 收尾时删多了一次
+
+删 `check_migrated_list` 时按"从 `parse_migrated_list` 到 `check_registry_agreement`"取范围,
+而 `check_bloom_weight_list` 正好夹在中间,被一起删了(`--check` 立刻 NameError)。
+`git checkout` 回滚后改成以 `check_bloom_weight_list` 为右边界重做。
+**教训:按"函数名到函数名"删范围之前,先列一遍该范围内的函数名。**
+
 ## P1b ⏳ 待做 —— 删除 `EMoonToonShadingFeature`
 
 单独一个提交,因为它是 v3 里**唯一要重编 C++ 的改动**(其余全是 shader + Python)。
