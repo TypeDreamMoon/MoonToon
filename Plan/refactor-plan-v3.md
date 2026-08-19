@@ -346,6 +346,7 @@
 | L3 参数 | MI override 快照前后语义比对 | 没有静默丢值 | P5 开关改名 |
 | L4 画面 | 逐特征目检截图 | 最终判据 | P5b 新效果 |
 | **L4b 画面 diff** | **同一 exec 里关 TAA 背靠背截 A → B → A,`|A−B|` 与 `|A−A'|` 比** | **差异 ≤ 时序噪声底(Showcase 实测 mean 0.27 / >4 的像素 0.31%)= 不可分** | **P2 / P3 / P4 / P5a** |
+| **L4c 对照面 A/B** | **改动跨 shader 重编时(同 exec 做不到):两次都先把场景钉死(删 UDS,换固定方向光 + 天光,关体积云/大气),再比"改动能影响的表面"与"改动证明影响不到的表面"** | **判据不是"差异够小",而是"差异落在改不到的地方"。P3 实测:天空 0.0000、toon 角色 1.51、非 toon 地面 3.24 —— 地面是角色的两倍多,而 ToonBxDF 对地面一行不执行,残差即 Lumen 时序收敛** | **P3 / P4 / P5a** |
 | **L5 性能** | **ProfileGPU,同视口同 SP,取两次最小值;只信单 draw 事件与 ParallelDraw 求和** | **主光 `RenderLight` ±10%** | **P3 / P4 末 / P5** |
 
 L4b 的操作细节在 `.claude` memory(`devtest-project-unreal-bridge.md`)和本次 scratchpad 的
