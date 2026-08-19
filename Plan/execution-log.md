@@ -551,6 +551,64 @@ MOON_TOON_FEATURE_LIST` —— 看起来像注册表写错了,其实是解析器
 **改成逐行扫描,不再依赖那个转义。** 教训:多层引用(heredoc → Python 字面量 → 正则)里的反斜杠,
 能不用就不用。
 
+## P2 ✅ 完成 2026-08-19 —— 主干抽横切
+
+引擎提交 `e59339df`,插件提交见下。
+
+**做了什么**
+
+1. **shadow tint 六处抄写 → 一个 helper。** `ApplyToonShadowTint` + `FToonShadowTint` 进
+   `ToonShadingHelpers.ush`;feature 只声明自己要的**形状**(LERP / MODULATE / NONE),主光判定
+   收进结构体。丝袜那个 `if (bIsNPRStockings && bToonMainLightPath)` 变成
+   `bIsNPRStockings ? MODULATE : NONE` —— 正好是 P3 要的 policy 形状。
+2. **两种光色改名。** `LightColorAndAttenuation` → `LightBanded`(29 处),
+   `RawLightColorAndAttenuation` → `LightUnbanded`(6 处),并在声明处写清规则:
+   **背光项永远取 Unbanded**(它存在于 band ≈ 0 的地方,喂 banded 等于关掉效果)。
+3. **bloom 权重去掉魔数。** `ToonBlur.usf` 的 `FeatureId == 0 || FeatureId == 1` →
+   `MoonToonFeatureHasBloomWeight`,从注册表新增的 `MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT` 展开;
+   生成器加 `check_bloom_weight_list` 把这张列表钉死在槽位表上。
+4. 计划里的第 4 项(`bUseFacialShadowOverride` / 主光选择 / `ToonShadowTintScale` 各收成一次)
+   —— **已经是现状**,写计划时看漏了,无事可做。
+
+**验收(逐条实测)**
+
+- **改名是纯改名。** 用 stb_preprocess 跑两套 permutation(deferred 副光;主光 + 前向 + 各向异性),
+  把两种拼写折叠成同一个规范记号后比对:**IDENTICAL,8771 / 9343 tokens**。
+  用"折叠"而不是"替换"才算数 —— 万一把 Unbanded 写成 Banded,折叠法照样报错。
+- **tint 收拢共 31 处记号改动**,两套 permutation 各 31,逐条点清:helper 1 + 构造 1 + 丝袜 4 +
+  五个同形点各 5。数学是恒等变换,要验的是接线,而这份清单就是接线证明。
+- **0 个 `error X####`**:整机启动全量编译(FDeferredLightPS 编了 608 次)+ 事后
+  `recompileshaders changed`。
+- Showcase 目检正常:丝袜仍有 skin/fabric 混合与密度过渡,脸和布料仍有明暗带。
+
+### 验收口径:P2 为什么不能用"记号流相同"
+
+P1 能用,是因为那是纯粹的展开搬家。P2 的 tint 收拢按定义会改记号(6 处内联表达式 → 1 个函数调用)。
+所以拆成两段分别证:改名段用规范化记号流(可机器判定),tint 段用**枚举全部记号改动并逐条核对**
+(也可机器判定,只是要人读一遍清单)。计划 §3 早写了这种情况,这次是第一次真用上。
+
+### 校验抓到的两件事
+
+1. **改名脚本把一行声明弄丢了。** 我用注释块替换 `float3 RawLightColorAndAttenuation = ...;` 那行时,
+   新文本忘了把声明本身写回去 —— `LightUnbanded` 未声明就被赋值,shader 根本编不过。
+   **规范化记号流比对当场报了出来**(before 比 after 多 5 个记号 `float3 @UNBANDED = @BANDED ;`)。
+   这就是"验收要能机器判定"的意义:目检这种 diff 极容易放过去。
+2. **bloom 校验一上来就报了 EYEBROW。** 它路由到 Default 模块,于是继承了 Default 的 BloomWeight 槽,
+   但旧代码 `Id==0||Id==1` 从不把它算进去。查清后的结论:**没有 `Is Eyebrow` 开关,没有材质能选中它**,
+   所以它不可能有被授权的 bloom 权重 —— 校验改成跳过 `FEATURES_WITHOUT_FUNCTION` 里的 id,
+   行为与旧代码完全一致。哪天它变成可授权的,这条校验会立刻要求把它列进去。
+
+**故障注入**(校验通不过才有意义,两条都验了):
+拿掉 `X(PBR_SPECULAR)` → `PBR_SPECULAR has a BloomWeight slot but is missing from ...`;
+塞进没有该槽的 `X(SKIN)` → `lists SKIN, but its slot table has no BloomWeight slot`。
+
+### 又踩了一次反斜杠
+
+`MOON_TOON_FEATURES_WITH_BLOOM_WEIGHT` 第一次写进注册表时,续行反斜杠在
+**bash heredoc → Python 字面量 → 文件**这条路上被吃掉,整个宏挤成了一行(合法,但和别的表不一致)。
+和 P1a 那次是同一类问题。**结论:凡是要落地带反斜杠的文本,一律先 `cat > 片段文件 <<'EOF'` 写成纯文本,
+再用 Python 读文件拼接 —— 不要让反斜杠经过 Python 字符串字面量。**
+
 ## P1b ⏳ 待做 —— 删除 `EMoonToonShadingFeature`
 
 单独一个提交,因为它是 v3 里**唯一要重编 C++ 的改动**(其余全是 shader + Python)。
