@@ -1,0 +1,45 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonModifierSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One modifier, one material function. A modifier is ADDITIVE on top of whatever shading feature the
+// material selected, so unlike a feature it does not compete for the 30 group's single choice.
+
+import "Shared/ToonFunctions.dsh";
+
+Function ToonModifierWrite_Matcap(
+	in float3 Color,
+	in float LightingMix,
+	out float4 ModifierData)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ModifierInputVector.xyz = Color;
+	TBuffer.ModifierInputVector.w = LightingMix;
+
+	ModifierData = TBuffer.ModifierInputVector;
+}
+
+ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_Matcap", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the Matcap modifier parameters into the ToonFeatureRT4 payload.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Modifiers";
+	}
+
+	Inputs = {
+		opt float3 NormalTS = float3(0.0, 0.0, 1.0) [Description="Tangent-space normal, the same one the surface ends up shading with."];
+	}
+
+	Outputs = {
+		float4 ModifierData;
+	}
+
+	Graph = {
+		ToonModifierWrite_Matcap(
+			MF_ToonMatcap(NormalTS, OutputIndex=0),
+			MF_ToonMatcap(NormalTS, OutputIndex=1),
+			ModifierData);
+	}
+}

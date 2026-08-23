@@ -478,17 +478,17 @@ HEADER = """// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by To
 """
 
 
-def parse_slot_tables(path):
-    """feature-macro -> [(Type, Slot, Name)], following one level of table aliasing."""
+def parse_slot_tables(path, prefix="MOON_TOON_SLOTS_"):
+    """table-macro -> [(Type, Slot, Name)], following one level of table aliasing."""
     src = open(path, encoding="utf-8").read()
     tables, alias = {}, {}
-    for m in re.finditer(r"#define\s+(MOON_TOON_SLOTS_\w+)\(X\)((?:[^\n]*\\\n)*[^\n]*)", src):
+    for m in re.finditer(r"#define\s+(%s\w+)\(X\)((?:[^\n]*\\\n)*[^\n]*)" % prefix, src):
         name, body = m.group(1), m.group(2)
         rows = re.findall(r"X\(\s*(\w+)\s*,\s*([\w.]+)\s*,\s*(\w+)\s*\)", body)
         if rows:
             tables[name] = rows
         else:
-            ref = re.search(r"(MOON_TOON_SLOTS_\w+)\(X\)", body)
+            ref = re.search(r"(%s\w+)\(X\)" % prefix, body)
             if ref:
                 alias[name] = ref.group(1)
     for a, target in alias.items():
@@ -903,6 +903,353 @@ def check_registry_agreement():
     return problems
 
 
+# =================================================================================================
+# The MODIFIER axis.
+#
+# Same machinery as the feature axis above, deliberately: one X-macro slot table in the engine, one
+# generated material function per entry, one generated selector. What differs is the fallback --
+# a feature always picks one (Default), while a modifier's normal state is NONE, which has no module
+# and no function. So the chains below bottom out in a literal zero rather than in a call.
+
+MODIFIER_SLOT_TABLE = os.path.join(os.path.dirname(SLOT_TABLE), "MoonToonModifierSlots.h")
+MODIFIER_ID_TABLE = os.path.join(os.path.dirname(SLOT_TABLE), "MoonToonModifierDefinitions.h")
+MODIFIER_OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "DShader", "MaterialFunctions", "Modifiers")
+MODIFIER_SELECT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DShader",
+                                    "MaterialFunctions", "MF_MoonToonModifierSelect.dsf")
+
+# modifier key -> (dsf name, MOON_TOON_MODIFIER_ID_*, parameter group)
+MODIFIERS = {
+    "Matcap":  ("Matcap",  "MOON_TOON_MODIFIER_ID_MATCAP",   "44 - Modifier: Matcap"),
+    "OilFilm": ("OilFilm", "MOON_TOON_MODIFIER_ID_OIL_FILM", "45 - Modifier: Oil Film"),
+}
+
+# Slots a modifier computes by calling a shared function instead of declaring a parameter for.
+# Identical in purpose to HELPERS on the feature side, and identical in payoff: everything the call
+# needs sits behind the modifier's own static switch, so an instance with the modifier off shows
+# none of its rows and fetches none of its textures.
+#
+# Matcap is entirely this -- all seven of its authoring parameters live in MF_ToonMatcap, which now
+# returns one output per SLOT rather than one packed float4, so the packing is stated only in the
+# engine's MOON_TOON_MOD_SLOTS_MATCAP table.
+MODIFIER_HELPERS = {
+    "Matcap": {
+        "Color":       "MF_ToonMatcap(NormalTS, OutputIndex=0)",
+        "LightingMix": "MF_ToonMatcap(NormalTS, OutputIndex=1)",
+    },
+}
+
+# Inputs a modifier's function takes, threaded through from the selector.
+# (type, function input, selector input, default, description)
+MODIFIER_INPUTS = {
+    "Matcap": [("float3", "NormalTS", "InNormalTS", "float3(0.0, 0.0, 1.0)",
+                "Tangent-space normal, the same one the surface ends up shading with.")],
+}
+
+# Slots a modifier declares its own material parameter for, for modifiers that are not a pure helper
+# call. slot Name -> (parameter name, default, description). Empty for Matcap by construction --
+# all seven of its knobs live in MF_ToonMatcap.
+#
+# The oil film is the opposite: every slot is a plain number, because its colour is NOT authored
+# here. It comes from the specular ramp atlas the material already carries, so the film inherits the
+# character's specular grading and Hue Shift only rotates where on that ramp it sits.
+MODIFIER_PARAMS = {
+    "OilFilm": {
+        "Intensity": ("Oil Film Intensity", "1.0",
+                      "油膜高光强度. 0 = 完全关闭(着色器会整段跳过), 所以这也是它的开关."),
+        "HighlightScale": ("Oil Film Highlight Scale", "1.0",
+                           "缩放 GGX 的 alpha, 也就是高光斑的大小. >1 更大更散, <1 更小更聚. "
+                           "这是风格化 GGX 的核心旋钮 —— 物理 GGX 收紧时会同时变暗, 这里不会."),
+        "FalloffPower": ("Oil Film Falloff Power", "1.0",
+                         "高光的锐利度: >1 边缘更硬(接近赛璐璐的一块高光), <1 更软更弥散. "
+                         "作用在阴影项之后, 所以越锐利的油膜进入暗部时也衰减得越快."),
+        "HueShift": ("Oil Film Hue Shift", "0.0",
+                     "在高光 ramp 上旋转油膜的取色位置, [0,1] 循环. "
+                     "油膜的颜色随视角在 ramp 上扫过(正视在头, 掠射在尾), 这个值整体平移那段扫描."),
+    },
+}
+
+MODIFIER_IMPORTS = {"Matcap": ["Shared/ToonFunctions.dsh"]}
+
+MODIFIER_HEADER = """// GENERATED from Engine/Shaders/Shared/MoonToonModifierSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One modifier, one material function. A modifier is ADDITIVE on top of whatever shading feature the
+// material selected, so unlike a feature it does not compete for the 30 group's single choice.
+"""
+
+
+def parse_modifier_list(path):
+    """IdName -> Module, out of MOON_TOON_MODIFIER_LIST."""
+    src = open(path, encoding="utf-8").read()
+    collected, collecting = [], False
+    for line in src.splitlines():
+        if not collecting and re.match(r"\s*#define\s+MOON_TOON_MODIFIER_LIST\(X\)", line):
+            collecting = True
+        if collecting:
+            collected.append(line)
+            if not line.rstrip().endswith("\\"):
+                break
+    if not collected:
+        raise SystemExit("%s: MOON_TOON_MODIFIER_LIST not found" % os.path.basename(path))
+    return dict(re.findall(r"X\(\s*(\w+)\s*,\s*(\w+)\s*\)", "\n".join(collected)))
+
+
+def parse_modifier_ids(path):
+    """MOON_TOON_MODIFIER_ID_* -> numeric value."""
+    src = open(path, encoding="utf-8").read()
+    return {m.group(1): int(m.group(2))
+            for m in re.finditer(r"#define\s+(MOON_TOON_MODIFIER_ID_\w+)\s+(\d+)", src)}
+
+
+def modifier_slot_table_for(key):
+    """The MOON_TOON_MOD_SLOTS_* macro this modifier reads, via the engine's modifier list."""
+    id_name = MODIFIERS[key][1][len("MOON_TOON_MODIFIER_ID_"):]
+    listed = parse_modifier_list(os.path.normpath(MODIFIER_ID_TABLE))
+    if id_name not in listed:
+        raise SystemExit("%s: id %s is not in MOON_TOON_MODIFIER_LIST -- its module does not exist "
+                         "yet, so a material function for it would author a value nothing reads"
+                         % (key, id_name))
+    return "MOON_TOON_MOD_SLOTS_%s" % id_name
+
+
+def emit_modifier(key, tables):
+    dsf_name, id_macro, group = MODIFIERS[key]
+    rows = tables[modifier_slot_table_for(key)]
+    helpers = MODIFIER_HELPERS.get(key, {})
+    params = MODIFIER_PARAMS.get(key, {})
+
+    missing = [n for (_, _, n) in rows if n not in helpers and n not in params]
+    if missing:
+        raise SystemExit("%s: slot table has %s with neither a helper nor a material parameter"
+                         % (key, ", ".join(missing)))
+
+    fn = "ToonModifierWrite_%s" % dsf_name
+    args = ",\n".join("\tin %s %s" % ("float3" if t == "float3" else "float", n)
+                      for (t, _, n) in rows)
+    body = "\n".join("\tTBuffer.%s = %s;" % (slot, name) for (_, slot, name) in rows)
+
+    prop_lines, call_lines = [], []
+    for i, (t, _, name) in enumerate(rows):
+        if name in helpers:
+            call_lines.append("\t\t\t%s," % helpers[name])
+            continue
+        display, default, desc = params[name]
+        # The DSL identifier is derived, not authored: it cannot carry spaces, and having the table
+        # state both spellings is one more pair that can drift. ParameterName is what an artist
+        # reads, so that is the one the table holds.
+        ident = "In_%s_%s" % (dsf_name, name)
+        kind = "VectorParameter" if t == "float3" else "ScalarParameter"
+        prop_lines.append('		%s %s = %s [ParameterName="%s"; Group="%s"; SortPriority=%d; '
+                          'Description="%s"];' % (kind, ident, default, display, group, i, desc))
+        call_lines.append("			%s%s," % (ident, ".rgb" if t == "float3" else ""))
+
+    input_lines = ['\t\topt %s %s = %s [Description="%s"];' % (t, fn_in, default, desc)
+                   for (t, fn_in, _s, default, desc) in MODIFIER_INPUTS.get(key, [])]
+    imports = "".join('\nimport "%s";\n' % h for h in MODIFIER_IMPORTS.get(key, []))
+
+    return """%s%s
+Function %s(
+%s,
+\tout float4 ModifierData)
+{
+\tFToonBuffer TBuffer = (FToonBuffer)0;
+\tInitToonBuffer(TBuffer);
+
+%s
+
+\tModifierData = TBuffer.ModifierInputVector;
+}
+
+ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_%s", Root="Plugin.MoonToon")
+{
+\tSettings = {
+\t\tDescription       = "Packs the %s modifier parameters into the ToonFeatureRT4 payload.";
+\t\tExposeToLibrary   = true;
+\t\tLibraryCategories = "MoonToon|Modifiers";
+\t}
+
+\tInputs = {
+%s
+\t}
+
+\tOutputs = {
+\t\tfloat4 ModifierData;
+\t}
+
+%s\tGraph = {
+\t\t%s(
+%s
+\t\t\tModifierData);
+\t}
+}
+""" % (MODIFIER_HEADER, imports, fn, args, body, dsf_name, dsf_name,
+       "\n".join(input_lines),
+       # A modifier whose slots all come from helpers declares no parameters of its own -- Matcap's
+       # seven live in MF_ToonMatcap. An empty Properties block would be noise, not information.
+       ("\tProperties = {\n%s\n\t}\n\n" % "\n".join(prop_lines)) if prop_lines else "",
+       fn, "\n".join(call_lines))
+
+
+def emit_modifier_selector(tables, ids):
+    picks = list(MODIFIERS)
+
+    def decl(k):
+        in_block = "\n".join("\t\topt %s %s = %s;" % (t, fn_in, default)
+                             for (t, fn_in, _s, default, _d) in MODIFIER_INPUTS.get(k, []))
+        return ('VirtualFunction(Name="MF_ToonModifier_%s")\n'
+                "{\n"
+                "\tOptions = {\n"
+                '\t\tAsset = Path(Plugins.MoonToon, "MaterialFunctions/Modifiers/MF_ToonModifier_%s");\n'
+                "\t}\n\n"
+                "\tInputs = {\n%s\n\t}\n\n"
+                "\tOutputs = {\n\t\tfloat4 ModifierData;\n\t}\n"
+                "}" % (MODIFIERS[k][0], MODIFIERS[k][0], in_block))
+
+    decls = "\n".join(decl(k) for k in picks)
+
+    sel_inputs, seen = [], set()
+    for k in picks:
+        for (t, _f, sel_in, default, desc) in MODIFIER_INPUTS.get(k, []):
+            if sel_in not in seen:
+                seen.add(sel_in)
+                sel_inputs.append((t, sel_in, default, desc))
+    sel_in_block = "\n".join('\t\topt %s %s = %s [Description="%s"];' % (t, n, default, desc)
+                             for (t, n, default, desc) in sel_inputs)
+
+    def switch_id(k):
+        return "Is_Modifier_%s" % MODIFIERS[k][0]
+
+    # The panel label comes from the group name's suffix rather than the .dsf name -- same
+    # convention as the feature switches, and the reason "Oil Film" can read as two words
+    # where the DSL identifier cannot.
+    def switch_label(k):
+        return MODIFIERS[k][2].split(": ")[-1]
+
+    props = "\n".join(
+        '\t\tStaticSwitchParameter %s = false '
+        '[ParameterName="Is Modifier %s"; Group="43 - Modifier (pick one)"; SortPriority=%d; '
+        'Description="启用 %s 修饰层. 修饰层叠加在着色特征之上, 与任意特征共存 —— 它不占 30 组的单选. '
+        '只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 无修饰层, 在面板和着色器里都不花代价."];'
+        % (switch_id(k), switch_label(k), i, switch_label(k))
+        for i, k in enumerate(picks))
+
+    def call(k):
+        args = "".join("%s, " % sel_in for (_t, _f, sel_in, _d, _c) in MODIFIER_INPUTS.get(k, []))
+        return "MF_ToonModifier_%s(%sOutputIndex=0)" % (MODIFIERS[k][0], args)
+
+    # Both chains bottom out in the NONE literal rather than in a call: NONE has no module, which is
+    # the whole reason "no modifier" costs nothing in the shader as well as in the panel.
+    def chain(depth=0):
+        if depth == len(picks):
+            return "float4(0.0, 0.0, 0.0, 0.0)"
+        pad = "\t\t\t" + "\t" * depth
+        return ("%s(\n%sTrue = %s,\n%sFalse = %s)"
+                % (switch_id(picks[depth]), pad, call(picks[depth]), pad, chain(depth + 1)))
+
+    def id_chain(depth=0):
+        if depth == len(picks):
+            return "%d.0" % ids["MOON_TOON_MODIFIER_ID_NONE"]
+        pad = "\t\t\t" + "\t" * depth
+        return ("%s(\n%sTrue = %d.0,\n%sFalse = %s)"
+                % (switch_id(picks[depth]), pad, ids[MODIFIERS[picks[depth]][1]], pad,
+                   id_chain(depth + 1)))
+
+    return """// GENERATED by Tools/gen_feature_functions.py. Do not edit.
+//
+// Static modifier selection, the additive counterpart to MF_MoonToonFeatureSelect. Only the selected
+// branch survives compilation, and only its parameters survive the material instance panel.
+//
+// Nothing ticked is the normal state and it is free: ModifierID stays MOON_TOON_MODIFIER_ID_NONE,
+// which the engine's dispatcher answers with a switch fall-through and no module at all.
+
+%s
+
+ShaderFunction(Name="MaterialFunctions/MF_MoonToonModifierSelect", Root="Plugin.MoonToon")
+{
+\tSettings = {
+\t\tDescription       = "Selects one toon modifier and packs its parameters into the modifier payload.";
+\t\tExposeToLibrary   = true;
+\t\tLibraryCategories = "MoonToon";
+\t}
+
+\tInputs = {
+%s
+\t}
+
+\tOutputs = {
+\t\t// ToonMaterialOutput pin 3 -> ToonFeatureRT4. What its channels mean is selected by ModifierID.
+\t\tfloat4 ModifierData;
+\t\t// ToonMaterialOutput pin 4 -> ToonFeatureRT3.w, as a RAW id; ComposeToonBufferD normalizes it
+\t\t// into the 8-bit lane. Same static choice that picked the branch above, so the payload and the
+\t\t// id that says how to read it cannot disagree.
+\t\tfloat ModifierID;
+\t}
+
+\tProperties = {
+%s
+\t}
+
+\tGraph = {
+\t\tModifierData = %s;
+
+\t\tModifierID = %s;
+\t}
+}
+""" % (decls, sel_in_block, props, chain(), id_chain())
+
+
+def check_modifier_agreement(tables):
+    """Every listed modifier must have a slot table, a material function and an id -- both ways."""
+    problems = []
+    listed = parse_modifier_list(os.path.normpath(MODIFIER_ID_TABLE))
+    ids = parse_modifier_ids(os.path.normpath(MODIFIER_ID_TABLE))
+
+    authored = {MODIFIERS[k][1][len("MOON_TOON_MODIFIER_ID_"):] for k in MODIFIERS}
+    for id_name in listed:
+        if id_name not in authored:
+            problems.append("MOON_TOON_MODIFIER_LIST has %s, but no MODIFIERS entry writes it -- "
+                            "the shader would dispatch to a module no material can select" % id_name)
+        if "MOON_TOON_MOD_SLOTS_%s" % id_name not in tables:
+            problems.append("MOON_TOON_MODIFIER_LIST has %s with no MOON_TOON_MOD_SLOTS_%s table"
+                            % (id_name, id_name))
+    for k in MODIFIERS:
+        if MODIFIERS[k][1] not in ids:
+            problems.append("%s names %s, which MoonToonModifierDefinitions.h does not define"
+                            % (k, MODIFIERS[k][1]))
+    return problems
+
+
+
+TRUNK = os.path.join(os.path.dirname(SLOT_TABLE), "..", "Private", "Toon", "ToonShadingModel.ush")
+
+
+def check_module_includes():
+    """Every module either registry names must exist on disk AND be #included by the trunk.
+
+    An X-macro cannot emit an #include, so the dispatch switches and the include list are two places
+    that have to agree, and only one of them is generated. When they disagree the dispatcher emits a
+    call to a symbol nothing defined -- which is a shader compile error four minutes into an editor
+    boot, and which is exactly how OilFilm first failed.
+    """
+    problems = []
+    src = open(os.path.normpath(TRUNK), encoding="utf-8").read()
+    toon_dir = os.path.dirname(os.path.normpath(TRUNK))
+
+    modules, _features = registry()
+    wanted = [("Features/ToonFeature_%s.ush" % m) for m in modules]
+    wanted += [("Modifiers/ToonModifier_%s.ush" % m)
+               for m in parse_modifier_list(os.path.normpath(MODIFIER_ID_TABLE)).values()]
+
+    for rel in wanted:
+        if not os.path.exists(os.path.join(toon_dir, rel.replace("/", os.sep))):
+            problems.append("%s is named by a registry but does not exist" % rel)
+        elif '#include "%s"' % rel not in src:
+            problems.append('ToonShadingModel.ush does not #include "%s" -- the dispatcher will '
+                            "call into it and the compiler will not find the symbol" % rel)
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
@@ -910,8 +1257,11 @@ def main():
     opts = ap.parse_args()
 
     tables = parse_slot_tables(SLOT_TABLE)
+    mod_tables = parse_slot_tables(os.path.normpath(MODIFIER_SLOT_TABLE),
+                                   "MOON_TOON_MOD_SLOTS_")
 
-    problems = check_registry_agreement() + check_bloom_weight_list(tables)
+    problems = (check_registry_agreement() + check_bloom_weight_list(tables)
+                + check_modifier_agreement(mod_tables) + check_module_includes())
     if problems:
         for problem in problems:
             print("registry/generator disagree: %s" % problem)
@@ -923,6 +1273,14 @@ def main():
                for k in FEATURES]
     ids = parse_feature_ids(os.path.normpath(ID_TABLE))
     targets.append((os.path.normpath(SELECT_PATH), emit_selector(tables, ids)))
+
+    mod_dir = os.path.normpath(MODIFIER_OUT_DIR)
+    os.makedirs(mod_dir, exist_ok=True)
+    targets += [(os.path.join(mod_dir, "MF_ToonModifier_%s.dsf" % MODIFIERS[k][0]),
+                 emit_modifier(k, mod_tables)) for k in MODIFIERS]
+    mod_ids = parse_modifier_ids(os.path.normpath(MODIFIER_ID_TABLE))
+    targets.append((os.path.normpath(MODIFIER_SELECT_PATH),
+                    emit_modifier_selector(mod_tables, mod_ids)))
 
     stale = []
     for path, text in targets:

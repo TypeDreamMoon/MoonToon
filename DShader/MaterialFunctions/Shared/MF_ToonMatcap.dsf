@@ -24,18 +24,15 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonMatcap", Root="Plugin.MoonT
 	}
 
 	Outputs = {
-		// rgb = the matcap contribution with its mask and intensity already applied, a = how much
-		// scene lighting modulates it. Goes to ToonMaterialOutput pin 3 -> ToonFeatureRT4.
-		float4 MatcapData;
+		// One output per MODIFIER SLOT, not one packed float4. The packing -- which channel of
+		// ToonFeatureRT4 each of these lands in -- is stated once, in the engine's
+		// MOON_TOON_MOD_SLOTS_MATCAP table, and MF_ToonModifier_Matcap is generated from it. A
+		// float4 here would be a second, hand-written copy of that layout.
+		float3 MatcapColor;
+		float MatcapLightingMix;
 	}
 
 	Properties = {
-		StaticSwitchParameter Enable_Matcap = false [
-			ParameterName="Enable Matcap";
-			Group="44 - Matcap";
-			SortPriority=0;
-			Description="启用 Matcap(球面环境贴图). 叠加在正常着色之上, 与任意着色特征共存 —— 它不是特征, 不占 30 组的单选.";
-		];
 		TextureObjectParameter Matcap_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Matcap Map";
 			Group="44 - Matcap";
@@ -103,11 +100,11 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonMatcap", Root="Plugin.MoonT
 		// engine only ever multiplies them, so this keeps the mask texture entirely on the authoring
 		// side and costs the GBuffer nothing.
 		float3 Matcap_RGB = ((Matcap_Sampled * Matcap_Mask_Sampled.r) * Matcap_Intensity);
-		// Uses the switch declared in Properties rather than an inline copy: two nodes with the same
-		// ParameterName would still be one panel row, but only the declared one carries the
-		// Description every parameter is required to have.
-		MatcapData = Enable_Matcap(
-			True = float4(Matcap_RGB, Matcap_Lighting_Mix),
-			False = float4(0.0, 0.0, 0.0, 0.0));
+		// No on/off switch here any more. "Is Modifier Matcap" in MF_MoonToonModifierSelect is the
+		// one that decides now, and being static it prunes this whole function -- parameters,
+		// texture fetches and all -- when it is off. A second switch would only be a second box an
+		// artist has to remember to tick in agreement with the first.
+		MatcapColor = Matcap_RGB;
+		MatcapLightingMix = Matcap_Lighting_Mix;
 	}
 }

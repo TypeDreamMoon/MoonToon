@@ -1,0 +1,56 @@
+// GENERATED from Engine/Shaders/Shared/MoonToonModifierSlots.h by Tools/gen_feature_functions.py.
+// Edit the slot table (for the mapping) or the generator (for names/defaults), not this file.
+//
+// One modifier, one material function. A modifier is ADDITIVE on top of whatever shading feature the
+// material selected, so unlike a feature it does not compete for the 30 group's single choice.
+
+Function ToonModifierWrite_OilFilm(
+	in float Intensity,
+	in float HighlightScale,
+	in float FalloffPower,
+	in float HueShift,
+	out float4 ModifierData)
+{
+	FToonBuffer TBuffer = (FToonBuffer)0;
+	InitToonBuffer(TBuffer);
+
+	TBuffer.ModifierInputVector.x = Intensity;
+	TBuffer.ModifierInputVector.y = HighlightScale;
+	TBuffer.ModifierInputVector.z = FalloffPower;
+	TBuffer.ModifierInputVector.w = HueShift;
+
+	ModifierData = TBuffer.ModifierInputVector;
+}
+
+ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_OilFilm", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Packs the OilFilm modifier parameters into the ToonFeatureRT4 payload.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Modifiers";
+	}
+
+	Inputs = {
+
+	}
+
+	Outputs = {
+		float4 ModifierData;
+	}
+
+	Properties = {
+		ScalarParameter In_OilFilm_Intensity = 1.0 [ParameterName="Oil Film Intensity"; Group="45 - Modifier: Oil Film"; SortPriority=0; Description="油膜高光强度. 0 = 完全关闭(着色器会整段跳过), 所以这也是它的开关."];
+		ScalarParameter In_OilFilm_HighlightScale = 1.0 [ParameterName="Oil Film Highlight Scale"; Group="45 - Modifier: Oil Film"; SortPriority=1; Description="缩放 GGX 的 alpha, 也就是高光斑的大小. >1 更大更散, <1 更小更聚. 这是风格化 GGX 的核心旋钮 —— 物理 GGX 收紧时会同时变暗, 这里不会."];
+		ScalarParameter In_OilFilm_FalloffPower = 1.0 [ParameterName="Oil Film Falloff Power"; Group="45 - Modifier: Oil Film"; SortPriority=2; Description="高光的锐利度: >1 边缘更硬(接近赛璐璐的一块高光), <1 更软更弥散. 作用在阴影项之后, 所以越锐利的油膜进入暗部时也衰减得越快."];
+		ScalarParameter In_OilFilm_HueShift = 0.0 [ParameterName="Oil Film Hue Shift"; Group="45 - Modifier: Oil Film"; SortPriority=3; Description="在高光 ramp 上旋转油膜的取色位置, [0,1] 循环. 油膜的颜色随视角在 ramp 上扫过(正视在头, 掠射在尾), 这个值整体平移那段扫描."];
+	}
+
+	Graph = {
+		ToonModifierWrite_OilFilm(
+			In_OilFilm_Intensity,
+			In_OilFilm_HighlightScale,
+			In_OilFilm_FalloffPower,
+			In_OilFilm_HueShift,
+			ModifierData);
+	}
+}

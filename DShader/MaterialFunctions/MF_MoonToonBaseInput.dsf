@@ -49,10 +49,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SortPriority=3;
 			Description="启用距离场脸部阴影. 同时决定是否采样 SDF 贴图、以及切线通道解码成脸朝向而不是高光切线 —— 旧版这是另一个叫 Enable Feature Distance Field Facial Shadow 的开关.";
 		];
-		// Matcap is a MODIFIER, not a shading feature. Per MToon 1.0 (VRMC_materials_mtoon) the
-		// matcap is additive on top of the lighting result, so a matcap surface is still a skin /
-		// hair / cloth surface -- it gets its own switch instead of one more row in group 30's
-		// pick-one list, and it composes with whichever feature is selected there.
+		// The matcap is not in this list because it is a MODIFIER, not a shading feature. Per MToon
+		// 1.0 (VRMC_materials_mtoon) it is additive on top of the lighting result, so a matcap
+		// surface is still a skin / hair / cloth surface. Its switch is "Is Modifier Matcap" in
+		// group 43, and it composes with whichever feature is selected here.
 		TextureObjectParameter Global_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Global Mask Map";
 			Group="01 - Global Mask Map";
@@ -448,10 +448,18 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// Extra occluder toon-stencil IDs (0-255 authoring space, -1 = unused). z/w reserved so
 		// two more slots can be added without touching the engine node.
 		float4 FaceOverlayStencilIDs;
-		// rgb = the matcap contribution with its mask and intensity already applied, a = how much
-		// scene lighting modulates it. Goes to ToonMaterialOutput pin 3 -> ToonFeatureRT4. Constant
-		// zero while "Enable Matcap" is off, and the engine ADDS it, so off costs exactly nothing.
-		float4 MatcapData;
+		// The MODIFIER axis, the second of the two. A modifier is a layer ADDED on top of whatever
+		// shading feature was selected above, so unlike ToonBufferA/B/C these two survive whichever
+		// feature that was.
+		//
+		// Payload -> ToonMaterialOutput pin 3 -> ToonFeatureRT4. What its four channels mean is
+		// selected by the id, so the two must travel together; they come out of one static choice
+		// in MF_MoonToonModifierSelect precisely so they cannot disagree.
+		float4 ModifierData;
+		// Raw modifier id -> ToonMaterialOutput pin 4 -> ToonFeatureRT3.w. Zero is
+		// MOON_TOON_MODIFIER_ID_NONE, which the engine answers with no module at all, so "no
+		// modifier" costs nothing.
+		float ModifierID;
 	}
 
 	Graph = {
@@ -873,10 +881,13 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float3 NormalTS = StaticSwitchParameter_24;
 		Attributes.Normal = NormalTS;
 
-		#Region "Matcap"
-		// Frame construction, mask and packing all live in MF_ToonMatcap now. It reads the shading
-		// normal and nothing else from here, which is why it was the first thing to leave.
-		float4 Matcap_Data = MF_ToonMatcap(NormalTS);
+		#Region "Modifier"
+		// The matcap used to be called directly from here. It goes through the modifier selector
+		// now, for the same reason feature selection does: the choice is a static switch, so an
+		// instance with no modifier ticked shows none of these rows and fetches none of these
+		// textures. NormalTS is the only thing any of it reads from this file.
+		float4 Modifier_Data = MF_MoonToonModifierSelect(NormalTS, OutputIndex=0);
+		float Modifier_ID = MF_MoonToonModifierSelect(NormalTS, OutputIndex=1);
 		#EndRegion
 
 		float2 MaterialExpressionTextureCoordinate_4 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
@@ -1487,6 +1498,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		FaceOverlayData = Face_Overlay_Data;
 		FaceOverlayParams = Face_Overlay_Params;
 		FaceOverlayStencilIDs = Face_Overlay_Stencil_IDs;
-		MatcapData = Matcap_Data;
+		ModifierData = Modifier_Data;
+		ModifierID = Modifier_ID;
 	}
 }

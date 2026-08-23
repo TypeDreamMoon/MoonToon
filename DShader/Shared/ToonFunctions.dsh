@@ -36,6 +36,24 @@ VirtualFunction(Name="MF_MoonToonFeatureSelect")
 		float4 DebugColor;
 	}
 }
+VirtualFunction(Name="MF_MoonToonModifierSelect")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonModifierSelect");
+		Description = "Static toon modifier selection; see Tools/gen_feature_functions.py.";
+	}
+
+	// Mirrors the Inputs block the generator writes into MF_MoonToonModifierSelect.dsf, in the same
+	// order -- positional, exactly like the feature selector above.
+	Inputs = {
+		opt float3 InNormalTS = float3(0.0, 0.0, 1.0);
+	}
+
+	Outputs = {
+		float4 ModifierData;
+		float ModifierID;
+	}
+}
 VirtualFunction(Name="AppendMany")
 {
 	Options = {
@@ -204,8 +222,11 @@ VirtualFunction(Name="MF_ToonMatcap")
 		float3 NormalTS;
 	}
 
+	// One output per MODIFIER SLOT, not one packed float4 -- the packing lives in the engine's
+	// MOON_TOON_MOD_SLOTS_MATCAP table, and MF_ToonModifier_Matcap is generated from it.
 	Outputs = {
-		float4 MatcapData;
+		float3 MatcapColor;
+		float MatcapLightingMix;
 	}
 }
 VirtualFunction(Name="MF_ToonSeeThroughOverlay")

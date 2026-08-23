@@ -10,6 +10,8 @@
 //   FaceOverlayData   -> MoonToonFaceOverlay.Pin[0]   (see-through bangs re-blend, 眉透/瞳透)
 //   FaceOverlayParams -> MoonToonFaceOverlay.Pin[1]   (per-MI depth threshold / fade / view fade)
 //   FaceOverlayStencilIDs -> MoonToonFaceOverlay.Pin[2] (extra occluder toon-stencil IDs)
+//   ModifierData      -> ToonMaterialOutput.Pin[3] | the modifier axis: an additive layer that
+//   ModifierID        -> ToonMaterialOutput.Pin[4] | composes with whichever feature was picked
 //
 // ToonMaterialOutput / MoonToonFaceOverlay are UMaterialExpressionCustomOutputs: they have no
 // output pins, so they can only be reached through an Outputs expression binding, never from the
@@ -33,10 +35,11 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 FaceOverlayData;
 		float4 FaceOverlayParams;
 		float4 FaceOverlayStencilIDs;
-		// rgb = matcap contribution (mask and intensity already applied), a = lighting mix.
-		// Must stay in step with MF_MoonToonBaseInput's own Outputs block -- this is a restated
-		// signature, and a missing entry is an "OutputIndex is out of range" build error.
-		float4 MatcapData;
+		// The modifier payload and the id that says how to read it. Must stay in step with
+		// MF_MoonToonBaseInput's own Outputs block -- this is a restated signature, and a missing
+		// entry is an "OutputIndex is out of range" build error.
+		float4 ModifierData;
+		float ModifierID;
 	}
 }
 
@@ -98,15 +101,19 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 FaceOverlayTuning;
 		float4 FaceOverlayStencils;
 		float4 ToonDataD;
+		float ToonDataE;
 
 		Base.MaterialAttributes = Attributes;
 
 		Expression(Class="ToonMaterialOutput").Pin[0] = ToonDataA;
 		Expression(Class="ToonMaterialOutput").Pin[1] = ToonDataB;
 		Expression(Class="ToonMaterialOutput").Pin[2] = ToonDataC;
-		// Pin 3 is the feature-INDEPENDENT lane (ToonFeatureRT4): the matcap. A/B/C only mean
-		// something in the context of the selected feature; this one survives whichever it is.
+		// Pins 3 and 4 are the feature-INDEPENDENT modifier axis. A/B/C only mean something in the
+		// context of the selected feature; these two survive whichever it is. Pin 3 is the payload
+		// (ToonFeatureRT4) and pin 4 the id that selects what its channels mean (ToonFeatureRT3.w),
+		// which is why they are bound next to each other and fed from one selector.
 		Expression(Class="ToonMaterialOutput").Pin[3] = ToonDataD;
+		Expression(Class="ToonMaterialOutput").Pin[4] = ToonDataE;
 
 		Expression(Class="MoonToonFaceOverlay").Pin[0] = FaceOverlay;
 		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
@@ -137,5 +144,6 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		FaceOverlayTuning = MF_MoonToonBaseInput(OutputIndex=5);
 		FaceOverlayStencils = MF_MoonToonBaseInput(OutputIndex=6);
 		ToonDataD = MF_MoonToonBaseInput(OutputIndex=7);
+		ToonDataE = MF_MoonToonBaseInput(OutputIndex=8);
 	}
 }
