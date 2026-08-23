@@ -115,8 +115,8 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 	}
 
 	Graph = {
-		MaterialAttributes Base = MF_MoonToonBaseInput(OutputIndex=0);
-		MaterialAttributes Attributes = Base;
+		MaterialAttributes Surface = MF_MoonToonBaseInput(OutputIndex=0);
+		MaterialAttributes Attributes = Surface;
 
 		#Region "Smoothed normal"
 		// The bake stores tangent-space smoothed normal * curvature, remapped to [0,1], across
@@ -237,7 +237,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		// OpacityMask -- that pin carries the SHADOW opacity (opacity folded through
 		// "Apply Opacity to Shadow" and then scaled by "Shadow Opacity"), which is a different
 		// quantity and would cut the hull to the shadow's silhouette rather than the surface's.
-		Attributes.OpacityMask = Base.Opacity;
+		Attributes.OpacityMask = Surface.Opacity;
 		#EndRegion
 
 		#Region "Outline colour"
@@ -260,11 +260,11 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				Class="MoonDecodeToonAttributes",
 				OutputType="float3",
 				OutputIndex=1,
-				MoonEncodedAttribute0=Base.MoonEncodedAttribute0,
-				MoonEncodedAttribute1=Base.MoonEncodedAttribute1,
-				MoonEncodedAttribute2=Base.MoonEncodedAttribute2,
-				MoonEncodedAttribute3=Base.MoonEncodedAttribute3,
-				MoonEncodedAttribute4=Base.MoonEncodedAttribute4
+				MoonEncodedAttribute0=Surface.MoonEncodedAttribute0,
+				MoonEncodedAttribute1=Surface.MoonEncodedAttribute1,
+				MoonEncodedAttribute2=Surface.MoonEncodedAttribute2,
+				MoonEncodedAttribute3=Surface.MoonEncodedAttribute3,
+				MoonEncodedAttribute4=Surface.MoonEncodedAttribute4
 			);
 
 		// Per-region outline colour. Two things matter here:
@@ -275,7 +275,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		//     channels, so it darkens AND saturates while preserving hue; multiplying by a near-black
 		//     tint would collapse skin and hair to the same black and throw away the very distinction
 		//     we want. The tint stays near white and only nudges temperature.
-		float3 RegionColor = lerp(Base.BaseColor, (Base.BaseColor * SurfaceShadowColor), Outline_Use_Shadow_Tint);
+		float3 RegionColor = lerp(Surface.BaseColor, (Surface.BaseColor * SurfaceShadowColor), Outline_Use_Shadow_Tint);
 		float3 FromSurface = (pow(max(RegionColor, 0.0), Outline_Gamma) * Outline_Tint.rgb);
 
 		// Per-vertex outline tint. Painted RGB multiplies the finished outline colour, so a region can
@@ -314,17 +314,17 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		Attributes.MoonEncodedAttribute0 =
 			UE.Expression(
 				Class="MoonSetToonAttributes", OutputType="float4", OutputIndex=0,
-				MoonEncodedAttribute0=Base.MoonEncodedAttribute0,
-				MoonEncodedAttribute1=Base.MoonEncodedAttribute1,
-				MoonEncodedAttribute2=Base.MoonEncodedAttribute2,
-				MoonEncodedAttribute3=Base.MoonEncodedAttribute3,
-				MoonEncodedAttribute4=Base.MoonEncodedAttribute4,
+				MoonEncodedAttribute0=Surface.MoonEncodedAttribute0,
+				MoonEncodedAttribute1=Surface.MoonEncodedAttribute1,
+				MoonEncodedAttribute2=Surface.MoonEncodedAttribute2,
+				MoonEncodedAttribute3=Surface.MoonEncodedAttribute3,
+				MoonEncodedAttribute4=Surface.MoonEncodedAttribute4,
 				MainLightShadowColor=OutlineShadowColor
 			);
-		Attributes.MoonEncodedAttribute1 = Base.MoonEncodedAttribute1;
-		Attributes.MoonEncodedAttribute2 = Base.MoonEncodedAttribute2;
-		Attributes.MoonEncodedAttribute3 = Base.MoonEncodedAttribute3;
-		Attributes.MoonEncodedAttribute4 = Base.MoonEncodedAttribute4;
+		Attributes.MoonEncodedAttribute1 = Surface.MoonEncodedAttribute1;
+		Attributes.MoonEncodedAttribute2 = Surface.MoonEncodedAttribute2;
+		Attributes.MoonEncodedAttribute3 = Surface.MoonEncodedAttribute3;
+		Attributes.MoonEncodedAttribute4 = Surface.MoonEncodedAttribute4;
 		#EndRegion
 
 		MaterialAttributes = Attributes;
