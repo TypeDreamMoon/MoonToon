@@ -77,6 +77,12 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			SortPriority=20;
 			Description="0 = extrude along the raw vertex normal (splits at hard edges), 1 = along the baked smoothed normal.";
 		];
+		ScalarParameter Reject_Inverted_Smooth_Normal = 0.0 [
+			ParameterName="Reject Inverted Smooth Normal";
+			Group="00 - Outline";
+			SortPriority=21;
+			Description="逐顶点丢弃与顶点法线夹角超过 90 度的烘焙平滑法线, 改用顶点法线外扩. 0 = 关(默认, 照单全收), 1 = 全开.\n\n默认关: 在 weld 过重合几何的导入角色上, '反向'极其常见 —— SK_ww_yy 脸部 23% 的顶点如此, 因为睫毛/眉毛/表情片/腮红这些浮在脸皮前面的薄片被焊进脸皮后法线相互抵消. 沿反向法线外扩会让壳沉进模型内部、被深度剔除, 结果就是脸上没有内描边 —— 那恰好是美术要的.\n\n开启的场景是单面开放片(裙摆/飘带): 那里没有'内部'可藏, 壳向内穿到背面会露出错误的描边. 按实例开.";
+		];
 		VectorParameter Outline_Color = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="Outline Color";
 			Group="00 - Outline";
@@ -149,7 +155,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 
 		// Spaces spelled out rather than left to the node defaults: this decode is only correct as
 		// tangent -> world, and a silently different default would be invisible in the source.
-		float3 SmoothNormalWS =
+		float3 SmoothNormalRawWS =
 			UE.Expression(
 				Class="Transform",
 				OutputType="float3",
@@ -157,31 +163,50 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				TransformSourceType="TRANSFORMSOURCE_Tangent",
 				TransformType="TRANSFORM_World"
 			);
+		// Re-normalized after the transform. The tangent basis is only approximately orthonormal --
+		// skewed UVs leave it slightly sheared -- so a unit tangent-space vector does not come out
+		// unit length, and this value is used BOTH as the extrusion direction (where its length
+		// scales the outline width) and inside a dot product (where its length scales the gate).
+		float3 SmoothNormalWS = (SmoothNormalRawWS / sqrt(max(dot(SmoothNormalRawWS, SmoothNormalRawWS), 0.000001)));
 
 		float3 VertexNormalWS = UE.Expression(Class="VertexNormalWS", OutputType="float3");
 
-		// How much to trust the bake, per vertex. Three ways it can be untrustworthy, and the
-		// length alone only catches two of them.
+		// How much to trust the bake, per vertex. Two length tests, always on, and one direction
+		// test that is off by default -- see below for why the third one is not free.
 		//
 		//   lower edge: |v| ramps in over 0.01 .. 0.05, so the degenerate encode fades out instead
 		//               of switching. It is seamless because low curvature *means* flat, and on a
 		//               flat patch the smoothed normal already equals the vertex normal.
 		//   upper edge: |v| > ~1.1 is not a curvature-scaled unit vector, so the channel holds
 		//               something else (unbaked zeros, or another tool's data). Reject outright.
-		//   direction:  a smoothed normal is an average of the faces meeting at the vertex, so it
-		//               can approach 90 degrees from the vertex normal at a razor edge and can
-		//               never exceed it. Anything past 90 is not a smoothed normal, and extruding
-		//               along it drives the hull INTO the surface -- through it, on the open sheets
-		//               a skirt is made of. Measured on SK_星穹铁道—昔涟5: 21% of wedges past 90
-		//               degrees and 14% at 165-180, i.e. very nearly inverted. SK_Lin has 0.8% and
-		//               0.0%; SK_ww_yy 3.7% and 0.6%. Same root cause as the zero-length encodes --
-		//               the bake welds coincident geometry before averaging, and this mesh carries
-		//               17968 pairs of exactly coincident triangles, so the averages cancel.
-		float BakeAgreement = dot(SmoothNormalWS, VertexNormalWS);
 		float BakeWeight =
 			(smoothstep(0.0001, 0.0025, BakedLenSq)
-			 * step(BakedLenSq, 1.2)
-			 * saturate(BakeAgreement * 4.0));
+			 * step(BakedLenSq, 1.2));
+
+		// The direction test, and why it is a parameter defaulting to OFF rather than always on.
+		//
+		// The premise -- "a smoothed normal is an average of the faces at a vertex, so it can
+		// approach 90 degrees from the vertex normal but never exceed it, and anything past 90
+		// drives the hull INTO the surface" -- is true for a closed, well-formed mesh. It is not
+		// true for a welded MMD/PMX import, and applying it there does visible harm:
+		//
+		//   * Measured on SK_ww_yy, per body region, the fraction of wedges this test would zero:
+		//     legs 1.0%, torso 0.6%, chest 4.5%, neck/jaw 5.3%, skull 14.6%, FACE 23.1% (11.0% of
+		//     the face is at dot <= -0.7, i.e. nearly fully inverted). Those are not damaged
+		//     wedges: the face carries lashes, brows, expression cards, blush and eye whites as
+		//     separate sheets floating in front of the skin, the bake welds coincident geometry
+		//     before averaging, and a sheet welded to the skin behind it averages to a flipped
+		//     normal. The whole face is like this by construction.
+		//   * Extruding along such a normal sinks the hull INSIDE the head, where the depth test
+		//     discards it -- so the face gets no inner outline, which is exactly what the art
+		//     wants. "Rescuing" those wedges to the vertex normal pops the hull back out and
+		//     draws a line across every cheek and jaw. That regression is what this parameter
+		//     exists to undo.
+		//
+		// Turn it ON for open single-sided sheets -- a skirt panel, a ribbon -- where there is no
+		// interior to hide in and an inward hull emerges through the back face instead.
+		float BakeAgreement = dot(SmoothNormalWS, VertexNormalWS);
+		BakeWeight = (BakeWeight * lerp(1.0, saturate(BakeAgreement * 4.0), saturate(Reject_Inverted_Smooth_Normal)));
 		float3 OffsetDirRaw = lerp(VertexNormalWS, SmoothNormalWS, (saturate(Use_Smooth_Normal) * BakeWeight));
 		// Floored again: the blend of two directions can cancel, and a zero here would re-introduce
 		// the NaN through the back door. Worst case the hull collapses onto the surface locally,
