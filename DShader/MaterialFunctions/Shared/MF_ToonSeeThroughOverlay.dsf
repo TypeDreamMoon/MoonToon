@@ -96,6 +96,42 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			SortPriority=41;
 			Description="Second accepted occluder CustomDepth stencil value. -1 = unused.";
 		];
+		// --- Front-hair depth gate (verbatim port of Game DShader/Functions/MF_TransparentFrontHair) ---
+		// Requires the CustomDepth stencil convention (eye/brow=1, face=2, hair=8, authored per
+		// material via the Material Stencil Value override + Render CustomDepth Pass on the mesh).
+		// Off by default: with no custom depth authored the IsHair test reads the far-plane dummy
+		// and would zero the overlay everywhere.
+		ScalarParameter Hair_Stencil_Value = 8.0 [
+			ParameterName="Hair Stencil Value";
+			Group="24 - See Through Overlay";
+			SortPriority=50;
+			Description="CustomDepth stencil value that counts as front hair (project convention: eye/brow=1, face=2, hair=8).";
+		];
+		ScalarParameter Front_Depth_Threshold = 0.01 [
+			ParameterName="Front Depth Threshold";
+			Group="24 - See Through Overlay";
+			SortPriority=51;
+			Description="Minimum positive eye-to-occluder depth gap in centimeters.";
+		];
+		ScalarParameter Front_View_Fade_Start = 0.3 [
+			ParameterName="Front View Fade Start";
+			Group="24 - See Through Overlay";
+			SortPriority=52;
+			Description="Head-forward alignment where the overlay starts to appear.";
+		];
+		ScalarParameter Front_View_Fade_End = 0.7 [
+			ParameterName="Front View Fade End";
+			Group="24 - See Through Overlay";
+			SortPriority=53;
+			Description="Head-forward alignment where the overlay reaches full strength.";
+		];
+		VectorParameter Head_Forward = float4(0.0, 0.0, 0.0, 0.0) [
+			ParameterName="HeadForward";
+			Group="24 - See Through Overlay";
+			SortPriority=54;
+			Description="World-space head forward, same parameter name MF_HeadVector binds, so a character BP driving 'HeadForward' on its MIDs feeds this too. Zero (default) disables just the view-fade term. Ignored when 'Head Forward From Baked Face UV' is on.";
+		];
+
 		ScalarParameter Through_Hair_Mask_Source = 0.0 [
 			ParameterName="Through Hair Mask Source";
 			Group="24 - See Through Overlay";
@@ -121,6 +157,71 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		float Through_Hair_Mask_Value = Through_Hair_Mask_Channel(Input = Through_Hair_Mask_Packed);
 		#EndRegion
 
+		#Region "Front Hair Depth Gate"
+		// Verbatim port of MF_TransparentFrontHair (Game DShader), applied to the OPACITY like the
+		// mask above. The gates that reference the scene rather than the occluder registry --
+		// scene-depth distance and the occlusion test itself -- stay engine-side (the overlay pass
+		// only ever shades occluded fragments, gated by Through Hair Depth Threshold), and the
+		// EyeBackWhiteMask cull is what Through Hair Mask Source already does; what the reference
+		// adds is the three tests below.
+		float4 FrontHair_CustomStencil = UE.Expression(
+			Class="SceneTexture",
+			OutputType="float4",
+			SceneTextureId="PPI_CustomStencil"
+		);
+		float4 FrontHair_CustomDepth = UE.Expression(
+			Class="SceneTexture",
+			OutputType="float4",
+			SceneTextureId="PPI_CustomDepth"
+		);
+		float FrontHair_PixelDepth = UE.Expression(Class="PixelDepth", OutputType="float");
+
+		// Nearest custom-depth surface must BE hair...
+		float FrontHair_IsHair = 1.0 - step(0.5, abs(FrontHair_CustomStencil.r - Hair_Stencil_Value));
+		// ...and sit in FRONT of this fragment. Keep the signed difference: back hair goes negative
+		// and must fail.
+		float FrontHair_InFront = step(Front_Depth_Threshold, FrontHair_PixelDepth - FrontHair_CustomDepth.r);
+
+		// Head-forward source. Preferred: the MoonToon "Bake Face Forward" data -- a tangent-space
+		// direction remapped to [0,1] in UV1.xy + UV2.x, the exact channels and decode the SDF face
+		// shadow reads in MF_MoonToonBaseInput -- because it rides the skin bind and follows the
+		// head BONE with nothing driving it. The switch exists because an UNBAKED mesh's UV1/UV2
+		// hold import residue that would decode to a garbage direction; leave it off and the
+		// HeadForward parameter (BP-driven or hand-set) is used instead, and a zero parameter
+		// disables just the view-fade term rather than killing the overlay.
+		float2 FrontHair_BakeUV1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
+		float2 FrontHair_BakeUV2 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		float3 FrontHair_BakedTS = (float3(FrontHair_BakeUV1.rg, FrontHair_BakeUV2.r) * 2.0) + -1.0;
+		float3 FrontHair_BakedWS = normalize(UE.Expression(Class="Transform", OutputType="float3", Input=FrontHair_BakedTS));
+		float3 FrontHair_HeadSource = UE.Expression(
+			Class="StaticSwitchParameter",
+			OutputType="float3",
+			True=FrontHair_BakedWS,
+			False=Head_Forward.rgb,
+			Group="24 - See Through Overlay",
+			SortPriority=46,
+			ParameterName="Head Forward From Baked Face UV"
+		);
+
+		float3 FrontHair_ViewDir = normalize(UE.CameraVectorWS());
+		float FrontHair_HeadLen = length(FrontHair_HeadSource);
+		float FrontHair_Align = saturate(dot(FrontHair_ViewDir, FrontHair_HeadSource / max(FrontHair_HeadLen, 0.001)));
+		float FrontHair_ViewMask = lerp(1.0,
+			smoothstep(Front_View_Fade_Start, Front_View_Fade_End, FrontHair_Align),
+			step(0.001, FrontHair_HeadLen));
+
+		float FrontHair_Mask = FrontHair_IsHair * FrontHair_InFront * FrontHair_ViewMask;
+		float FrontHair_Gate = UE.Expression(
+			Class="StaticSwitchParameter",
+			OutputType="float",
+			True=FrontHair_Mask,
+			False=1.0,
+			Group="24 - See Through Overlay",
+			SortPriority=45,
+			ParameterName="Use Front Hair Depth Gate"
+		);
+		#EndRegion
+
 		float3 Multiply_Overlay = (BaseColor * Through_Hair_Tint.rgb);
 		// The mask multiplies the OPACITY, which is also what carries enrollment: a masked-out pixel
 		// leaves the alpha at zero and the re-draw writes nothing there.
@@ -128,7 +229,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=float4(Multiply_Overlay, (Through_Hair_Opacity * Through_Hair_Mask_Value)),
+				True=float4(Multiply_Overlay, (Through_Hair_Opacity * Through_Hair_Mask_Value * FrontHair_Gate)),
 				False=float4(0.0, 0.0, 0.0, 0.0),
 				Group="24 - See Through Overlay",
 				SortPriority=5,
