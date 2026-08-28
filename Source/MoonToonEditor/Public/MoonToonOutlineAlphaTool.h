@@ -53,18 +53,31 @@ enum class EMoonToonAlphaBlend : uint8
 	Lerp,
 };
 
-/** Which end of an island's axis counts as the tip. */
+/**
+ * Which end of an island's axis counts as the tip.
+ *
+ * The island axis is canonicalised to point up (+Z) before any of this is decided, so "positive end"
+ * names the same physical end on every island. Without that the axis sign is whatever power iteration
+ * happened to converge to, and the two explicit modes are per-island coin flips rather than choices.
+ */
 UENUM()
 enum class EMoonToonIslandOrientation : uint8
 {
 	/**
-	 * Measure how thick the island is at both ends and treat the thinner end as the tip. Correct for
-	 * hair, which always tapers, and saves flipping the curve per mesh.
+	 * Measure how thick the island is at both ends and treat the thinner end as the tip.
+	 *
+	 * Right whenever the geometry actually tapers. It cannot answer for a card of even width, which
+	 * hair has plenty of -- on SK_ww_yy roughly 45% of shells differ by under 20% end to end -- so
+	 * below Auto Tip Contrast this defers to Tip Direction rather than guessing. Guessing there gives
+	 * every second card a taper running backwards, which reads as noise along the silhouette.
 	 */
-	Auto UMETA(DisplayName = "Auto (thinner end is the tip)"),
+	Auto UMETA(DisplayName = "Auto (thinner end, falling back to Tip Direction)"),
 
-	PositiveEnd UMETA(DisplayName = "Positive axis end is the tip"),
-	NegativeEnd UMETA(DisplayName = "Negative axis end is the tip"),
+	PositiveEnd UMETA(DisplayName = "Upper end is the tip"),
+	NegativeEnd UMETA(DisplayName = "Lower end is the tip"),
+
+	/** Whichever end sits further along Tip Direction. The only mode that ignores the geometry. */
+	Direction UMETA(DisplayName = "Tip Direction decides"),
 };
 
 /**
@@ -107,8 +120,33 @@ public:
 	EMoonToonIslandOrientation IslandOrientation = EMoonToonIslandOrientation::Auto;
 
 	/**
+	 * Mesh-local direction the tips point. Hair falls, so down is the default.
+	 *
+	 * Read by "Tip Direction decides", and by Auto whenever the two ends are too alike to call. One
+	 * consistent answer across the whole selection beats a per-island guess: a taper that is uniformly
+	 * wrong is one flick of Invert Signal away from right, a random one is not fixable at all.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Signal",
+		meta = (EditCondition =
+			"Signal == EMoonToonAlphaSignal::IslandAxis && IslandOrientation != EMoonToonIslandOrientation::PositiveEnd && IslandOrientation != EMoonToonIslandOrientation::NegativeEnd"))
+	FVector TipDirection = FVector(0.0, 0.0, -1.0);
+
+	/**
+	 * How different the two ends have to be before Auto trusts its own measurement, as a fraction of
+	 * the thicker end. Below it the island is oriented by Tip Direction instead, and the report says
+	 * how many landed there.
+	 */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Signal",
+		meta = (EditCondition = "Signal == EMoonToonAlphaSignal::IslandAxis && IslandOrientation == EMoonToonIslandOrientation::Auto",
+			ClampMin = "0.0", ClampMax = "1.0"))
+	float AutoTipContrast = 0.15f;
+
+	/**
 	 * Islands smaller than this are left alone. A handful of vertices has no meaningful principal
 	 * axis, and forcing one produces a random taper on stray geometry.
+	 *
+	 * Counted in welded vertices -- distinct positions after the shell weld -- so the number means the
+	 * same thing whatever the importer did with its point sharing.
 	 */
 	UPROPERTY(EditAnywhere, Category = "Signal",
 		meta = (EditCondition = "Signal == EMoonToonAlphaSignal::IslandAxis", ClampMin = "3"))

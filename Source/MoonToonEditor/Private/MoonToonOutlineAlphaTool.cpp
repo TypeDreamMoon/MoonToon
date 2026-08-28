@@ -77,12 +77,19 @@ namespace
 		return Axis;
 	}
 
-	/** Per-wedge signal in 0..1, plus how many islands contributed. */
+	/** Per-wedge signal in 0..1, plus enough about the segmentation to explain a disappointing run. */
 	struct FSignalResult
 	{
 		TArray<float> PerWedge;
 		int32 NumIslands = 0;
 		int32 NumSkippedIslands = 0;
+
+		/** Islands Auto could not call, oriented by Tip Direction instead. */
+		int32 NumDirectionOriented = 0;
+
+		/** Welded-vertex counts of the islands that were kept, for the report. */
+		int32 MedianIslandVertices = 0;
+		int32 LargestIslandVertices = 0;
 	};
 
 	/**
@@ -108,7 +115,9 @@ namespace
 		const FMoonToonLODFaces& Faces,
 		const FMoonToonWedgeMask& Mask,
 		int32 MinIslandVertices,
-		EMoonToonIslandOrientation Orientation)
+		EMoonToonIslandOrientation Orientation,
+		const FVector3f& TipDirection,
+		float AutoTipContrast)
 	{
 		const int32 NumWedges = VertexIndices.Num();
 
@@ -136,22 +145,61 @@ namespace
 			Islands.Union(Face.X, Face.Z);
 		}
 
-		// Then merge the duplicate wedges that are NOT a seam: same point, same UV. This is the part
-		// the old position weld was really there for -- a normal seam duplicates the point but leaves
+		// Then merge the duplicate wedges that are NOT a seam: same place, same UV. This is the part
+		// the old position weld was really there for -- a normal seam duplicates the vertex but leaves
 		// the UV alone, so those halves rejoin, while a UV seam keeps the two cards apart.
+		//
+		// Keyed on the position, not on the import point index. The index is only ever a proxy for
+		// "same place", and it is a proxy that some importers do not honour: SK_ww_yy's LOD0 has
+		// 268299 wedges over 268299 points, one point per face corner and never shared. No two wedges
+		// could collide on it, so nothing merged across a face boundary, every triangle became its own
+		// island, all of them fell under Min Island Vertices, and the signal stayed 0 everywhere --
+		// which the curve turns into full width on every vertex. The tool ran, reported, saved, and
+		// changed nothing.
+		//
+		// Quantum is relative to the selection's own size so this behaves the same on a 2 m character
+		// and on a 2 cm prop. It only has to absorb float round-trip noise -- a seam stores duplicated,
+		// normally bit-identical positions -- so it stays far below any real modelling slack.
+		FBox3f Bounds(ForceInit);
+		for (int32 WedgeIndex = 0; WedgeIndex < NumWedges; ++WedgeIndex)
+		{
+			if (Mask.Contains(WedgeIndex) && VertexIndices.IsValidIndex(WedgeIndex)
+				&& Positions.IsValidIndex(VertexIndices[WedgeIndex]))
+			{
+				Bounds += Positions[VertexIndices[WedgeIndex]];
+			}
+		}
+		const FVector3f WeldOrigin = Bounds.IsValid ? Bounds.Min : FVector3f::ZeroVector;
+		const float PositionQuantum =
+			FMath::Max((Bounds.IsValid ? Bounds.GetSize().GetMax() : 1.0f) * 1e-5f, UE_SMALL_NUMBER);
+
 		constexpr float UVQuantum = 1.0f / 65536.0f;
-		TMap<TPair<int32, FIntPoint>, int32> SeamlessKeyToWedge;
+
+		// Kept for the island sizing below, which counts welded vertices rather than wedges.
+		TArray<FIntVector> WeldedPosition;
+		WeldedPosition.Init(FIntVector::ZeroValue, NumWedges);
+
+		TMap<TPair<FIntVector, FIntPoint>, int32> SeamlessKeyToWedge;
 		SeamlessKeyToWedge.Reserve(NumWedges);
 		for (int32 WedgeIndex = 0; WedgeIndex < NumWedges; ++WedgeIndex)
 		{
-			if (!Mask.Contains(WedgeIndex) || !UV0s.IsValidIndex(WedgeIndex))
+			if (!Mask.Contains(WedgeIndex) || !UV0s.IsValidIndex(WedgeIndex)
+				|| !VertexIndices.IsValidIndex(WedgeIndex)
+				|| !Positions.IsValidIndex(VertexIndices[WedgeIndex]))
 			{
 				continue;
 			}
+
+			const FVector3f Local = (Positions[VertexIndices[WedgeIndex]] - WeldOrigin) / PositionQuantum;
+			const FIntVector QuantizedPosition(
+				FMath::RoundToInt(Local.X), FMath::RoundToInt(Local.Y), FMath::RoundToInt(Local.Z));
+			WeldedPosition[WedgeIndex] = QuantizedPosition;
+
 			const FIntPoint QuantizedUV(
 				FMath::RoundToInt(UV0s[WedgeIndex].X / UVQuantum),
 				FMath::RoundToInt(UV0s[WedgeIndex].Y / UVQuantum));
-			const TPair<int32, FIntPoint> Key(VertexIndices[WedgeIndex], QuantizedUV);
+
+			const TPair<FIntVector, FIntPoint> Key(QuantizedPosition, QuantizedUV);
 			if (const int32* Existing = SeamlessKeyToWedge.Find(Key))
 			{
 				Islands.Union(*Existing, WedgeIndex);
@@ -171,20 +219,25 @@ namespace
 			}
 		}
 
+		TArray<int32> KeptIslandSizes;
+		KeptIslandSizes.Reserve(IslandMembers.Num());
+
 		for (const TPair<int32, TArray<int32>>& Island : IslandMembers)
 		{
 			const TArray<int32>& Members = Island.Value;
 
-			// Sized in distinct points rather than in wedges, so Min Island Vertices keeps meaning
-			// what it meant while this walked points -- a wedge count would be roughly three times
-			// larger and would quietly stop skipping the fragments it was set to skip.
-			TSet<int32> DistinctPoints;
-			DistinctPoints.Reserve(Members.Num());
+			// Sized in welded vertices rather than in wedges, so Min Island Vertices means the same
+			// thing on every mesh: a wedge count runs roughly three to six times larger and would
+			// quietly stop skipping the fragments the setting exists to skip. Counting import point
+			// indices instead would inherit whatever the importer decided about sharing them, which
+			// is the very thing that made this segmentation collapse in the first place.
+			TSet<FIntVector> DistinctPositions;
+			DistinctPositions.Reserve(Members.Num());
 			for (int32 WedgeIndex : Members)
 			{
-				DistinctPoints.Add(VertexIndices[WedgeIndex]);
+				DistinctPositions.Add(WeldedPosition[WedgeIndex]);
 			}
-			if (DistinctPoints.Num() < MinIslandVertices)
+			if (DistinctPositions.Num() < MinIslandVertices)
 			{
 				++Result.NumSkippedIslands;
 				// Left at 0, i.e. treated as root: a stray fragment keeps full width rather than
@@ -192,6 +245,7 @@ namespace
 				continue;
 			}
 			++Result.NumIslands;
+			KeptIslandSizes.Add(DistinctPositions.Num());
 
 			FVector3f Centroid = FVector3f::ZeroVector;
 			for (int32 WedgeIndex : Members)
@@ -209,7 +263,17 @@ namespace
 				Covariance[2] += FVector3f(D.Z * D.X, D.Z * D.Y, D.Z * D.Z);
 			}
 
-			const FVector3f Axis = DominantAxis(Covariance);
+			FVector3f Axis = DominantAxis(Covariance);
+
+			// Power iteration converges to +v or -v depending on where it started and on the data, so
+			// the sign carries no meaning of its own. Pin it -- +Axis always points up -- so "upper
+			// end" names the same physical end on every island. Without this the two explicit
+			// orientation modes are per-island coin flips wearing the label of a choice.
+			if (Axis.Z < 0.0f
+				|| (Axis.Z == 0.0f && (Axis.X < 0.0f || (Axis.X == 0.0f && Axis.Y < 0.0f))))
+			{
+				Axis = -Axis;
+			}
 
 			float MinProjection = TNumericLimits<float>::Max();
 			float MaxProjection = TNumericLimits<float>::Lowest();
@@ -226,33 +290,64 @@ namespace
 				continue;
 			}
 
-			// Which end is the tip: compare how far the geometry spreads off-axis near each end.
-			// A hair card is wide at the root and narrow at the tip, so the thinner end is the tip.
-			bool bPositiveEndIsTip = true;
-			if (Orientation == EMoonToonIslandOrientation::Auto)
-			{
-				double NearRadius = 0.0, FarRadius = 0.0;
-				int32 NearCount = 0, FarCount = 0;
-				for (int32 WedgeIndex : Members)
-				{
-					const FVector3f D = Positions[VertexIndices[WedgeIndex]] - Centroid;
-					const float Projection = D | Axis;
-					const float Normalized = (Projection - MinProjection) / Span;
-					const float Radius = (D - Axis * Projection).Size();
+			// Which end is the tip. Tip Direction is the fallback everywhere, because it is the one
+			// rule that answers the same way for every island in the selection.
+			const bool bDirectionPicksPositive = (Axis | TipDirection) > 0.0f;
 
-					if (Normalized < 0.2f) { NearRadius += Radius; ++NearCount; }
-					else if (Normalized > 0.8f) { FarRadius += Radius; ++FarCount; }
-				}
-				if (NearCount > 0 && FarCount > 0)
-				{
-					const double NearMean = NearRadius / NearCount;
-					const double FarMean = FarRadius / FarCount;
-					bPositiveEndIsTip = FarMean <= NearMean;
-				}
-			}
-			else
+			bool bPositiveEndIsTip = bDirectionPicksPositive;
+			switch (Orientation)
 			{
-				bPositiveEndIsTip = (Orientation == EMoonToonIslandOrientation::PositiveEnd);
+			case EMoonToonIslandOrientation::PositiveEnd:
+				bPositiveEndIsTip = true;
+				break;
+			case EMoonToonIslandOrientation::NegativeEnd:
+				bPositiveEndIsTip = false;
+				break;
+			case EMoonToonIslandOrientation::Direction:
+				bPositiveEndIsTip = bDirectionPicksPositive;
+				break;
+			default:
+				{
+					// Compare how far the geometry spreads off-axis near each end. A hair card is wide
+					// at the root and narrow at the tip, so the thinner end is the tip.
+					double NearRadius = 0.0, FarRadius = 0.0;
+					int32 NearCount = 0, FarCount = 0;
+					for (int32 WedgeIndex : Members)
+					{
+						const FVector3f D = Positions[VertexIndices[WedgeIndex]] - Centroid;
+						const float Projection = D | Axis;
+						const float Normalized = (Projection - MinProjection) / Span;
+						const float Radius = (D - Axis * Projection).Size();
+
+						if (Normalized < 0.2f) { NearRadius += Radius; ++NearCount; }
+						else if (Normalized > 0.8f) { FarRadius += Radius; ++FarCount; }
+					}
+
+					// Only trust the measurement when the ends actually differ. A card of even width
+					// -- and hair has plenty of those -- puts the two means within noise of each
+					// other, and taking the winner anyway tapers every second card backwards. That
+					// reads as noise along the silhouette and no single setting can undo it, whereas
+					// one consistent direction is at worst one flick of Invert Signal from right.
+					bool bResolved = false;
+					if (NearCount > 0 && FarCount > 0)
+					{
+						const double NearMean = NearRadius / NearCount;
+						const double FarMean = FarRadius / FarCount;
+						const double Contrast = FMath::Abs(NearMean - FarMean)
+							/ FMath::Max(FMath::Max(NearMean, FarMean), UE_DOUBLE_SMALL_NUMBER);
+						if (Contrast >= AutoTipContrast)
+						{
+							bPositiveEndIsTip = FarMean <= NearMean;
+							bResolved = true;
+						}
+					}
+					if (!bResolved)
+					{
+						bPositiveEndIsTip = bDirectionPicksPositive;
+						++Result.NumDirectionOriented;
+					}
+				}
+				break;
 			}
 
 			for (int32 WedgeIndex : Members)
@@ -261,6 +356,13 @@ namespace
 				const float Normalized = (Projection - MinProjection) / Span;
 				Result.PerWedge[WedgeIndex] = bPositiveEndIsTip ? Normalized : (1.0f - Normalized);
 			}
+		}
+
+		if (KeptIslandSizes.Num() > 0)
+		{
+			KeptIslandSizes.Sort();
+			Result.MedianIslandVertices = KeptIslandSizes[KeptIslandSizes.Num() / 2];
+			Result.LargestIslandVertices = KeptIslandSizes.Last();
 		}
 
 		return Result;
@@ -314,7 +416,10 @@ FText UMoonToonOutlineAlphaTool::GetToolDescription() const
 		"written -- RGB is preserved, because the base material reads it for feature ID, rim width "
 		"and opacity.\n\n"
 		"Use Preview Only to check a curve before committing, and Multiply to re-run without "
-		"discarding hand-painted work.");
+		"discarding hand-painted work.\n\n"
+		"Island Axis splits the selection into UV shells -- one hair card each -- and tapers along "
+		"every shell's own axis. Read the report: it says how many shells were found and how many "
+		"had no clear thin end, and those are oriented by Tip Direction rather than guessed.");
 }
 
 FText UMoonToonOutlineAlphaTool::GetRunLabel() const
@@ -337,6 +442,17 @@ FString UMoonToonOutlineAlphaTool::Run(const FMoonToonToolContext& Context)
 	if (!Curve || Curve->GetNumKeys() == 0)
 	{
 		return TEXT("Width Curve has no keys. Add at least one key before running.");
+	}
+
+	// Zero would silently orient every ambiguous island the same way while claiming to be a direction,
+	// so it falls back to the documented default instead.
+	FVector3f NormalizedTipDirection(
+		static_cast<float>(TipDirection.X),
+		static_cast<float>(TipDirection.Y),
+		static_cast<float>(TipDirection.Z));
+	if (!NormalizedTipDirection.Normalize())
+	{
+		NormalizedTipDirection = FVector3f(0.0f, 0.0f, -1.0f);
 	}
 
 	TArray<FString> Lines;
@@ -399,11 +515,13 @@ FString UMoonToonOutlineAlphaTool::Run(const FMoonToonToolContext& Context)
 			TArray<float> WedgeSignal;
 			WedgeSignal.Init(0.0f, NumWedges);
 			FString SignalNote;
+			TArray<FString> ExtraNotes;
 
 			if (Signal == EMoonToonAlphaSignal::IslandAxis)
 			{
 				const FSignalResult IslandSignal = ComputeIslandAxisSignal(
-					Positions, VertexIndices, UV0s, Faces, Mask, MinIslandVertices, IslandOrientation);
+					Positions, VertexIndices, UV0s, Faces, Mask, MinIslandVertices, IslandOrientation,
+					NormalizedTipDirection, AutoTipContrast);
 
 				for (int32 WedgeIndex = 0; WedgeIndex < NumWedges; ++WedgeIndex)
 				{
@@ -412,8 +530,28 @@ FString UMoonToonOutlineAlphaTool::Run(const FMoonToonToolContext& Context)
 						WedgeSignal[WedgeIndex] = IslandSignal.PerWedge[WedgeIndex];
 					}
 				}
-				SignalNote = FString::Printf(TEXT("%d UV shell(s), %d skipped as too small"),
-					IslandSignal.NumIslands, IslandSignal.NumSkippedIslands);
+				SignalNote = FString::Printf(
+					TEXT("%d UV shell(s), median %d verts, largest %d; %d skipped as under %d verts"),
+					IslandSignal.NumIslands, IslandSignal.MedianIslandVertices,
+					IslandSignal.LargestIslandVertices, IslandSignal.NumSkippedIslands,
+					MinIslandVertices);
+
+				if (IslandSignal.NumIslands == 0)
+				{
+					// Worth spelling out: with no island the signal is 0 everywhere, so the curve
+					// writes its value at 0 to every vertex and the run looks successful while
+					// changing nothing.
+					ExtraNotes.Add(FString::Printf(TEXT(
+						"      -> no shell survived Min Island Vertices, so the signal is 0 everywhere. "
+						"Lower Min Island Vertices, or widen the section filter.")));
+				}
+				else if (IslandSignal.NumDirectionOriented > 0)
+				{
+					ExtraNotes.Add(FString::Printf(TEXT(
+						"      %d of %d shell(s) had no clear thin end -- oriented by Tip Direction (%s)."),
+						IslandSignal.NumDirectionOriented, IslandSignal.NumIslands,
+						*NormalizedTipDirection.ToString()));
+				}
 			}
 			else if (Signal == EMoonToonAlphaSignal::UVAxis)
 			{
@@ -511,8 +649,20 @@ FString UMoonToonOutlineAlphaTool::Run(const FMoonToonToolContext& Context)
 
 			Lines.Add(FString::Printf(TEXT("  %s LOD%d: %d/%d wedges  |  %s"),
 				*Mesh->GetName(), LOD, NumWritten, NumWedges, *SignalNote));
+			Lines.Append(ExtraNotes);
 			Lines.Add(FString::Printf(TEXT("      alpha min %.3f  max %.3f  mean %.3f"),
 				MinAlpha, MaxAlpha, SumAlpha / NumWritten));
+
+			// A flat result is the shape every silent failure takes -- a collapsed segmentation, a
+			// signal the curve flattens, a floor or ceiling clamping everything together. It is easy
+			// to read past in a wall of statistics, so say it outright rather than leave the reader to
+			// notice that min and max agree.
+			if (MaxAlpha - MinAlpha < 1.0f / 255.0f)
+			{
+				Lines.Add(FString::Printf(TEXT(
+					"      -> every vertex got the same width (%.3f). Nothing tapered; check the notes above, "
+					"the curve, and Output Floor/Ceiling."), MinAlpha));
+			}
 
 			if (!bPreviewOnly)
 			{
