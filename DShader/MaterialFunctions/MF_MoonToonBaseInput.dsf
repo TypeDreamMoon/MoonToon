@@ -268,11 +268,13 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			ParameterName="Shadow Opacity";
 			Group="21 - Translucency";
 			SortPriority=41;
+			Description="只作用于阴影图, 不影响画面上的裁剪. 缩放写进阴影深度Pass的不透明度: >1 让阴影比本体更实, <1 更透, 0 等于不投影.\r\n\r\nShadow Opacity\r\nShadow map only -- it does not affect the visible cutout. Scales the opacity written into the shadow depth pass: >1 makes the shadow more solid than the surface, <1 more transparent, 0 removes it.";
 		];
 		ScalarParameter Apply_Opacity_to_Shadow = 1.0 [
 			ParameterName="Apply Opacity to Shadow";
 			Group="21 - Translucency";
 			SortPriority=42;
+			Description="阴影是否跟随不透明度. 1 = 阴影按 Opacity 一起变透, 0 = 阴影按全不透明算. 同样只作用于阴影图.\r\n\r\nApply Opacity to Shadow\r\n1 = the shadow fades with Opacity, 0 = the shadow is cast as if fully opaque. Shadow map only.";
 		];
 		ChannelMaskParameter AO_Channel = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="AO Channel";
@@ -805,14 +807,34 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#EndRegion
 
 		float Opacity_1 = Multiply_8;
-		Attributes.Opacity = Opacity_1;
+		Attributes.Opacity = Sampled_Opacity;
 		#Region "Translucency"
 		float LinearInterpolate_1 = lerp(1.0, Opacity_1, Apply_Opacity_to_Shadow);
 		float Multiply_9 = (LinearInterpolate_1 * Shadow_Opacity);
 		#EndRegion
 
 		float Shadow_Opacity_1 = Multiply_9;
-		Attributes.OpacityMask = Shadow_Opacity_1;
+
+		// OpacityMask is the CUTOUT of a masked material -- base pass, depth pass and shadow pass all
+		// clip against it. It used to receive Shadow_Opacity_1 directly, which is a leftover from the
+		// retired dithered-masked-translucency scheme (see M_MoonToon.dsm Settings): back then the base
+		// was Opaque + DitherOpacityMask and this pin drove the dither, so "shadow opacity" was a fair
+		// name for what it did. Once that path went away the product had no consumer left except the
+		// cutout it was silently hijacking, and both knobs became traps on any Masked instance --
+		// "Shadow Opacity" scales the clip (2.0 halves the effective clip value, so every feathered
+		// edge survives), and "Apply Opacity to Shadow" = 0 collapses the whole thing to a constant,
+		// which disables the alpha cut and fills the mesh in solid. M_MoonToonOutline.dsm already had
+		// to route around this pin for exactly that reason.
+		//
+		// ShadowPassSwitch makes both meanings honest: the visible cutout is the sampled alpha, and the
+		// two shadow knobs act only where their names say they do -- in the shadow map.
+		Attributes.OpacityMask = 
+			UE.Expression(
+				Class="ShadowReplace",
+				OutputType="float",
+				Default=Opacity_1,
+				Shadow=Shadow_Opacity_1
+			);
 		#Region "Texture Sample"
 		float3 StaticSwitchParameter_19 = MF_ToonSampleColor(SA_Map, Global_UV).rgb;
 		#EndRegion
