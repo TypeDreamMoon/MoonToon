@@ -40,7 +40,10 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 	Settings = {
 		Backend      = "Graph";
 		Domain       = "Surface";
+#if !DS_SUBSTRATE
+		// See M_MoonToon: under Substrate the closure carries the shading model.
 		ShadingModel = "Toon";
+#endif
 
 		// Masked, not Opaque. The hull wraps whatever section it was drawn for, and on an imported
 		// character most of those sections are alpha-cut -- hair cards, lace, gauze. An opaque hull
@@ -115,9 +118,60 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 	}
 
 	Outputs = {
+#if DS_SUBSTRATE
+		// Substrate storage: closure plus every root pin, the ones the hull drives (extrusion, cutout,
+		// colour) and the pass-through ones the base input writes. See M_MoonToon for why the root
+		// pins are bound as well.
+		Substrate ToonClosure;
+		float3 BaseColor;
+		float  Metallic;
+		float  Specular;
+		float  Roughness;
+		float  Anisotropy;
+		float3 EmissiveColor;
+		float3 Normal;
+		float3 Tangent;
+		float4 MoonEncodedAttribute0;
+		float4 MoonEncodedAttribute1;
+		float4 MoonEncodedAttribute2;
+		float4 MoonEncodedAttribute3;
+		float4 MoonEncodedAttribute4;
+		float3 WorldPositionOffset;
+		float  Opacity;
+		float  OpacityMask;
+		float  AmbientOcclusion;
+		float2 CustomizedUV1;
+		float2 CustomizedUV2;
+		float  CustomData0;
+		float  CustomData1;
+
+		Base.FrontMaterial        = ToonClosure;
+		Base.BaseColor             = BaseColor;
+		Base.Metallic              = Metallic;
+		Base.Specular              = Specular;
+		Base.Roughness             = Roughness;
+		Base.Anisotropy            = Anisotropy;
+		Base.EmissiveColor         = EmissiveColor;
+		Base.Normal                = Normal;
+		Base.Tangent               = Tangent;
+		Base.MoonEncodedAttribute0 = MoonEncodedAttribute0;
+		Base.MoonEncodedAttribute1 = MoonEncodedAttribute1;
+		Base.MoonEncodedAttribute2 = MoonEncodedAttribute2;
+		Base.MoonEncodedAttribute3 = MoonEncodedAttribute3;
+		Base.MoonEncodedAttribute4 = MoonEncodedAttribute4;
+		Base.WorldPositionOffset  = WorldPositionOffset;
+		Base.Opacity              = Opacity;
+		Base.OpacityMask          = OpacityMask;
+		Base.AmbientOcclusion     = AmbientOcclusion;
+		Base.CustomizedUV1        = CustomizedUV1;
+		Base.CustomizedUV2        = CustomizedUV2;
+		Base.CustomData0          = CustomData0;
+		Base.CustomData1          = CustomData1;
+#else
 		MaterialAttributes MaterialAttributes;
 
 		Base.MaterialAttributes = MaterialAttributes;
+#endif
 	}
 
 	Graph = {
@@ -352,6 +406,47 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		Attributes.MoonEncodedAttribute4 = Surface.MoonEncodedAttribute4;
 		#EndRegion
 
+#if !DS_SUBSTRATE
 		MaterialAttributes = Attributes;
+#else
+		// Substrate: the finished attribute set, split into the closure and the root pins.
+		ToonClosure = UE.Expression(
+			Class="SubstrateMoonToonBSDF", OutputType="Substrate",
+			BaseColor         = Attributes.BaseColor,
+			Metallic          = Attributes.Metallic,
+			Specular          = Attributes.Specular,
+			Roughness         = Attributes.Roughness,
+			Normal            = Attributes.Normal,
+			EmissiveColor     = Attributes.EmissiveColor,
+			Anisotropy        = Attributes.Anisotropy,
+			Tangent           = Attributes.Tangent,
+			EncodedAttribute0 = Attributes.MoonEncodedAttribute0,
+			EncodedAttribute1 = Attributes.MoonEncodedAttribute1,
+			EncodedAttribute2 = Attributes.MoonEncodedAttribute2,
+			EncodedAttribute3 = Attributes.MoonEncodedAttribute3,
+			EncodedAttribute4 = Attributes.MoonEncodedAttribute4
+		);
+		BaseColor             = Attributes.BaseColor;
+		Metallic              = Attributes.Metallic;
+		Specular              = Attributes.Specular;
+		Roughness             = Attributes.Roughness;
+		Anisotropy            = Attributes.Anisotropy;
+		EmissiveColor         = Attributes.EmissiveColor;
+		Normal                = Attributes.Normal;
+		Tangent               = Attributes.Tangent;
+		MoonEncodedAttribute0 = Attributes.MoonEncodedAttribute0;
+		MoonEncodedAttribute1 = Attributes.MoonEncodedAttribute1;
+		MoonEncodedAttribute2 = Attributes.MoonEncodedAttribute2;
+		MoonEncodedAttribute3 = Attributes.MoonEncodedAttribute3;
+		MoonEncodedAttribute4 = Attributes.MoonEncodedAttribute4;
+		WorldPositionOffset   = Attributes.WorldPositionOffset;
+		Opacity               = Attributes.Opacity;
+		OpacityMask         = Attributes.OpacityMask;
+		AmbientOcclusion    = Attributes.AmbientOcclusion;
+		CustomizedUV1       = Attributes.CustomizedUV1;
+		CustomizedUV2       = Attributes.CustomizedUV2;
+		CustomData0         = Attributes.CustomData0;
+		CustomData1         = Attributes.CustomData1;
+#endif
 	}
 }

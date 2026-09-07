@@ -68,7 +68,13 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// openable in the Material Editor.
 		Backend      = "Graph";
 		Domain       = "Surface";
+#if !DS_SUBSTRATE
+		// Under Substrate the shading model comes from the closure: binding Base.FrontMaterial
+		// force-sets the material to Substrate, and SubstrateMoonToonBSDF registers SSM_Toon, which
+		// the engine folds back to MSM_Toon for every toon gate. Only the legacy GBuffer needs the
+		// setting spelled out.
 		ShadingModel = "Toon";
+#endif
 		BlendMode    = "Opaque";
 
 		// Real translucency (engine-side ToonTranslucent). A translucent MI of this base gets:
@@ -93,7 +99,42 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 	}
 
 	Outputs = {
+#if DS_SUBSTRATE
+		// Substrate storage. The shaded surface travels as a closure (SubstrateMoonToonBSDF, the
+		// engine's Moon toon BSDF), and EVERY root pin the base input writes is bound as well, from
+		// the same authored attributes. That is what the engine's hidden legacy conversion did (it
+		// left MaterialAttributes on the root next to the converted closure), and the root pins are
+		// not dead under Substrate: the template still builds PixelMaterialInputs from them, and the
+		// toon base pass reads some of them directly -- ComposeToonBufferD (ToonMaterialCommon.ush)
+		// takes the feature id and the SDF-live bit from the ROOT MoonEncodedAttribute0/4, so with
+		// those unbound the face lost its SDF shadow while the closure itself was correct; the
+		// ray-tracing hit shaders read the root CustomData0; WorldNormal / WorldTangent come from
+		// the root Normal / Tangent. Binding all of them keeps the two storages byte-for-byte alike
+		// in what the passes see.
+		Substrate ToonClosure;
+		float3 BaseColor;
+		float  Metallic;
+		float  Specular;
+		float  Roughness;
+		float  Anisotropy;
+		float3 EmissiveColor;
+		float3 Normal;
+		float3 Tangent;
+		float4 MoonEncodedAttribute0;
+		float4 MoonEncodedAttribute1;
+		float4 MoonEncodedAttribute2;
+		float4 MoonEncodedAttribute3;
+		float4 MoonEncodedAttribute4;
+		float  Opacity;
+		float  OpacityMask;
+		float  AmbientOcclusion;
+		float2 CustomizedUV1;
+		float2 CustomizedUV2;
+		float  CustomData0;
+		float  CustomData1;
+#else
 		MaterialAttributes Attributes;
+#endif
 		float4 ToonDataA;
 		float4 ToonDataB;
 		float4 ToonDataC;
@@ -103,7 +144,31 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 ToonDataD;
 		float ToonDataE;
 
+#if DS_SUBSTRATE
+		Base.FrontMaterial    = ToonClosure;
+		Base.BaseColor             = BaseColor;
+		Base.Metallic              = Metallic;
+		Base.Specular              = Specular;
+		Base.Roughness             = Roughness;
+		Base.Anisotropy            = Anisotropy;
+		Base.EmissiveColor         = EmissiveColor;
+		Base.Normal                = Normal;
+		Base.Tangent               = Tangent;
+		Base.MoonEncodedAttribute0 = MoonEncodedAttribute0;
+		Base.MoonEncodedAttribute1 = MoonEncodedAttribute1;
+		Base.MoonEncodedAttribute2 = MoonEncodedAttribute2;
+		Base.MoonEncodedAttribute3 = MoonEncodedAttribute3;
+		Base.MoonEncodedAttribute4 = MoonEncodedAttribute4;
+		Base.Opacity          = Opacity;
+		Base.OpacityMask      = OpacityMask;
+		Base.AmbientOcclusion = AmbientOcclusion;
+		Base.CustomizedUV1    = CustomizedUV1;
+		Base.CustomizedUV2    = CustomizedUV2;
+		Base.CustomData0      = CustomData0;
+		Base.CustomData1      = CustomData1;
+#else
 		Base.MaterialAttributes = Attributes;
+#endif
 
 		Expression(Class="ToonMaterialOutput").Pin[0] = ToonDataA;
 		Expression(Class="ToonMaterialOutput").Pin[1] = ToonDataB;
@@ -135,7 +200,51 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// MF_MoonToonBaseInput already writes both channels: Attributes.Opacity for the translucent
 		// blend and Attributes.OpacityMask ("Shadow Opacity" x "Apply Opacity to Shadow") for the
 		// masked shadow, so passing Surface straight through keeps masked materials working.
+#if !DS_SUBSTRATE
 		Attributes = Surface;
+#else
+		// Substrate: the same authored attributes, split the way Substrate stores them. The
+		// closure takes the shaded-surface set; Normal is the authored tangent-space normal (the
+		// node converts it to world space, as the legacy root did) and Tangent is the authored
+		// world-space direction (facial forward / hair direction), which the node stores as-is.
+		// The same values are then routed to the root pins (see the Outputs block for why).
+		ToonClosure = UE.Expression(
+			Class="SubstrateMoonToonBSDF", OutputType="Substrate",
+			BaseColor         = Surface.BaseColor,
+			Metallic          = Surface.Metallic,
+			Specular          = Surface.Specular,
+			Roughness         = Surface.Roughness,
+			Normal            = Surface.Normal,
+			EmissiveColor     = Surface.EmissiveColor,
+			Anisotropy        = Surface.Anisotropy,
+			Tangent           = Surface.Tangent,
+			EncodedAttribute0 = Surface.MoonEncodedAttribute0,
+			EncodedAttribute1 = Surface.MoonEncodedAttribute1,
+			EncodedAttribute2 = Surface.MoonEncodedAttribute2,
+			EncodedAttribute3 = Surface.MoonEncodedAttribute3,
+			EncodedAttribute4 = Surface.MoonEncodedAttribute4
+		);
+		BaseColor             = Surface.BaseColor;
+		Metallic              = Surface.Metallic;
+		Specular              = Surface.Specular;
+		Roughness             = Surface.Roughness;
+		Anisotropy            = Surface.Anisotropy;
+		EmissiveColor         = Surface.EmissiveColor;
+		Normal                = Surface.Normal;
+		Tangent               = Surface.Tangent;
+		MoonEncodedAttribute0 = Surface.MoonEncodedAttribute0;
+		MoonEncodedAttribute1 = Surface.MoonEncodedAttribute1;
+		MoonEncodedAttribute2 = Surface.MoonEncodedAttribute2;
+		MoonEncodedAttribute3 = Surface.MoonEncodedAttribute3;
+		MoonEncodedAttribute4 = Surface.MoonEncodedAttribute4;
+		Opacity               = Surface.Opacity;
+		OpacityMask           = Surface.OpacityMask;
+		AmbientOcclusion      = Surface.AmbientOcclusion;
+		CustomizedUV1         = Surface.CustomizedUV1;
+		CustomizedUV2         = Surface.CustomizedUV2;
+		CustomData0           = Surface.CustomData0;
+		CustomData1           = Surface.CustomData1;
+#endif
 
 		ToonDataA = MF_MoonToonBaseInput(OutputIndex=1);
 		ToonDataB = MF_MoonToonBaseInput(OutputIndex=2);
