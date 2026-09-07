@@ -75,6 +75,15 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// setting spelled out.
 		ShadingModel = "Toon";
 #endif
+#if DS_SUBSTRATE
+		// The per-pin form has no MaterialAttributes struct to carry the customised UVs: UMaterial
+		// compiles CustomizedUV[i] only for i < NumCustomizedUVs and passes the raw vertex UV through
+		// otherwise. MF_MoonToonBaseInput moves the head-forward / hair tangent from the vertex stage to
+		// the pixel stage through CustomizedUV1/2 (the Tangent pin reads TexCoords[1].xy + TexCoords[2].x
+		// back), so the SDF facial shadow needs UV1 and UV2 compiled -- 3 covers UV0..UV2. The
+		// attributes form (legacy branch) compiles them from the attribute struct regardless of this.
+		NumCustomizedUVs = 3;
+#endif
 		BlendMode    = "Opaque";
 
 		// Real translucency (engine-side ToonTranslucent). A translucent MI of this base gets:
