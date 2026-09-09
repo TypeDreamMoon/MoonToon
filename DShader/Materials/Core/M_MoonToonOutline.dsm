@@ -128,9 +128,20 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 
 	Outputs = {
 #if DS_SUBSTRATE
-		// Substrate storage: closure plus every root pin, the ones the hull drives (extrusion, cutout,
-		// colour) and the pass-through ones the base input writes. See M_MoonToon for why the root
-		// pins are bound as well.
+		// Substrate storage: the closure plus the root pins the hull drives (extrusion, cutout,
+		// colour) and the pass-through ones the base input writes.
+		//
+		// Since Phase 2a the toon payload rides the closure record -- the toon prepass and its
+		// full-screen targets are not created under Substrate -- so the seven toon root pins
+		// (MoonEncodedAttribute0-4, CustomData0/1) are NO LONGER bound: the engine compiles them as
+		// inactive on a native-form Substrate toon material, and the closure carries the encoded
+		// attributes on its own EncodedAttribute0-4 pins. Their declarations and Graph assignments
+		// are left in place, unbound, so both branches keep the same shape. See M_MoonToon.
+		//
+		// This material authors no ToonMaterialOutput pins at all (it never called the base input's
+		// ToonBuffer outputs), so the closure's FeaturePayload0-2 / ModifierPayload / ModifierId /
+		// TonemapWeight pins are left unconnected -- their defaults (zero payload, modifier id 0,
+		// tonemap weight 1) are exactly what the prepass wrote for an outline draw.
 		Substrate ToonClosure;
 		float3 BaseColor;
 		float  Metallic;
@@ -163,19 +174,16 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		Base.EmissiveColor         = EmissiveColor;
 		Base.Normal                = Normal;
 		Base.Tangent               = Tangent;
-		Base.MoonEncodedAttribute0 = MoonEncodedAttribute0;
-		Base.MoonEncodedAttribute1 = MoonEncodedAttribute1;
-		Base.MoonEncodedAttribute2 = MoonEncodedAttribute2;
-		Base.MoonEncodedAttribute3 = MoonEncodedAttribute3;
-		Base.MoonEncodedAttribute4 = MoonEncodedAttribute4;
 		Base.WorldPositionOffset  = WorldPositionOffset;
 		Base.Opacity              = Opacity;
 		Base.OpacityMask          = OpacityMask;
 		Base.AmbientOcclusion     = AmbientOcclusion;
 		Base.CustomizedUV1        = CustomizedUV1;
 		Base.CustomizedUV2        = CustomizedUV2;
-		Base.CustomData0          = CustomData0;
-		Base.CustomData1          = CustomData1;
+		// Still bound under Substrate (Phase 2a): the ray-tracing hit shader reads root CustomData0 on
+		// both forms -- the closure record has no lane for the cast-shadow-on-toon bit.
+		Base.CustomData0      = CustomData0;
+		Base.CustomData1      = CustomData1;
 #else
 		MaterialAttributes MaterialAttributes;
 
@@ -418,7 +426,11 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 #if !DS_SUBSTRATE
 		MaterialAttributes = Attributes;
 #else
-		// Substrate: the finished attribute set, split into the closure and the root pins.
+		// Substrate: the finished attribute set -- post outline-colour override -- handed to the
+		// closure. The encoded attributes go in on the node's own EncodedAttribute0-4 pins, which is
+		// their only storage now that the toon root pins are unbound (Phase 2a); the feature-payload
+		// pins stay unconnected because this material authors no ToonMaterialOutput pins. See the
+		// Outputs block.
 		ToonClosure = UE.Expression(
 			Class="SubstrateMoonToonBSDF", OutputType="Substrate",
 			BaseColor         = Attributes.BaseColor,
@@ -443,6 +455,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		EmissiveColor         = Attributes.EmissiveColor;
 		Normal                = Attributes.Normal;
 		Tangent               = Attributes.Tangent;
+		// Kept, but bound to nothing since Phase 2a -- see the Outputs block.
 		MoonEncodedAttribute0 = Attributes.MoonEncodedAttribute0;
 		MoonEncodedAttribute1 = Attributes.MoonEncodedAttribute1;
 		MoonEncodedAttribute2 = Attributes.MoonEncodedAttribute2;
@@ -454,6 +467,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		AmbientOcclusion    = Attributes.AmbientOcclusion;
 		CustomizedUV1       = Attributes.CustomizedUV1;
 		CustomizedUV2       = Attributes.CustomizedUV2;
+		// Unbound as well (Phase 2a) -- see the Outputs block.
 		CustomData0         = Attributes.CustomData0;
 		CustomData1         = Attributes.CustomData1;
 #endif

@@ -16,6 +16,12 @@
 // ToonMaterialOutput / MoonToonFaceOverlay are UMaterialExpressionCustomOutputs: they have no
 // output pins, so they can only be reached through an Outputs expression binding, never from the
 // Graph body.
+//
+// Under Substrate (Phase 2a) the four ToonBuffer/Modifier values above ALSO feed the closure node's
+// FeaturePayload0-2 / ModifierPayload / ModifierId pins, because the toon prepass that used to read
+// the custom outputs into full-screen targets is not run at all there -- the payload rides the Moon
+// closure record instead. The custom outputs stay bound because the legacy (r.Substrate=False) path
+// still needs them, and they cost nothing when the prepass is gone.
 
 VirtualFunction(Name="MF_MoonToonBaseInput")
 {
@@ -110,16 +116,29 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 	Outputs = {
 #if DS_SUBSTRATE
 		// Substrate storage. The shaded surface travels as a closure (SubstrateMoonToonBSDF, the
-		// engine's Moon toon BSDF), and EVERY root pin the base input writes is bound as well, from
-		// the same authored attributes. That is what the engine's hidden legacy conversion did (it
-		// left MaterialAttributes on the root next to the converted closure), and the root pins are
-		// not dead under Substrate: the template still builds PixelMaterialInputs from them, and the
-		// toon base pass reads some of them directly -- ComposeToonBufferD (ToonMaterialCommon.ush)
-		// takes the feature id and the SDF-live bit from the ROOT MoonEncodedAttribute0/4, so with
-		// those unbound the face lost its SDF shadow while the closure itself was correct; the
-		// ray-tracing hit shaders read the root CustomData0; WorldNormal / WorldTangent come from
-		// the root Normal / Tangent. Binding all of them keeps the two storages byte-for-byte alike
-		// in what the passes see.
+		// engine's Moon toon BSDF) -- and since Phase 2a so does the toon FEATURE payload: the node
+		// grew FeaturePayload0-2 / ModifierPayload / ModifierId pins, fed in Graph from the very
+		// expressions that bind ToonMaterialOutput.Pin[0..4] below, and the closure record carries
+		// those five RGBA8 lanes (plus the toon actor id and the tonemap weight) itself. The toon
+		// prepass and its seven full-screen targets are not created under Substrate at all any more,
+		// so every Substrate consumer reads the record.
+		//
+		// Consequently the seven toon ROOT pins -- MoonEncodedAttribute0-4 and CustomData0/1 -- are
+		// NO LONGER bound here. The passes that used to need them read the record instead:
+		// ComposeToonBufferD's feature id and SDF pair are composed inside the closure constructor
+		// from the payload and EncodedAttribute4, and the ray-tracing hit shaders take MoonCustomData
+		// from the closure's CustomData lane rather than the root CustomData0. The engine compiles
+		// those seven pins as inactive on a native-form Substrate toon material (Phase 2a), so
+		// binding them would be dead weight, not insurance.
+		//
+		// The declarations and their Graph assignments are deliberately left in place: nothing
+		// requires a declared output to be bound, and keeping them makes the two branches read alike
+		// and the pins one edit away should a root-pin consumer come back.
+		//
+		// Still bound, and still load-bearing: the surface pins the Substrate material template
+		// builds PixelMaterialInputs from (WorldNormal / WorldTangent come from the root Normal /
+		// Tangent), and CustomizedUV1/2, which carry the head-forward / hair tangent to the pixel
+		// stage.
 		Substrate ToonClosure;
 		float3 BaseColor;
 		float  Metallic;
@@ -163,16 +182,13 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		Base.EmissiveColor         = EmissiveColor;
 		Base.Normal                = Normal;
 		Base.Tangent               = Tangent;
-		Base.MoonEncodedAttribute0 = MoonEncodedAttribute0;
-		Base.MoonEncodedAttribute1 = MoonEncodedAttribute1;
-		Base.MoonEncodedAttribute2 = MoonEncodedAttribute2;
-		Base.MoonEncodedAttribute3 = MoonEncodedAttribute3;
-		Base.MoonEncodedAttribute4 = MoonEncodedAttribute4;
 		Base.Opacity          = Opacity;
 		Base.OpacityMask      = OpacityMask;
 		Base.AmbientOcclusion = AmbientOcclusion;
 		Base.CustomizedUV1    = CustomizedUV1;
 		Base.CustomizedUV2    = CustomizedUV2;
+		// Still bound under Substrate (Phase 2a): the ray-tracing hit shader reads root CustomData0 on
+		// both forms -- the closure record has no lane for the cast-shadow-on-toon bit.
 		Base.CustomData0      = CustomData0;
 		Base.CustomData1      = CustomData1;
 #else
@@ -216,7 +232,24 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// closure takes the shaded-surface set; Normal is the authored tangent-space normal (the
 		// node converts it to world space, as the legacy root did) and Tangent is the authored
 		// world-space direction (facial forward / hair direction), which the node stores as-is.
-		// The same values are then routed to the root pins (see the Outputs block for why).
+		//
+		// Phase 2a: the FEATURE payload goes in too. These are the same five values the
+		// ToonMaterialOutput custom-output pins take below -- literally the same nodes, because a
+		// VirtualFunction call with the same argument list is served from the graph builder's reuse
+		// cache, so MF_MoonToonBaseInput is still called once and each output read once. Under
+		// Substrate that payload no longer travels through the toon prepass MRTs (they are not
+		// created); the closure record carries it, and every consumer reads it back from there.
+		// RT3 (the SDF pair, the flags and the normalized modifier id) is composed inside the
+		// closure constructor, exactly as ComposeToonBufferD composes it for the legacy MRT, which
+		// is why there is no FeaturePayload3 pin. The tonemap-weight pin (ToonMaterialOutput pin 5)
+		// is not authored by this material, so TonemapWeight is left unconnected == 1.0, which is
+		// what GetToonTonemapWeight returned for it.
+		float4 FeaturePayloadRT0 = MF_MoonToonBaseInput(OutputIndex=1);
+		float4 FeaturePayloadRT1 = MF_MoonToonBaseInput(OutputIndex=2);
+		float4 FeaturePayloadRT2 = MF_MoonToonBaseInput(OutputIndex=3);
+		float4 ModifierPayloadRT4 = MF_MoonToonBaseInput(OutputIndex=7);
+		float ModifierRawId = MF_MoonToonBaseInput(OutputIndex=8);
+
 		ToonClosure = UE.Expression(
 			Class="SubstrateMoonToonBSDF", OutputType="Substrate",
 			BaseColor         = Surface.BaseColor,
@@ -231,7 +264,12 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			EncodedAttribute1 = Surface.MoonEncodedAttribute1,
 			EncodedAttribute2 = Surface.MoonEncodedAttribute2,
 			EncodedAttribute3 = Surface.MoonEncodedAttribute3,
-			EncodedAttribute4 = Surface.MoonEncodedAttribute4
+			EncodedAttribute4 = Surface.MoonEncodedAttribute4,
+			FeaturePayload0   = FeaturePayloadRT0,
+			FeaturePayload1   = FeaturePayloadRT1,
+			FeaturePayload2   = FeaturePayloadRT2,
+			ModifierPayload   = ModifierPayloadRT4,
+			ModifierId        = ModifierRawId
 		);
 		BaseColor             = Surface.BaseColor;
 		Metallic              = Surface.Metallic;
@@ -241,6 +279,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		EmissiveColor         = Surface.EmissiveColor;
 		Normal                = Surface.Normal;
 		Tangent               = Surface.Tangent;
+		// Kept, but bound to nothing since Phase 2a: the toon root pins are inactive on a native
+		// Substrate toon material and the closure record is the payload's only storage. See the
+		// Outputs block.
 		MoonEncodedAttribute0 = Surface.MoonEncodedAttribute0;
 		MoonEncodedAttribute1 = Surface.MoonEncodedAttribute1;
 		MoonEncodedAttribute2 = Surface.MoonEncodedAttribute2;
@@ -251,6 +292,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		AmbientOcclusion      = Surface.AmbientOcclusion;
 		CustomizedUV1         = Surface.CustomizedUV1;
 		CustomizedUV2         = Surface.CustomizedUV2;
+		// Unbound as well (Phase 2a): the ray-tracing hit shaders take MoonCustomData from the
+		// closure's CustomData lane under Substrate.
 		CustomData0           = Surface.CustomData0;
 		CustomData1           = Surface.CustomData1;
 #endif
