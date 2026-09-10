@@ -504,6 +504,40 @@ def parse_slot_tables(path, prefix="MOON_TOON_SLOTS_"):
     return tables
 
 
+# The profile column that DOES reach a collapsed slot, so the warning can name it rather than saying
+# "use a profile" and leaving the artist to find which row.
+_COLLAPSED_SLOT_ESCAPE = {
+    "FeatureInputScalarE":  "FeatureScalar[4]",
+    "FeatureInputScalarF":  "FeatureScalar[5]",
+    "FeatureInputScalarG":  "FeatureScalar[6]",
+    "FeatureInputVector.w": "FeatureVector 的 A",
+}
+
+
+def parse_perpixel_slots(path):
+    """The slots the closure record still carries, off MOONTOON_RECORD_PERPIXEL_SLOTS.
+
+    Read from the engine rather than restated here: it is a fact about the record layout, and the
+    record header is where that layout is decided.
+    """
+    src = open(path, encoding="utf-8").read()
+    m = re.search(r"#define\s+MOONTOON_RECORD_PERPIXEL_SLOTS\s+([^\n]*)", src)
+    if not m:
+        raise SystemExit("%s: MOONTOON_RECORD_PERPIXEL_SLOTS not found -- the record header is the "
+                         "single source for which slots survive" % os.path.basename(path))
+    return set(m.group(1).split())
+
+
+def collapsed_slot_warning(slot, perpixel):
+    """The sentence appended to a parameter whose slot the record no longer carries."""
+    if slot in perpixel:
+        return ""
+    escape = _COLLAPSED_SLOT_ESCAPE.get(slot, "profile 的 feature 列")
+    return (" ⚠ Substrate 下改这里不生效: 记录自 2b-3 起不再携带这条通道, 它由本 feature 的母材质"
+            "默认值提供. 要给这个材质一个不同的值, 给它挂一个 MoonToonProfile 并设 %s. "
+            "(legacy 存储下仍然生效, 所以两条存储会不一致.)" % escape)
+
+
 def parse_slot_defaults(path, prefix="MOON_TOON_SLOTS_"):
     """table-macro -> {slot Name: default literal}, for the tables that HAVE a fourth column."""
     src = open(path, encoding="utf-8").read()
@@ -640,14 +674,20 @@ def emit(feature_key, tables):
     helpers = HELPERS.get(feature_key, {})
     derived = DERIVED.get(feature_key, {})
 
+    perpixel = parse_perpixel_slots(SLOT_TABLE.replace("MoonToonFeatureSlots.h",
+                                                       "MoonToonRecordDefinitions.h"))
+
     prop_lines, call_lines, pre_lines = [], [], []
-    for i, (t, _, name) in enumerate(rows):
+    for i, (t, slot, name) in enumerate(rows):
         pname, default = params[name]
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
         desc = DESC.get(feature_key, {}).get(name) or DESC_COMMON.get(name)
         if not desc:
             raise SystemExit("%s.%s has no description -- add one to DESC or DESC_COMMON"
                              % (feature_key, name))
+        # A parameter whose slot the record dropped says so, in the one place an artist is looking
+        # when they type a value into it.
+        desc = desc + collapsed_slot_warning(slot, perpixel)
         prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d; Description="%s"];'
                           % (kind, pname, default, group, i, desc))
         expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")

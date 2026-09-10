@@ -57,11 +57,11 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 		ScalarParameter In_Eye_LimbalDarkenStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=1; Description="角膜缘变暗强度 —— 视角越偏, 眼球边缘越深."];
 		ScalarParameter In_Eye_SpecularShadowStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=2; Description="高光受阴影影响的程度."];
 		ScalarParameter In_Eye_PrimaryRoughnessScale = 1.0 [Group="39 - Feature: Eye"; SortPriority=3; Description="主高光(小而锐的那点)粗糙度倍数."];
-		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="39 - Feature: Eye"; SortPriority=4; Description="次高光(大而柔的那片)粗糙度倍数."];
-		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=5; Description="主高光强度."];
-		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=6; Description="次高光强度."];
+		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="39 - Feature: Eye"; SortPriority=4; Description="次高光(大而柔的那片)粗糙度倍数. ⚠ Substrate 下改这里不生效: 记录自 2b-3 起不再携带这条通道, 它由本 feature 的母材质默认值提供. 要给这个材质一个不同的值, 给它挂一个 MoonToonProfile 并设 FeatureScalar[4]. (legacy 存储下仍然生效, 所以两条存储会不一致.)"];
+		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=5; Description="主高光强度. ⚠ Substrate 下改这里不生效: 记录自 2b-3 起不再携带这条通道, 它由本 feature 的母材质默认值提供. 要给这个材质一个不同的值, 给它挂一个 MoonToonProfile 并设 FeatureScalar[5]. (legacy 存储下仍然生效, 所以两条存储会不一致.)"];
+		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=6; Description="次高光强度. ⚠ Substrate 下改这里不生效: 记录自 2b-3 起不再携带这条通道, 它由本 feature 的母材质默认值提供. 要给这个材质一个不同的值, 给它挂一个 MoonToonProfile 并设 FeatureScalar[6]. (legacy 存储下仍然生效, 所以两条存储会不一致.)"];
 		VectorParameter In_Eye_EyeTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="39 - Feature: Eye"; SortPriority=7; Description="眼球染色. 全黑 = 未授权, 此时用材质的 Base Color."];
-		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="39 - Feature: Eye"; SortPriority=8; Description="次高光在 Specular Ramp 上的横向偏移."];
+		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="39 - Feature: Eye"; SortPriority=8; Description="次高光在 Specular Ramp 上的横向偏移. ⚠ Substrate 下改这里不生效: 记录自 2b-3 起不再携带这条通道, 它由本 feature 的母材质默认值提供. 要给这个材质一个不同的值, 给它挂一个 MoonToonProfile 并设 FeatureVector 的 A. (legacy 存储下仍然生效, 所以两条存储会不一致.)"];
 	}
 
 	Graph = {
