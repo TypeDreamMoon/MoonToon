@@ -504,16 +504,6 @@ def parse_slot_tables(path, prefix="MOON_TOON_SLOTS_"):
     return tables
 
 
-# The profile column that DOES reach a collapsed slot, so the warning can name it rather than saying
-# "use a profile" and leaving the artist to find which row.
-_COLLAPSED_SLOT_ESCAPE = {
-    "FeatureInputScalarE":  "FeatureScalar[4]",
-    "FeatureInputScalarF":  "FeatureScalar[5]",
-    "FeatureInputScalarG":  "FeatureScalar[6]",
-    "FeatureInputVector.w": "FeatureVector 的 A",
-}
-
-
 def parse_perpixel_slots(path):
     """The slots the closure record still carries, off MOONTOON_RECORD_PERPIXEL_SLOTS.
 
@@ -529,13 +519,18 @@ def parse_perpixel_slots(path):
 
 
 def collapsed_slot_warning(slot, perpixel):
-    """The sentence appended to a parameter whose slot the record no longer carries."""
+    """The sentence appended to a parameter whose slot the closure record does not carry.
+
+    Since phase 5c the record carries every slot, so this fires on nothing -- which is the point of
+    leaving it in. It reads MOONTOON_RECORD_PERPIXEL_SLOTS out of the engine rather than restating
+    it, so the day a channel is dropped again the warning appears by itself instead of the failure
+    being silent, which is exactly how 2b-3 went.
+    """
     if slot in perpixel:
         return ""
-    escape = _COLLAPSED_SLOT_ESCAPE.get(slot, "profile 的 feature 列")
-    return (" ⚠ Substrate 下改这里不生效: 记录自 2b-3 起不再携带这条通道, 它由本 feature 的母材质"
-            "默认值提供. 要给这个材质一个不同的值, 给它挂一个 MoonToonProfile 并设 %s. "
-            "(legacy 存储下仍然生效, 所以两条存储会不一致.)" % escape)
+    return (" ⚠ Substrate 下改这里不生效: 闭包记录不携带这条通道 (%s), 它只会取本 feature 的母材质"
+            "默认值. legacy 存储下仍然生效, 所以两条存储会不一致 —— 这是引擎侧的缺口, 不是本材质"
+            "能绕过去的东西." % slot)
 
 
 def parse_slot_defaults(path, prefix="MOON_TOON_SLOTS_"):

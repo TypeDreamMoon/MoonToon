@@ -37,7 +37,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_PBRSpecular", Roo
 	}
 
 	Properties = {
-		ScalarParameter In_PBRSpecular_BloomWeight = 0.0 [Group="32 - Feature: PBR Specular"; SortPriority=0; Description="该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理). ⚠ Substrate 下改这里不生效: 记录自 2b-3 起不再携带这条通道, 它由本 feature 的母材质默认值提供. 要给这个材质一个不同的值, 给它挂一个 MoonToonProfile 并设 FeatureVector 的 A. (legacy 存储下仍然生效, 所以两条存储会不一致.)"];
+		ScalarParameter In_PBRSpecular_BloomWeight = 0.0 [Group="32 - Feature: PBR Specular"; SortPriority=0; Description="该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理)."];
 	}
 
 	Graph = {
