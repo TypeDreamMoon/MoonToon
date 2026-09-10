@@ -479,12 +479,20 @@ HEADER = """// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by To
 
 
 def parse_slot_tables(path, prefix="MOON_TOON_SLOTS_"):
-    """table-macro -> [(Type, Slot, Name)], following one level of table aliasing."""
+    """table-macro -> [(Type, Slot, Name)], following one level of table aliasing.
+
+    FEATURE tables carry a fourth column since phase 2b-3 -- the value the shader falls back to when
+    the record stops carrying that channel -- and MODIFIER tables carry three, because the modifier
+    payload was never collapsed and so has nothing to fall back to. Both shapes are accepted here;
+    the fourth column is kept separately (parse_slot_defaults) so every caller of this function keeps
+    the triple it was written against.
+    """
     src = open(path, encoding="utf-8").read()
     tables, alias = {}, {}
     for m in re.finditer(r"#define\s+(%s\w+)\(X\)((?:[^\n]*\\\n)*[^\n]*)" % prefix, src):
         name, body = m.group(1), m.group(2)
-        rows = re.findall(r"X\(\s*(\w+)\s*,\s*([\w.]+)\s*,\s*(\w+)\s*\)", body)
+        rows = [r[:3] for r in re.findall(
+            r"X\(\s*(\w+)\s*,\s*([\w.]+)\s*,\s*(\w+)\s*(?:,[^)]*(?:\([^)]*\))?[^)]*)?\)", body)]
         if rows:
             tables[name] = rows
         else:
@@ -494,6 +502,72 @@ def parse_slot_tables(path, prefix="MOON_TOON_SLOTS_"):
     for a, target in alias.items():
         tables[a] = tables[target]
     return tables
+
+
+def parse_slot_defaults(path, prefix="MOON_TOON_SLOTS_"):
+    """table-macro -> {slot Name: default literal}, for the tables that HAVE a fourth column."""
+    src = open(path, encoding="utf-8").read()
+    out, alias = {}, {}
+    for m in re.finditer(r"#define\s+(%s\w+)\(X\)((?:[^\n]*\\\n)*[^\n]*)" % prefix, src):
+        name, body = m.group(1), m.group(2)
+        rows = re.findall(
+            r"X\(\s*\w+\s*,\s*[\w.]+\s*,\s*(\w+)\s*,\s*((?:[^,()]|\([^)]*\))+?)\s*\)", body)
+        if rows:
+            out[name] = {n: d.strip() for n, d in rows}
+        else:
+            ref = re.search(r"(%s\w+)\(X\)" % prefix, body)
+            if ref:
+                alias[name] = ref.group(1)
+    for a, target in alias.items():
+        if target in out:
+            out[a] = out[target]
+    return out
+
+
+def _numbers(literal):
+    """The numeric components of a slot default, whichever spelling it arrived in.
+
+    The engine writes HLSL (`0.4482f`, `float3(1.0f, 1.0f, 1.0f)`) and the generator writes
+    DreamShaderLang (`0.4482`, `float4(1.0, 1.0, 1.0, 1.0)`). A float3 slot is authored as a float4
+    parameter because that is what a colour picker is, so the trailing alpha is dropped before
+    comparing -- it is not a slot.
+    """
+    body = re.sub(r"^\s*float[234]\s*\(", "(", literal.strip())
+    vals = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", body)]
+    # a float3 slot is authored as a float4 parameter, because that is what a colour picker is
+    if len(vals) == 4:
+        vals = vals[:3]
+    return vals
+
+
+def check_slot_defaults(defaults):
+    """The engine slot table and this generator must agree on every slot default.
+
+    They are the same fact in two places: the shader falls back to the table column when the record
+    stops carrying the channel, and the material instance starts at the generator's literal. If they
+    drift, a material at its own default stops matching the fallback -- which is the entire premise
+    of the phase 2b-3 record narrowing, and would show up as a look change nobody edited.
+    """
+    problems = []
+    for key in FEATURES:
+        table = slot_table_for(key)
+        if table not in defaults:
+            continue
+        derived = DERIVED.get(key, {})
+        for name, (pname, pdefault) in PARAMS.get(key, {}).items():
+            if name not in defaults[table]:
+                continue
+            if name in derived:
+                # The parameter and the slot are different QUANTITIES here, related by a curve --
+                # Stockings authors denier and the slot holds the opacity it maps to -- so there is
+                # no number to compare. The slot table comments carry that arithmetic; checking it
+                # would mean evaluating the generator expression, which is not what this guards.
+                continue
+            want, got = _numbers(defaults[table][name]), _numbers(pdefault)
+            if len(want) != len(got) or any(abs(a - b) > 1e-4 for a, b in zip(want, got)):
+                problems.append("%s.%s: slot table says %s, generator parameter %s says %s"
+                                % (key, name, defaults[table][name], pname, pdefault))
+    return problems
 
 
 def parse_registry(path):
@@ -1260,8 +1334,10 @@ def main():
     mod_tables = parse_slot_tables(os.path.normpath(MODIFIER_SLOT_TABLE),
                                    "MOON_TOON_MOD_SLOTS_")
 
+    slot_defaults = parse_slot_defaults(SLOT_TABLE)
     problems = (check_registry_agreement() + check_bloom_weight_list(tables)
-                + check_modifier_agreement(mod_tables) + check_module_includes())
+                + check_modifier_agreement(mod_tables) + check_module_includes()
+                + check_slot_defaults(slot_defaults))
     if problems:
         for problem in problems:
             print("registry/generator disagree: %s" % problem)
