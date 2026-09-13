@@ -4,6 +4,13 @@
 // One toon feature, one material function. It declares only its own slots, so a material instance
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
+//
+// Two output lanes over ONE set of parameters:
+//   * ToonBufferA/B/C -- the packed RGBA8 form the legacy (r.Substrate=0) toon prepass reads,
+//     reached through MF_MoonToonFeatureSelect. Kept first so its OutputIndex 0/1/2 do not move.
+//   * one output per SLOT, named as the slot table names it -- what M_MoonToon wires straight onto
+//     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
+//     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
 Function ToonFeatureWrite_ToonKajiyaHair(
 	in float TangentRotate,
@@ -41,7 +48,7 @@ Function ToonFeatureWrite_ToonKajiyaHair(
 ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonKajiyaHair", Root="Plugin.MoonToon")
 {
 	Settings = {
-		Description       = "Packs the ToonKajiyaHair toon feature parameters into ToonBufferA/B/C.";
+		Description       = "The ToonKajiyaHair toon feature's channels, named after its slot table.";
 		ExposeToLibrary   = true;
 		LibraryCategories = "MoonToon|Features";
 	}
@@ -52,9 +59,27 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonKajiyaHair", 
 	}
 
 	Outputs = {
+		// The legacy lane: the same channels packed into the three RGBA8 ToonBuffer float4s the
+		// r.Substrate=0 toon prepass splats into its full-screen targets. FIRST, and staying first,
+		// because MF_MoonToonFeatureSelect reaches them by OutputIndex 0/1/2.
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		// The Substrate lane: one output per slot this feature's table declares, named exactly as the
+		// table names it -- which is also what UMaterialExpressionSubstrateMoonToonBSDF /
+		// UMaterialExpressionMoonToonFeature call the matching pin, so M_MoonToon can wire the closure
+		// by name instead of by lane. Order is slot-table order.
+		float TangentRotate;
+		float SecondaryShift;
+		float SecondaryMask;
+		float PrimaryShift;
+		float PrimaryExpScale;
+		float SecondaryExpScale;
+		float OverallIntensity;
+		float PrimaryIntensity;
+		float SecondaryIntensity;
+		float SecondaryShiftScale;
+		float ShadowStrength;
 	}
 
 	Properties = {
@@ -72,18 +97,42 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonKajiyaHair", 
 	}
 
 	Graph = {
+		float Slot_TangentRotate = In_ToonHair_TangentRotate;
+		float Slot_SecondaryShift = InSecondaryStrandShift + In_ToonHair_SecondaryShift;
+		float Slot_SecondaryMask = In_ToonHair_SecondaryMask;
+		float Slot_PrimaryShift = InPrimaryStrandShift + In_ToonHair_PrimaryStrandShift;
+		float Slot_PrimaryExpScale = In_ToonHair_PrimaryExpScale;
+		float Slot_SecondaryExpScale = In_ToonHair_SecondaryExpScale;
+		float Slot_OverallIntensity = In_ToonHair_OverallSpecIntensity;
+		float Slot_PrimaryIntensity = In_ToonHair_PrimaryIntensity;
+		float Slot_SecondaryIntensity = In_ToonHair_SecondaryIntensity;
+		float Slot_SecondaryShiftScale = In_ToonHair_SecondaryShiftScale;
+		float Slot_ShadowStrength = In_ToonHair_ShadowStrength;
+
 		ToonFeatureWrite_ToonKajiyaHair(
-			In_ToonHair_TangentRotate,
-			InSecondaryStrandShift + In_ToonHair_SecondaryShift,
-			In_ToonHair_SecondaryMask,
-			InPrimaryStrandShift + In_ToonHair_PrimaryStrandShift,
-			In_ToonHair_PrimaryExpScale,
-			In_ToonHair_SecondaryExpScale,
-			In_ToonHair_OverallSpecIntensity,
-			In_ToonHair_PrimaryIntensity,
-			In_ToonHair_SecondaryIntensity,
-			In_ToonHair_SecondaryShiftScale,
-			In_ToonHair_ShadowStrength,
+			Slot_TangentRotate,
+			Slot_SecondaryShift,
+			Slot_SecondaryMask,
+			Slot_PrimaryShift,
+			Slot_PrimaryExpScale,
+			Slot_SecondaryExpScale,
+			Slot_OverallIntensity,
+			Slot_PrimaryIntensity,
+			Slot_SecondaryIntensity,
+			Slot_SecondaryShiftScale,
+			Slot_ShadowStrength,
 			ToonBufferA, ToonBufferB, ToonBufferC);
+
+		TangentRotate = Slot_TangentRotate;
+		SecondaryShift = Slot_SecondaryShift;
+		SecondaryMask = Slot_SecondaryMask;
+		PrimaryShift = Slot_PrimaryShift;
+		PrimaryExpScale = Slot_PrimaryExpScale;
+		SecondaryExpScale = Slot_SecondaryExpScale;
+		OverallIntensity = Slot_OverallIntensity;
+		PrimaryIntensity = Slot_PrimaryIntensity;
+		SecondaryIntensity = Slot_SecondaryIntensity;
+		SecondaryShiftScale = Slot_SecondaryShiftScale;
+		ShadowStrength = Slot_ShadowStrength;
 	}
 }

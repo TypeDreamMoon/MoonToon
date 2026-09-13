@@ -4,6 +4,13 @@
 // One toon feature, one material function. It declares only its own slots, so a material instance
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
+//
+// Two output lanes over ONE set of parameters:
+//   * ToonBufferA/B/C -- the packed RGBA8 form the legacy (r.Substrate=0) toon prepass reads,
+//     reached through MF_MoonToonFeatureSelect. Kept first so its OutputIndex 0/1/2 do not move.
+//   * one output per SLOT, named as the slot table names it -- what M_MoonToon wires straight onto
+//     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
+//     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
 import "Shared/ToonFunctions.dsh";
 
@@ -29,7 +36,7 @@ Function ToonFeatureWrite_HairHighlightMask(
 ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask", Root="Plugin.MoonToon")
 {
 	Settings = {
-		Description       = "Packs the HairHighlightMask toon feature parameters into ToonBufferA/B/C.";
+		Description       = "The HairHighlightMask toon feature's channels, named after its slot table.";
 		ExposeToLibrary   = true;
 		LibraryCategories = "MoonToon|Features";
 	}
@@ -41,9 +48,20 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 	}
 
 	Outputs = {
+		// The legacy lane: the same channels packed into the three RGBA8 ToonBuffer float4s the
+		// r.Substrate=0 toon prepass splats into its full-screen targets. FIRST, and staying first,
+		// because MF_MoonToonFeatureSelect reaches them by OutputIndex 0/1/2.
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		// The Substrate lane: one output per slot this feature's table declares, named exactly as the
+		// table names it -- which is also what UMaterialExpressionSubstrateMoonToonBSDF /
+		// UMaterialExpressionMoonToonFeature call the matching pin, so M_MoonToon can wire the closure
+		// by name instead of by lane. Order is slot-table order.
+		float Mask;
+		float Intensity;
+		float ShadowIntensity;
+		float ViewAnchorBlend;
 	}
 
 	Properties = {
@@ -54,11 +72,21 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 	}
 
 	Graph = {
+		float Slot_Mask = MF_ToonHairHighlightMask(GlobalMaskA, GlobalMaskB, GlobalMaskC) + In_Hair_HighlightMask;
+		float Slot_Intensity = In_Hair_HighlightMaskIntensity;
+		float Slot_ShadowIntensity = In_Hair_HighlightMaskShadowIntensity;
+		float Slot_ViewAnchorBlend = In_Hair_HighlightViewAnchorBlend;
+
 		ToonFeatureWrite_HairHighlightMask(
-			MF_ToonHairHighlightMask(GlobalMaskA, GlobalMaskB, GlobalMaskC) + In_Hair_HighlightMask,
-			In_Hair_HighlightMaskIntensity,
-			In_Hair_HighlightMaskShadowIntensity,
-			In_Hair_HighlightViewAnchorBlend,
+			Slot_Mask,
+			Slot_Intensity,
+			Slot_ShadowIntensity,
+			Slot_ViewAnchorBlend,
 			ToonBufferA, ToonBufferB, ToonBufferC);
+
+		Mask = Slot_Mask;
+		Intensity = Slot_Intensity;
+		ShadowIntensity = Slot_ShadowIntensity;
+		ViewAnchorBlend = Slot_ViewAnchorBlend;
 	}
 }

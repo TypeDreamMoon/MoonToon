@@ -475,6 +475,13 @@ HEADER = """// GENERATED from Engine/Shaders/Shared/MoonToonFeatureSlots.h by To
 // One toon feature, one material function. It declares only its own slots, so a material instance
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
+//
+// Two output lanes over ONE set of parameters:
+//   * ToonBufferA/B/C -- the packed RGBA8 form the legacy (r.Substrate=0) toon prepass reads,
+//     reached through MF_MoonToonFeatureSelect. Kept first so its OutputIndex 0/1/2 do not move.
+//   * one output per SLOT, named as the slot table names it -- what M_MoonToon wires straight onto
+//     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
+//     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 """
 
 
@@ -672,7 +679,7 @@ def emit(feature_key, tables):
     perpixel = parse_perpixel_slots(SLOT_TABLE.replace("MoonToonFeatureSlots.h",
                                                        "MoonToonRecordDefinitions.h"))
 
-    prop_lines, call_lines, pre_lines = [], [], []
+    prop_lines, call_lines, pre_lines, slot_lines, out_decls, out_lines = [], [], [], [], [], []
     for i, (t, slot, name) in enumerate(rows):
         pname, default = params[name]
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
@@ -701,7 +708,15 @@ def emit(feature_key, tables):
             if name in helpers:
                 hop = helpers[name][3] if len(helpers[name]) > 3 else "+"
                 expr = "%s %s %s" % (helpers[name][0], hop, expr)
-        call_lines.append("\t\t\t%s," % expr)
+        # The finished channel, named once and read twice: by the legacy packer below and by the
+        # named output. Once rather than twice so a map-driven or helper-driven slot builds ONE
+        # subgraph -- `MF_ToonHairHighlightMask(...) + In_Hair_Mask` written out in both places
+        # would be two of everything in the generated asset.
+        channel_type = "float3" if t == "float3" else "float"
+        slot_lines.append("\t\t%s Slot_%s = %s;" % (channel_type, name, expr))
+        call_lines.append("\t\t\tSlot_%s," % name)
+        out_decls.append("\t\t%s %s;" % (channel_type, name))
+        out_lines.append("\t\t%s = Slot_%s;" % (name, name))
 
     input_lines = ['\t\topt %s %s = %s [Description="%s"];' % (t, fn_in, default, desc)
                    for (t, fn_in, _, default, desc) in _feature_inputs(feature_key, tables)]
@@ -725,7 +740,7 @@ Function %s(
 ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_%s", Root="Plugin.MoonToon")
 {
 \tSettings = {
-\t\tDescription       = "Packs the %s toon feature parameters into ToonBufferA/B/C.";
+\t\tDescription       = "The %s toon feature's channels, named after its slot table.";
 \t\tExposeToLibrary   = true;
 \t\tLibraryCategories = "MoonToon|Features";
 \t}
@@ -735,9 +750,17 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_%s", Root="Plugin
 \t}
 
 \tOutputs = {
+\t\t// The legacy lane: the same channels packed into the three RGBA8 ToonBuffer float4s the
+\t\t// r.Substrate=0 toon prepass splats into its full-screen targets. FIRST, and staying first,
+\t\t// because MF_MoonToonFeatureSelect reaches them by OutputIndex 0/1/2.
 \t\tfloat4 ToonBufferA;
 \t\tfloat4 ToonBufferB;
 \t\tfloat4 ToonBufferC;
+\t\t// The Substrate lane: one output per slot this feature's table declares, named exactly as the
+\t\t// table names it -- which is also what UMaterialExpressionSubstrateMoonToonBSDF /
+\t\t// UMaterialExpressionMoonToonFeature call the matching pin, so M_MoonToon can wire the closure
+\t\t// by name instead of by lane. Order is slot-table order.
+%s
 \t}
 
 \tProperties = {
@@ -745,15 +768,19 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_%s", Root="Plugin
 \t}
 
 \tGraph = {
-%s\t\t%s(
+%s%s
+
+\t\t%s(
 %s
 \t\t\tToonBufferA, ToonBufferB, ToonBufferC);
+
+%s
 \t}
 }
 """ % (HEADER, imports, fn, args, id_macro, body, dsf_name, dsf_name,
-       "\n".join(input_lines), "\n".join(prop_lines),
-       ("\n".join(pre_lines) + "\n\n") if pre_lines else "", fn,
-       "\n".join(call_lines))
+       "\n".join(input_lines), "\n".join(out_decls), "\n".join(prop_lines),
+       ("\n".join(pre_lines) + "\n\n") if pre_lines else "", "\n".join(slot_lines), fn,
+       "\n".join(call_lines), "\n".join(out_lines))
 
 
 SELECT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -785,6 +812,38 @@ def _feature_inputs(key, tables):
     return ins
 
 
+def _feature_channel_outputs(key, tables):
+    """[(type, output name)] for one feature's named channel outputs, in slot-table order.
+
+    The same list emit() writes into the .dsf, derived from the same table, so a caller that has to
+    RESTATE the signature (a VirtualFunction block) cannot drift from the function it names.
+    """
+    return [("float3" if t == "float3" else "float", name)
+            for (t, _slot, name) in tables[slot_table_for(key)]]
+
+
+def _feature_outputs_block(key, tables, indent="\t\t"):
+    """The full Outputs body of a feature function: the three packed lanes, then the slots."""
+    lines = ["%sfloat4 ToonBuffer%s;" % (indent, c) for c in "ABC"]
+    lines += ["%s%s %s;" % (indent, t, n) for (t, n) in _feature_channel_outputs(key, tables)]
+    return "\n".join(lines)
+
+
+def _feature_virtual_decl(key, tables):
+    """The VirtualFunction block that restates one feature function's signature."""
+    in_block = "\n".join("\t\topt %s %s = %s;" % (t, fn_in, default)
+                         for (t, fn_in, _s, default, _d) in _feature_inputs(key, tables))
+    return ('VirtualFunction(Name="MF_ToonFeature_%s")\n'
+            "{\n"
+            "\tOptions = {\n"
+            '\t\tAsset = Path(Plugins.MoonToon, "MaterialFunctions/Features/MF_ToonFeature_%s");\n'
+            "\t}\n\n"
+            "\tInputs = {\n%s\n\t}\n\n"
+            "\tOutputs = {\n%s\n\t}\n"
+            "}" % (FEATURES[key][0], FEATURES[key][0], in_block,
+                   _feature_outputs_block(key, tables)))
+
+
 def parse_feature_ids(path):
     """MOON_SHADING_FEATURE_ID_* -> numeric value, straight from the shared definition header."""
     src = open(path, encoding="utf-8").read()
@@ -795,20 +854,7 @@ def parse_feature_ids(path):
 def emit_selector(tables, ids):
     picks = [k for k in FEATURES if k != FALLBACK]
 
-    def decl(k):
-        ins = _feature_inputs(k, tables)
-        in_block = "\n".join('\t\topt %s %s = %s;' % (t, fn_in, default)
-                             for (t, fn_in, _, default, _d) in ins)
-        return ('VirtualFunction(Name="MF_ToonFeature_%s")\n'
-                "{\n"
-                "\tOptions = {\n"
-                '\t\tAsset = Path(Plugins.MoonToon, "MaterialFunctions/Features/MF_ToonFeature_%s");\n'
-                "\t}\n\n"
-                "\tInputs = {\n%s\n\t}\n\n"
-                "\tOutputs = {\n\t\tfloat4 ToonBufferA;\n\t\tfloat4 ToonBufferB;\n\t\tfloat4 ToonBufferC;\n\t}\n"
-                "}" % (FEATURES[k][0], FEATURES[k][0], in_block))
-
-    decls = "\n".join(decl(k) for k in FEATURES)
+    decls = "\n".join(_feature_virtual_decl(k, tables) for k in FEATURES)
 
     # Selector-level inputs: the union of every feature's map-driven slots, deduplicated.
     sel_inputs, seen = [], set()
@@ -1138,10 +1184,14 @@ def emit_modifier(key, tables):
                       for (t, _, n) in rows)
     body = "\n".join("\tTBuffer.%s = %s;" % (slot, name) for (_, slot, name) in rows)
 
-    prop_lines, call_lines = [], []
+    prop_lines, call_lines, slot_lines, out_decls, out_lines = [], [], [], [], []
     for i, (t, _, name) in enumerate(rows):
+        channel_type = "float3" if t == "float3" else "float"
+        out_decls.append("\t\t%s %s;" % (channel_type, name))
+        out_lines.append("\t\t%s = Slot_%s;" % (name, name))
+        call_lines.append("\t\t\tSlot_%s," % name)
         if name in helpers:
-            call_lines.append("\t\t\t%s," % helpers[name])
+            slot_lines.append("\t\t%s Slot_%s = %s;" % (channel_type, name, helpers[name]))
             continue
         display, default, desc = params[name]
         # The DSL identifier is derived, not authored: it cannot carry spaces, and having the table
@@ -1151,7 +1201,8 @@ def emit_modifier(key, tables):
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
         prop_lines.append('		%s %s = %s [ParameterName="%s"; Group="%s"; SortPriority=%d; '
                           'Description="%s"];' % (kind, ident, default, display, group, i, desc))
-        call_lines.append("			%s%s," % (ident, ".rgb" if t == "float3" else ""))
+        slot_lines.append("\t\t%s Slot_%s = %s%s;"
+                          % (channel_type, name, ident, ".rgb" if t == "float3" else ""))
 
     input_lines = ['\t\topt %s %s = %s [Description="%s"];' % (t, fn_in, default, desc)
                    for (t, fn_in, _s, default, desc) in MODIFIER_INPUTS.get(key, [])]
@@ -1173,7 +1224,7 @@ Function %s(
 ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_%s", Root="Plugin.MoonToon")
 {
 \tSettings = {
-\t\tDescription       = "Packs the %s modifier parameters into the ToonFeatureRT4 payload.";
+\t\tDescription       = "The %s modifier's channels, named after its slot table.";
 \t\tExposeToLibrary   = true;
 \t\tLibraryCategories = "MoonToon|Modifiers";
 \t}
@@ -1183,39 +1234,94 @@ ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_%s", Root="Plug
 \t}
 
 \tOutputs = {
+\t\t// The legacy lane: the four channels packed into ToonFeatureRT4, reached through
+\t\t// MF_MoonToonModifierSelect. First, and staying first, because that selector reads OutputIndex 0.
 \t\tfloat4 ModifierData;
+\t\t// The Substrate lane: one output per slot, named as MoonToonModifierSlots.h names it -- which
+\t\t// is what UMaterialExpressionMoonToonModifier calls the matching pin for this Modifier.
+%s
 \t}
 
 %s\tGraph = {
+%s
+
 \t\t%s(
 %s
 \t\t\tModifierData);
+
+%s
 \t}
 }
 """ % (MODIFIER_HEADER, imports, fn, args, body, dsf_name, dsf_name,
-       "\n".join(input_lines),
+       "\n".join(input_lines), "\n".join(out_decls),
        # A modifier whose slots all come from helpers declares no parameters of its own -- Matcap's
        # seven live in MF_ToonMatcap. An empty Properties block would be noise, not information.
        ("\tProperties = {\n%s\n\t}\n\n" % "\n".join(prop_lines)) if prop_lines else "",
-       fn, "\n".join(call_lines))
+       "\n".join(slot_lines), fn, "\n".join(call_lines), "\n".join(out_lines))
+
+
+def _modifier_channel_outputs(key, tables):
+    """[(type, output name)] for one modifier's named channel outputs, in slot-table order."""
+    return [("float3" if t == "float3" else "float", name)
+            for (t, _slot, name) in tables[modifier_slot_table_for(key)]]
+
+
+def _modifier_outputs_block(key, tables, indent="\t\t"):
+    """The full Outputs body of a modifier function: the packed lane, then the slots."""
+    lines = ["%sfloat4 ModifierData;" % indent]
+    lines += ["%s%s %s;" % (indent, t, n) for (t, n) in _modifier_channel_outputs(key, tables)]
+    return "\n".join(lines)
+
+
+def _modifier_virtual_decl(key, tables):
+    """The VirtualFunction block that restates one modifier function's signature."""
+    in_block = "\n".join("\t\topt %s %s = %s;" % (t, fn_in, default)
+                         for (t, fn_in, _s, default, _d) in MODIFIER_INPUTS.get(key, []))
+    return ('VirtualFunction(Name="MF_ToonModifier_%s")\n'
+            "{\n"
+            "\tOptions = {\n"
+            '\t\tAsset = Path(Plugins.MoonToon, "MaterialFunctions/Modifiers/MF_ToonModifier_%s");\n'
+            "\t}\n\n"
+            "\tInputs = {\n%s\n\t}\n\n"
+            "\tOutputs = {\n%s\n\t}\n"
+            "}" % (MODIFIERS[key][0], MODIFIERS[key][0], in_block,
+                   _modifier_outputs_block(key, tables)))
+
+
+SIGNATURES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "..", "DShader", "Shared", "ToonFeatureSignatures.dsh")
+
+
+def emit_signatures(tables, mod_tables):
+    """The importable restatement of every generated feature / modifier function's signature.
+
+    M_MoonToon calls those functions directly now -- one per Substrate closure leaf -- and a
+    VirtualFunction block is how DreamShader is told an asset's shape. Written by the generator for
+    the same reason the functions are: the Outputs lists are long, they change whenever the engine's
+    slot table does, and a restatement that drifts from the function it names does not warn, it
+    fails the build with "OutputIndex is out of range".
+    """
+    blocks = [_feature_virtual_decl(k, tables) for k in FEATURES]
+    blocks += [_modifier_virtual_decl(k, mod_tables) for k in MODIFIERS]
+    return """// GENERATED by Tools/gen_feature_functions.py. Do not edit.
+//
+// The signatures of the thirteen toon feature functions and the two modifier functions, restated so
+// a material can call them. A VirtualFunction declares an asset that already exists: it generates
+// nothing, and importing this header costs nothing for the functions a material does not call.
+//
+// Each function publishes TWO lanes over one set of parameters -- the packed ToonBufferA/B/C
+// (ModifierData for a modifier), which the legacy r.Substrate=0 selectors read, and one output per
+// SLOT, named as the engine's slot table names it. The second lane is what M_MoonToon wires onto
+// the Substrate Moon toon closure, whose pins wear those same names.
+
+%s
+""" % "\n".join(blocks)
 
 
 def emit_modifier_selector(tables, ids):
     picks = list(MODIFIERS)
 
-    def decl(k):
-        in_block = "\n".join("\t\topt %s %s = %s;" % (t, fn_in, default)
-                             for (t, fn_in, _s, default, _d) in MODIFIER_INPUTS.get(k, []))
-        return ('VirtualFunction(Name="MF_ToonModifier_%s")\n'
-                "{\n"
-                "\tOptions = {\n"
-                '\t\tAsset = Path(Plugins.MoonToon, "MaterialFunctions/Modifiers/MF_ToonModifier_%s");\n'
-                "\t}\n\n"
-                "\tInputs = {\n%s\n\t}\n\n"
-                "\tOutputs = {\n\t\tfloat4 ModifierData;\n\t}\n"
-                "}" % (MODIFIERS[k][0], MODIFIERS[k][0], in_block))
-
-    decls = "\n".join(decl(k) for k in picks)
+    decls = "\n".join(_modifier_virtual_decl(k, tables) for k in picks)
 
     sel_inputs, seen = [], set()
     for k in picks:
@@ -1392,6 +1498,10 @@ def main():
     mod_ids = parse_modifier_ids(os.path.normpath(MODIFIER_ID_TABLE))
     targets.append((os.path.normpath(MODIFIER_SELECT_PATH),
                     emit_modifier_selector(mod_tables, mod_ids)))
+
+    sig_path = os.path.normpath(SIGNATURES_PATH)
+    os.makedirs(os.path.dirname(sig_path), exist_ok=True)
+    targets.append((sig_path, emit_signatures(tables, mod_tables)))
 
     stale = []
     for path, text in targets:

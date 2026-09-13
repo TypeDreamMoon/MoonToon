@@ -4,6 +4,13 @@
 // One toon feature, one material function. It declares only its own slots, so a material instance
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
+//
+// Two output lanes over ONE set of parameters:
+//   * ToonBufferA/B/C -- the packed RGBA8 form the legacy (r.Substrate=0) toon prepass reads,
+//     reached through MF_MoonToonFeatureSelect. Kept first so its OutputIndex 0/1/2 do not move.
+//   * one output per SLOT, named as the slot table names it -- what M_MoonToon wires straight onto
+//     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
+//     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
 Function ToonFeatureWrite_EmissiveInk(
 	in float LightInfluence,
@@ -37,7 +44,7 @@ Function ToonFeatureWrite_EmissiveInk(
 ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_EmissiveInk", Root="Plugin.MoonToon")
 {
 	Settings = {
-		Description       = "Packs the EmissiveInk toon feature parameters into ToonBufferA/B/C.";
+		Description       = "The EmissiveInk toon feature's channels, named after its slot table.";
 		ExposeToLibrary   = true;
 		LibraryCategories = "MoonToon|Features";
 	}
@@ -47,9 +54,25 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_EmissiveInk", Roo
 	}
 
 	Outputs = {
+		// The legacy lane: the same channels packed into the three RGBA8 ToonBuffer float4s the
+		// r.Substrate=0 toon prepass splats into its full-screen targets. FIRST, and staying first,
+		// because MF_MoonToonFeatureSelect reaches them by OutputIndex 0/1/2.
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		// The Substrate lane: one output per slot this feature's table declares, named exactly as the
+		// table names it -- which is also what UMaterialExpressionSubstrateMoonToonBSDF /
+		// UMaterialExpressionMoonToonFeature call the matching pin, so M_MoonToon can wire the closure
+		// by name instead of by lane. Order is slot-table order.
+		float LightInfluence;
+		float ShadowLift;
+		float InkDarkenStrength;
+		float RoughnessScale;
+		float SpecularIntensity;
+		float EdgeBoost;
+		float InkBlend;
+		float3 InkTint;
+		float RimBias;
 	}
 
 	Properties = {
@@ -65,16 +88,36 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_EmissiveInk", Roo
 	}
 
 	Graph = {
+		float Slot_LightInfluence = In_ToonEmissiveInk_LightInfluence;
+		float Slot_ShadowLift = In_ToonEmissiveInk_ShadowLift;
+		float Slot_InkDarkenStrength = In_ToonEmissiveInk_InkDarkenStrength;
+		float Slot_RoughnessScale = In_ToonEmissiveInk_RoughnessScale;
+		float Slot_SpecularIntensity = In_ToonEmissiveInk_SpecularIntensity;
+		float Slot_EdgeBoost = In_ToonEmissiveInk_EdgeBoost;
+		float Slot_InkBlend = In_ToonEmissiveInk_InkBlend;
+		float3 Slot_InkTint = In_ToonEmissiveInk_InkTintRGB.rgb;
+		float Slot_RimBias = In_ToonEmissiveInk_RimBias;
+
 		ToonFeatureWrite_EmissiveInk(
-			In_ToonEmissiveInk_LightInfluence,
-			In_ToonEmissiveInk_ShadowLift,
-			In_ToonEmissiveInk_InkDarkenStrength,
-			In_ToonEmissiveInk_RoughnessScale,
-			In_ToonEmissiveInk_SpecularIntensity,
-			In_ToonEmissiveInk_EdgeBoost,
-			In_ToonEmissiveInk_InkBlend,
-			In_ToonEmissiveInk_InkTintRGB.rgb,
-			In_ToonEmissiveInk_RimBias,
+			Slot_LightInfluence,
+			Slot_ShadowLift,
+			Slot_InkDarkenStrength,
+			Slot_RoughnessScale,
+			Slot_SpecularIntensity,
+			Slot_EdgeBoost,
+			Slot_InkBlend,
+			Slot_InkTint,
+			Slot_RimBias,
 			ToonBufferA, ToonBufferB, ToonBufferC);
+
+		LightInfluence = Slot_LightInfluence;
+		ShadowLift = Slot_ShadowLift;
+		InkDarkenStrength = Slot_InkDarkenStrength;
+		RoughnessScale = Slot_RoughnessScale;
+		SpecularIntensity = Slot_SpecularIntensity;
+		EdgeBoost = Slot_EdgeBoost;
+		InkBlend = Slot_InkBlend;
+		InkTint = Slot_InkTint;
+		RimBias = Slot_RimBias;
 	}
 }

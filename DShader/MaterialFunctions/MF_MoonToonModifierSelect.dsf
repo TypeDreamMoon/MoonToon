@@ -18,6 +18,8 @@ VirtualFunction(Name="MF_ToonModifier_Matcap")
 
 	Outputs = {
 		float4 ModifierData;
+		float3 Color;
+		float LightingMix;
 	}
 }
 VirtualFunction(Name="MF_ToonModifier_OilFilm")
@@ -32,6 +34,10 @@ VirtualFunction(Name="MF_ToonModifier_OilFilm")
 
 	Outputs = {
 		float4 ModifierData;
+		float Intensity;
+		float HighlightScale;
+		float FalloffPower;
+		float HueShift;
 	}
 }
 

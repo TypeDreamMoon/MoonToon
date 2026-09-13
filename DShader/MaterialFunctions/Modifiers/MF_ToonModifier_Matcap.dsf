@@ -23,7 +23,7 @@ Function ToonModifierWrite_Matcap(
 ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_Matcap", Root="Plugin.MoonToon")
 {
 	Settings = {
-		Description       = "Packs the Matcap modifier parameters into the ToonFeatureRT4 payload.";
+		Description       = "The Matcap modifier's channels, named after its slot table.";
 		ExposeToLibrary   = true;
 		LibraryCategories = "MoonToon|Modifiers";
 	}
@@ -33,13 +33,25 @@ ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_Matcap", Root="
 	}
 
 	Outputs = {
+		// The legacy lane: the four channels packed into ToonFeatureRT4, reached through
+		// MF_MoonToonModifierSelect. First, and staying first, because that selector reads OutputIndex 0.
 		float4 ModifierData;
+		// The Substrate lane: one output per slot, named as MoonToonModifierSlots.h names it -- which
+		// is what UMaterialExpressionMoonToonModifier calls the matching pin for this Modifier.
+		float3 Color;
+		float LightingMix;
 	}
 
 	Graph = {
+		float3 Slot_Color = MF_ToonMatcap(NormalTS, OutputIndex=0);
+		float Slot_LightingMix = MF_ToonMatcap(NormalTS, OutputIndex=1);
+
 		ToonModifierWrite_Matcap(
-			MF_ToonMatcap(NormalTS, OutputIndex=0),
-			MF_ToonMatcap(NormalTS, OutputIndex=1),
+			Slot_Color,
+			Slot_LightingMix,
 			ModifierData);
+
+		Color = Slot_Color;
+		LightingMix = Slot_LightingMix;
 	}
 }

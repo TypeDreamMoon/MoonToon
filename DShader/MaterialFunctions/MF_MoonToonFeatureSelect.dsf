@@ -22,6 +22,9 @@ VirtualFunction(Name="MF_ToonFeature_Default")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float MultiBandCelEnable;
+		float TerminatorWidth;
+		float BloomWeight;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_PBRSpecular")
@@ -38,6 +41,7 @@ VirtualFunction(Name="MF_ToonFeature_PBRSpecular")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float BloomWeight;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_KajiyaHair")
@@ -54,6 +58,17 @@ VirtualFunction(Name="MF_ToonFeature_KajiyaHair")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float TangentRotate;
+		float SecondaryShift;
+		float SecondaryMask;
+		float PrimaryShift;
+		float PrimaryExpScale;
+		float SecondaryExpScale;
+		float OverallIntensity;
+		float PrimaryIntensity;
+		float SecondaryIntensity;
+		float SecondaryShiftScale;
+		float ShadowStrength;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_ToonKajiyaHair")
@@ -71,6 +86,17 @@ VirtualFunction(Name="MF_ToonFeature_ToonKajiyaHair")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float TangentRotate;
+		float SecondaryShift;
+		float SecondaryMask;
+		float PrimaryShift;
+		float PrimaryExpScale;
+		float SecondaryExpScale;
+		float OverallIntensity;
+		float PrimaryIntensity;
+		float SecondaryIntensity;
+		float SecondaryShiftScale;
+		float ShadowStrength;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_DFFacialShadow")
@@ -87,6 +113,17 @@ VirtualFunction(Name="MF_ToonFeature_DFFacialShadow")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float ScatterStrength;
+		float TransmissionStrength;
+		float TransmissionPower;
+		float PrimaryRoughnessScale;
+		float SecondaryRoughnessScale;
+		float SecondaryRampOffset;
+		float OverallSpecIntensity;
+		float PrimaryLobeIntensity;
+		float SecondaryLobeIntensity;
+		float SpecShadowStrength;
+		float WarmTintStrength;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_HairHighlightMask")
@@ -105,6 +142,10 @@ VirtualFunction(Name="MF_ToonFeature_HairHighlightMask")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float Mask;
+		float Intensity;
+		float ShadowIntensity;
+		float ViewAnchorBlend;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_Skin")
@@ -121,6 +162,17 @@ VirtualFunction(Name="MF_ToonFeature_Skin")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float ScatterStrength;
+		float TransmissionStrength;
+		float TransmissionPower;
+		float PrimaryRoughnessScale;
+		float SecondaryRoughnessScale;
+		float SecondaryRampOffset;
+		float OverallSpecIntensity;
+		float PrimaryLobeIntensity;
+		float SecondaryLobeIntensity;
+		float SpecShadowStrength;
+		float WarmTintStrength;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_Stockings")
@@ -141,6 +193,15 @@ VirtualFunction(Name="MF_ToonFeature_Stockings")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float Density;
+		float FresnelPower;
+		float TransmissionStrength;
+		float TransmissionDistortion;
+		float SpecularIntensity;
+		float ShadowStrength;
+		float GrazingDarkenStrength;
+		float3 SkinColor;
+		float GrazingSpecBoost;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_NPRStockings")
@@ -161,6 +222,15 @@ VirtualFunction(Name="MF_ToonFeature_NPRStockings")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float Density;
+		float FresnelPower;
+		float TransmissionStrength;
+		float TransmissionDistortion;
+		float SpecularIntensity;
+		float ShadowStrength;
+		float GrazingDarkenStrength;
+		float3 SkinColor;
+		float GrazingSpecBoost;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_Eye")
@@ -177,6 +247,15 @@ VirtualFunction(Name="MF_ToonFeature_Eye")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float DiffuseWrapStrength;
+		float LimbalDarkenStrength;
+		float SpecularShadowStrength;
+		float PrimaryRoughnessScale;
+		float SecondaryRoughnessScale;
+		float PrimaryIntensity;
+		float SecondaryIntensity;
+		float3 EyeTint;
+		float SecondaryRampOffset;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_ClothVelvet")
@@ -193,6 +272,15 @@ VirtualFunction(Name="MF_ToonFeature_ClothVelvet")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float WrapStrength;
+		float SheenPower;
+		float SheenShadowStrength;
+		float RoughnessScale;
+		float SheenIntensity;
+		float RetroDiffuseStrength;
+		float GrazingDarkenStrength;
+		float3 SheenTint;
+		float RimBias;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_ToonMetal")
@@ -209,6 +297,14 @@ VirtualFunction(Name="MF_ToonFeature_ToonMetal")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float DiffuseIntensity;
+		float ShadowSpecularFloor;
+		float RampOffset;
+		float RoughnessScale;
+		float SpecularIntensity;
+		float EdgeBoost;
+		float SpecularContrast;
+		float3 MetalTint;
 	}
 }
 VirtualFunction(Name="MF_ToonFeature_EmissiveInk")
@@ -225,6 +321,15 @@ VirtualFunction(Name="MF_ToonFeature_EmissiveInk")
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		float LightInfluence;
+		float ShadowLift;
+		float InkDarkenStrength;
+		float RoughnessScale;
+		float SpecularIntensity;
+		float EdgeBoost;
+		float InkBlend;
+		float3 InkTint;
+		float RimBias;
 	}
 }
 

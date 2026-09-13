@@ -5,14 +5,19 @@
 //
 //   1. The smoothed normal is read from UV2.y + UV3.xy, which is the layout MoonToon's own bake tool
 //      (UMoonToonSmoothNormalTool) writes. MooaToon read TexCoord2/TexCoord3 wholesale.
-//   2. Toon attributes go through the native MoonDecodeToonAttributes / MoonSetToonAttributes
-//      expressions instead of MF_MooaDecodeAttributes / MF_MooaSetAttributes. The decode function
-//      instantiated the *same* 14-output Custom node 14 times (once per output); the node does it in
-//      one ComponentMask each. The set function compared every field against a -999 sentinel because
-//      a material function cannot see whether a pin is connected; the node checks IsConnected() at
-//      compile time, so untouched fields cost nothing and -999 is a legal value again.
+//   2. The hull is a Substrate closure of its own, not a copy of the surface's. It needs three
+//      things from the toon model -- a flat colour, a shadow tint, and the stencil the outline /
+//      post groups key on -- so it is a Kind = Default Moon toon BSDF with those three pins driven
+//      and everything else passed through from MF_MoonToonBaseInput. No feature, no modifier: a
+//      hull is not lit like the surface it wraps.
 //   3. The debug-visualisation Custom node is dropped. It was a dozen static branches over
 //      Show* switches; keep the shipping path clean and debug in the base material instead.
+//
+// Until 2026-09-13 this material reached the toon path the only way there was -- ShadingModel =
+// "Toon" and a MaterialAttributes root -- and overrode the shadow tint by decoding and re-encoding
+// the five bit-packed MoonEncodedAttribute lanes (MoonDecodeToonAttributes / MoonSetToonAttributes).
+// Both nodes are gone with the packing: the shadow colour is a pin now, so overriding it is an
+// assignment.
 
 VirtualFunction(Name="MF_MoonToonBaseInput")
 {
@@ -24,6 +29,10 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 	Inputs = {
 	}
 
+	// Restated by hand, and it must stay in step with MF_MoonToonBaseInput's own Outputs block: a
+	// missing entry is an "OutputIndex is out of range" build error, and a REORDERED one is worse,
+	// because these names are what Output="..." resolves against. Kept complete rather than trimmed
+	// to what this file reads, so the two materials' restatements can be diffed against each other.
 	Outputs = {
 		MaterialAttributes Output;
 		float4 ToonBufferA;
@@ -32,6 +41,39 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 FaceOverlayData;
 		float4 FaceOverlayParams;
 		float4 FaceOverlayStencilIDs;
+		float4 ModifierData;
+		float ModifierID;
+		float3 OutBaseColor;
+		float  OutMetallic;
+		float  OutSpecular;
+		float  OutRoughness;
+		float3 OutNormal;
+		float3 OutEmissiveColor;
+		float  OutAnisotropy;
+		float3 OutTangent;
+		float  OutOpacity;
+		float  OutOpacityMask;
+		float  OutAmbientOcclusion;
+		float2 OutCustomizedUV1;
+		float2 OutCustomizedUV2;
+		float  OutCustomData0;
+		float3 OutMainLightShadowColor;
+		float  OutDiffuseColorRampIndex;
+		float  OutDiffuseRampUVOffset;
+		float3 OutSpecularColor;
+		float  OutSpecularColorRampIndex;
+		float  OutSpecularRampUVOffset;
+		float  OutReflectionIntensity;
+		float  OutStencil;
+		float  OutRayTracingShadowFlag;
+		float  OutFacialShadowSdfLeft;
+		float  OutFacialShadowSdfRight;
+		float  OutKajiyaStrandShift;
+		float4 OutGlobalMaskA;
+		float4 OutGlobalMaskB;
+		float4 OutGlobalMaskC;
+		float  OutStockingsThickness;
+		float3 OutStockingsSkinColor;
 	}
 }
 
@@ -40,9 +82,14 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 	Settings = {
 		Backend      = "Graph";
 		Domain       = "Surface";
-		// See M_MoonToon: one form for both storages; under Substrate the engine bridges this
-		// MaterialAttributes root into the Moon toon closure by this shading model.
-		ShadingModel = "Toon";
+		// No ShadingModel line: binding Base.FrontMaterial force-sets the material to Substrate, and
+		// the Moon toon closure registers SSM_Toon, which is what every toon gate keys on.
+
+		// Same reason as M_MoonToon: the per-pin form compiles CustomizedUV[i] only for
+		// i < NumCustomizedUVs, and MF_MoonToonBaseInput routes the head-forward / hair tangent
+		// through UV1 and UV2. The hull does not shade off them, but it is drawn from the same
+		// function and a missing customised UV would be a silent difference rather than an error.
+		NumCustomizedUVs = 3;
 
 		// Masked, not Opaque. The hull wraps whatever section it was drawn for, and on an imported
 		// character most of those sections are alpha-cut -- hair cards, lace, gauze. An opaque hull
@@ -117,14 +164,61 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 	}
 
 	Outputs = {
-		MaterialAttributes MaterialAttributes;
+		Substrate ToonClosure;
+		float  OpacityMask;
+		float3 WorldPositionOffset;
+		float  AmbientOcclusion;
+		float2 CustomizedUV1;
+		float2 CustomizedUV2;
+		float  CustomData0;
+		float  CustomData1;
 
-		Base.MaterialAttributes = MaterialAttributes;
+		Base.FrontMaterial       = ToonClosure;
+		Base.OpacityMask         = OpacityMask;
+		Base.WorldPositionOffset = WorldPositionOffset;
+		Base.AmbientOcclusion    = AmbientOcclusion;
+		Base.CustomizedUV1       = CustomizedUV1;
+		Base.CustomizedUV2       = CustomizedUV2;
+		Base.CustomData0         = CustomData0;
+		Base.CustomData1         = CustomData1;
 	}
 
 	Graph = {
-		MaterialAttributes Surface = MF_MoonToonBaseInput(OutputIndex=0);
-		MaterialAttributes Attributes = Surface;
+		#Region "Surface"
+		// One call, read many times -- the graph builder's reuse cache makes this one node.
+		//
+		// "The surface" below means THIS material instance's own settings, not the section's.
+		// Worth being blunt about, because the naming invites the opposite reading: the outline is
+		// drawn from its own FMaterialRenderProxy (see FSkeletalMeshSceneProxy's outline batch), so
+		// MF_MoonToonBaseInput is evaluated with the outline instance's parameters. Point the
+		// outline instance at the same Base Color Map / Shadow Color as the section and the
+		// derivation is real; leave it on the defaults and it resolves to one flat colour for the
+		// whole mesh, whatever the character underneath looks like.
+		//
+		// UMoonToonOutlineSetupTool generates one instance per slot and copies the cutout across.
+		// It deliberately does NOT copy the shading parameters -- those are shader permutations, and
+		// a hull is not lit like the surface it wraps -- so per-region colour still means setting
+		// Base Color Map on the generated instances by hand, or leaving
+		// "Blend Outline Color From Surface" at 0 and using a flat Outline Color.
+		float3 Surf_BaseColor              = MF_MoonToonBaseInput(Output="OutBaseColor");
+		float  Surf_Metallic               = MF_MoonToonBaseInput(Output="OutMetallic");
+		float  Surf_Specular               = MF_MoonToonBaseInput(Output="OutSpecular");
+		float  Surf_Roughness              = MF_MoonToonBaseInput(Output="OutRoughness");
+		float3 Surf_Normal                 = MF_MoonToonBaseInput(Output="OutNormal");
+		float3 Surf_EmissiveColor          = MF_MoonToonBaseInput(Output="OutEmissiveColor");
+		float  Surf_Anisotropy             = MF_MoonToonBaseInput(Output="OutAnisotropy");
+		float3 Surf_Tangent                = MF_MoonToonBaseInput(Output="OutTangent");
+		float3 Surf_MainLightShadowColor   = MF_MoonToonBaseInput(Output="OutMainLightShadowColor");
+		float  Surf_DiffuseColorRampIndex  = MF_MoonToonBaseInput(Output="OutDiffuseColorRampIndex");
+		float  Surf_DiffuseRampUVOffset    = MF_MoonToonBaseInput(Output="OutDiffuseRampUVOffset");
+		float3 Surf_SpecularColor          = MF_MoonToonBaseInput(Output="OutSpecularColor");
+		float  Surf_SpecularColorRampIndex = MF_MoonToonBaseInput(Output="OutSpecularColorRampIndex");
+		float  Surf_SpecularRampUVOffset   = MF_MoonToonBaseInput(Output="OutSpecularRampUVOffset");
+		float  Surf_ReflectionIntensity    = MF_MoonToonBaseInput(Output="OutReflectionIntensity");
+		float  Surf_Stencil                = MF_MoonToonBaseInput(Output="OutStencil");
+		float  Surf_RayTracingShadowFlag   = MF_MoonToonBaseInput(Output="OutRayTracingShadowFlag");
+		float  Surf_Opacity                = MF_MoonToonBaseInput(Output="OutOpacity");
+		#EndRegion
 
 		#Region "Smoothed normal"
 		// The bake stores tangent-space smoothed normal * curvature, remapped to [0,1], across
@@ -257,52 +351,17 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		float Width = (Width_Ramp.r * Outline_Width * WidthMask);
 		#EndRegion
 
-		Attributes.WorldPositionOffset = (OffsetDir * Width);
-
-		#Region "Cutout"
-		// The hull is cut by the surface opacity, not by what MF_MoonToonBaseInput left on
-		// OpacityMask -- that pin carries the SHADOW opacity (opacity folded through
-		// "Apply Opacity to Shadow" and then scaled by "Shadow Opacity"), which is a different
-		// quantity and would cut the hull to the shadow's silhouette rather than the surface's.
-		Attributes.OpacityMask = Surface.Opacity;
-		#EndRegion
-
 		#Region "Outline colour"
-		// "The surface" below means THIS material instance's own settings, not the section's.
-		//
-		// Worth being blunt about, because the naming invites the opposite reading: the outline is
-		// drawn from its own FMaterialRenderProxy (see FSkeletalMeshSceneProxy's outline batch), so
-		// MF_MoonToonBaseInput above is evaluated with the outline instance's parameters. Point the
-		// outline instance at the same Base Color Map / Shadow Color as the section and the
-		// derivation is real; leave it on the defaults and it resolves to one flat colour for the
-		// whole mesh, whatever the character underneath looks like.
-		//
-		// UMoonToonOutlineSetupTool generates one instance per slot and copies the cutout across.
-		// It deliberately does NOT copy the shading parameters -- those are shader permutations, and
-		// a hull is not lit like the surface it wraps -- so per-region colour still means setting
-		// Base Color Map on the generated instances by hand, or leaving
-		// "Blend Outline Color From Surface" at 0 and using a flat Outline Color.
-		float3 SurfaceShadowColor =
-			UE.Expression(
-				Class="MoonDecodeToonAttributes",
-				OutputType="float3",
-				OutputIndex=1,
-				MoonEncodedAttribute0=Surface.MoonEncodedAttribute0,
-				MoonEncodedAttribute1=Surface.MoonEncodedAttribute1,
-				MoonEncodedAttribute2=Surface.MoonEncodedAttribute2,
-				MoonEncodedAttribute3=Surface.MoonEncodedAttribute3,
-				MoonEncodedAttribute4=Surface.MoonEncodedAttribute4
-			);
-
 		// Per-region outline colour. Two things matter here:
 		//   * The source is the authored shadow tint, not raw albedo. The artist already decided what
 		//     skin/hair look like in shadow, and an outline is the darkest shadow band -- so this comes
-		//     out palette-consistent for free, per material, with nothing extra to author.
+		//     out palette-consistent for free, per material, with nothing extra to author. It is one
+		//     named output now; it used to mean decoding it back out of a packed lane.
 		//   * Darkening is pow(), not a multiply by a dark colour. pow widens the ratios between
 		//     channels, so it darkens AND saturates while preserving hue; multiplying by a near-black
 		//     tint would collapse skin and hair to the same black and throw away the very distinction
 		//     we want. The tint stays near white and only nudges temperature.
-		float3 RegionColor = lerp(Surface.BaseColor, (Surface.BaseColor * SurfaceShadowColor), Outline_Use_Shadow_Tint);
+		float3 RegionColor = lerp(Surf_BaseColor, (Surf_BaseColor * Surf_MainLightShadowColor), Outline_Use_Shadow_Tint);
 		float3 FromSurface = (pow(max(RegionColor, 0.0), Outline_Gamma) * Outline_Tint.rgb);
 
 		// Per-vertex outline tint. Painted RGB multiplies the finished outline colour, so a region can
@@ -330,30 +389,51 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		// original multiplied the tint into base and shadow colour separately, which is the same
 		// result by a longer route.)
 		float3 OutlineColor = (lerp(Outline_Color.rgb, FromSurface, Outline_Color_From_Base) * VertexTint);
-		float3 OutlineShadowColor = (OutlineColor * SurfaceShadowColor);
-
-		Attributes.BaseColor = OutlineColor;
+		float3 OutlineShadowColor = (OutlineColor * Surf_MainLightShadowColor);
 		#EndRegion
 
-		#Region "Toon attributes"
-		// Only MainLightShadowColor is overridden; every other toon field passes through untouched
-		// because its pin is left unconnected.
-		Attributes.MoonEncodedAttribute0 =
-			UE.Expression(
-				Class="MoonSetToonAttributes", OutputType="float4", OutputIndex=0,
-				MoonEncodedAttribute0=Surface.MoonEncodedAttribute0,
-				MoonEncodedAttribute1=Surface.MoonEncodedAttribute1,
-				MoonEncodedAttribute2=Surface.MoonEncodedAttribute2,
-				MoonEncodedAttribute3=Surface.MoonEncodedAttribute3,
-				MoonEncodedAttribute4=Surface.MoonEncodedAttribute4,
-				MainLightShadowColor=OutlineShadowColor
-			);
-		Attributes.MoonEncodedAttribute1 = Surface.MoonEncodedAttribute1;
-		Attributes.MoonEncodedAttribute2 = Surface.MoonEncodedAttribute2;
-		Attributes.MoonEncodedAttribute3 = Surface.MoonEncodedAttribute3;
-		Attributes.MoonEncodedAttribute4 = Surface.MoonEncodedAttribute4;
+		#Region "Closure"
+		// Kind = Default and nothing stacked on it: the hull has no shading feature and no modifier.
+		// Two pins carry the outline -- the flat colour and the shadow tint -- and the rest is the
+		// surface's, so a hull that does end up lit reads like the material it wraps rather than like
+		// a default grey. The three Default channel pins are left unconnected, which means the slot
+		// table's own defaults rather than zero.
+		ToonClosure = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = OutlineColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = OutlineShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
 		#EndRegion
 
-		MaterialAttributes = Attributes;
+		#Region "Root pins"
+		WorldPositionOffset = (OffsetDir * Width);
+
+		// The hull is cut by the surface opacity, not by what MF_MoonToonBaseInput left on
+		// OpacityMask -- that pin carries the SHADOW opacity (opacity folded through
+		// "Apply Opacity to Shadow" and then scaled by "Shadow Opacity"), which is a different
+		// quantity and would cut the hull to the shadow's silhouette rather than the surface's.
+		OpacityMask = Surf_Opacity;
+
+		AmbientOcclusion = MF_MoonToonBaseInput(Output="OutAmbientOcclusion");
+		CustomizedUV1    = MF_MoonToonBaseInput(Output="OutCustomizedUV1");
+		CustomizedUV2    = MF_MoonToonBaseInput(Output="OutCustomizedUV2");
+		CustomData0      = MF_MoonToonBaseInput(Output="OutCustomData0");
+		CustomData1      = 1.0;
+		#EndRegion
 	}
 }

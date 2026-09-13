@@ -25,7 +25,7 @@ Function ToonModifierWrite_OilFilm(
 ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_OilFilm", Root="Plugin.MoonToon")
 {
 	Settings = {
-		Description       = "Packs the OilFilm modifier parameters into the ToonFeatureRT4 payload.";
+		Description       = "The OilFilm modifier's channels, named after its slot table.";
 		ExposeToLibrary   = true;
 		LibraryCategories = "MoonToon|Modifiers";
 	}
@@ -35,7 +35,15 @@ ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_OilFilm", Root=
 	}
 
 	Outputs = {
+		// The legacy lane: the four channels packed into ToonFeatureRT4, reached through
+		// MF_MoonToonModifierSelect. First, and staying first, because that selector reads OutputIndex 0.
 		float4 ModifierData;
+		// The Substrate lane: one output per slot, named as MoonToonModifierSlots.h names it -- which
+		// is what UMaterialExpressionMoonToonModifier calls the matching pin for this Modifier.
+		float Intensity;
+		float HighlightScale;
+		float FalloffPower;
+		float HueShift;
 	}
 
 	Properties = {
@@ -46,11 +54,21 @@ ShaderFunction(Name="MaterialFunctions/Modifiers/MF_ToonModifier_OilFilm", Root=
 	}
 
 	Graph = {
+		float Slot_Intensity = In_OilFilm_Intensity;
+		float Slot_HighlightScale = In_OilFilm_HighlightScale;
+		float Slot_FalloffPower = In_OilFilm_FalloffPower;
+		float Slot_HueShift = In_OilFilm_HueShift;
+
 		ToonModifierWrite_OilFilm(
-			In_OilFilm_Intensity,
-			In_OilFilm_HighlightScale,
-			In_OilFilm_FalloffPower,
-			In_OilFilm_HueShift,
+			Slot_Intensity,
+			Slot_HighlightScale,
+			Slot_FalloffPower,
+			Slot_HueShift,
 			ModifierData);
+
+		Intensity = Slot_Intensity;
+		HighlightScale = Slot_HighlightScale;
+		FalloffPower = Slot_FalloffPower;
+		HueShift = Slot_HueShift;
 	}
 }

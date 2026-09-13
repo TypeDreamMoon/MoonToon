@@ -6,6 +6,16 @@
 //   * calls MF_MoonToonBuffer with ShadingFeatureID actually wired (the original calls
 //     MF_MoonToonBufferInput whose internal ShadingFeatureID parameter is stuck at 0)
 //   * UVChannelSwitch + default textures point at MoonToon's own copies
+//
+// It publishes the authored surface TWICE, over one set of nodes:
+//   * the MaterialAttributes struct plus the ToonBuffer / FaceOverlay / Modifier float4s -- the
+//     legacy (r.Substrate=0) shape, where the toon fields ride five bit-packed MoonEncodedAttribute
+//     root pins and the feature payload rides a custom output;
+//   * one named output per closure pin (the Out* block) -- what M_MoonToon wires onto
+//     SubstrateMoonToonBSDF / MoonToonFeature, whose pins are named after the same fields.
+// Neither lane recomputes anything: the Out* assignments at the bottom of Graph read the same
+// locals the attribute writes do, and a material function output is only translated when something
+// reads it, so a material that takes one lane pays for one.
 // Regenerate the baseline with: dsc.ps1 decompile /MooaToon/MaterialFunctions/MF_MooaToonBaseInput
 // Warning: Exported 'MaterialExpressionVertexTangentWS' as UE.Expression; review reflected literal properties if the node has editor-only state.
 // Warning: Exported 'MaterialExpressionTransform' as UE.Expression; review reflected literal properties if the node has editor-only state.
@@ -462,6 +472,72 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// MOON_TOON_MODIFIER_ID_NONE, which the engine answers with no module at all, so "no
 		// modifier" costs nothing.
 		float ModifierID;
+
+		// ------------------------------------------------------------------------------------
+		// The SUBSTRATE lane. Everything above travels either inside the MaterialAttributes struct
+		// or through a ToonMaterialOutput custom output; neither shape can feed a Substrate closure
+		// pin, so the same values are published again here one per pin.
+		//
+		// Nothing is recomputed: each of these is the very local the attribute write above uses, so
+		// the two lanes are the same nodes and a material that reads only one of them compiles only
+		// that one (a material function output is translated on demand).
+		//
+		// Names carry an Out prefix because five of the surface ones -- Metallic, Specular,
+		// Roughness, Anisotropy, Opacity -- are also the names of this function's own material
+		// PARAMETERS, and an output declaration would shadow the parameter for every read after it.
+		// The order is the order the Substrate Moon toon closure node shows its pins in.
+		// ------------------------------------------------------------------------------------
+		float3 OutBaseColor;
+		float  OutMetallic;
+		float  OutSpecular;
+		float  OutRoughness;
+		// Tangent space, as authored. The closure node converts it to world space, which is what the
+		// legacy root pin did too.
+		float3 OutNormal;
+		float3 OutEmissiveColor;
+		float  OutAnisotropy;
+		// World space, as authored: the toon trunk reads this as the facial forward / hair strand
+		// direction, and the closure stores it unrotated.
+		float3 OutTangent;
+		float  OutOpacity;
+		float  OutOpacityMask;
+		float  OutAmbientOcclusion;
+		// The head-forward / hair tangent, moved from the vertex stage to the pixel stage. A material
+		// binding these per pin needs NumCustomizedUVs >= 3 in its own Settings; the attribute form
+		// got that for free.
+		float2 OutCustomizedUV1;
+		float2 OutCustomizedUV2;
+		// The ray tracing payload (FMoonCustomPayload: the self-shadow and cast-shadow-on-toon bits
+		// plus the stencil). Still a ROOT pin under Substrate -- the closure record has no lane for
+		// it and the hit shaders read CustomData0 off the root on both storages.
+		float  OutCustomData0;
+
+		// The nine toon SURFACE fields, one per named pin on the closure. These used to reach the
+		// renderer only after MoonEncodeToonAttributes bit-packed them into five float4 root pins.
+		float3 OutMainLightShadowColor;
+		float  OutDiffuseColorRampIndex;
+		float  OutDiffuseRampUVOffset;
+		float3 OutSpecularColor;
+		float  OutSpecularColorRampIndex;
+		float  OutSpecularRampUVOffset;
+		float  OutReflectionIntensity;
+		float  OutStencil;
+		float  OutRayTracingShadowFlag;
+		// The distance-field facial shadow pair. CONNECTING them to a Skin closure is what makes it
+		// an SDF face -- there is no second switch -- so a material must gate them on the same
+		// Is DFFacialShadow choice this function already gates the samples on.
+		float  OutFacialShadowSdfLeft;
+		float  OutFacialShadowSdfRight;
+
+		// What the thirteen MF_ToonFeature_* functions need from this one. They used to be reached
+		// through MF_MoonToonFeatureSelect, which took these as its own inputs; a material that
+		// calls the feature functions itself has to hand them over itself.
+		float  OutKajiyaStrandShift;
+		float4 OutGlobalMaskA;
+		float4 OutGlobalMaskB;
+		float4 OutGlobalMaskC;
+		float  OutStockingsThickness;
+		float3 OutStockingsSkinColor;
 	}
 
 	Graph = {
@@ -828,13 +904,17 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		//
 		// ShadowPassSwitch makes both meanings honest: the visible cutout is the sampled alpha, and the
 		// two shadow knobs act only where their names say they do -- in the shadow map.
-		Attributes.OpacityMask = 
+		// Named rather than inlined into the attribute write, because the Substrate form binds the
+		// same value to Base.OpacityMask straight from this function's named outputs and must get
+		// the one node, not a second ShadowReplace.
+		float Opacity_Mask =
 			UE.Expression(
 				Class="ShadowReplace",
 				OutputType="float",
 				Default=Opacity_1,
 				Shadow=Shadow_Opacity_1
 			);
+		Attributes.OpacityMask = Opacity_Mask;
 		#Region "Texture Sample"
 		float3 StaticSwitchParameter_19 = MF_ToonSampleColor(SA_Map, Global_UV).rgb;
 		#EndRegion
@@ -1522,5 +1602,47 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		FaceOverlayStencilIDs = Face_Overlay_Stencil_IDs;
 		ModifierData = Modifier_Data;
 		ModifierID = Modifier_ID;
+
+		#Region "Substrate lane"
+		// The same locals the attribute writes above use, published one per closure pin. The two
+		// swizzles are the casts the consumer would apply anyway: BaseColor arrives as the float4 of
+		// a colour parameter times a map, and the right-hand SDF half arrives as float3 because it
+		// can come from the SA map's rgb -- the closure's pin is one float and takes .r.
+		OutBaseColor = StaticSwitchParameter_7.rgb;
+		OutMetallic = Metallic_1;
+		OutSpecular = Specular;
+		OutRoughness = Roughness_1;
+		OutNormal = NormalTS;
+		OutEmissiveColor = Emission;
+		OutAnisotropy = Anisotropy_Output;
+		OutTangent = TangentWS;
+		OutOpacity = Sampled_Opacity;
+		OutOpacityMask = Opacity_Mask;
+		OutAmbientOcclusion = AO;
+		OutCustomizedUV1 = Custom_Vertex_UV1;
+		OutCustomizedUV2 = Custom_Vertex_UV2;
+		OutCustomData0 = Encoded_Ray_Tracing_Data;
+
+		OutMainLightShadowColor = StaticSwitchParameter_46;
+		OutDiffuseColorRampIndex = Diffuse_Ramp_Index;
+		OutDiffuseRampUVOffset = Diffuse_Ramp_UV_Offset;
+		OutSpecularColor = Specular_Color_1;
+		OutSpecularColorRampIndex = Specular_Ramp_Index;
+		OutSpecularRampUVOffset = Specular_Ramp_Offset;
+		OutReflectionIntensity = Reflection;
+		OutStencil = Encoded_Stencil;
+		OutRayTracingShadowFlag = Encoded_Ray_Tracing_Flags;
+		OutFacialShadowSdfLeft = StaticSwitchParameter_56;
+		OutFacialShadowSdfRight = StaticSwitchParameter_59.r;
+
+		// Exactly the argument list MF_MoonToonFeatureSelect is called with above, in the same order:
+		// the strand-shift mask goes to BOTH of the Toon Kajiya inputs, as it does there.
+		OutKajiyaStrandShift = KajiyaSecondaryMaskChannel_Masked;
+		OutGlobalMaskA = Sampled_Global_Mask_Map;
+		OutGlobalMaskB = Sampled_Global_Mask_Map_2;
+		OutGlobalMaskC = Sampled_Global_Mask_Map_3;
+		OutStockingsThickness = Stockings_Thickness_Map.r;
+		OutStockingsSkinColor = BodyBaseColor.rgb;
+		#EndRegion
 	}
 }

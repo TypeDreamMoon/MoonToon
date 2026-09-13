@@ -4,6 +4,13 @@
 // One toon feature, one material function. It declares only its own slots, so a material instance
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
+//
+// Two output lanes over ONE set of parameters:
+//   * ToonBufferA/B/C -- the packed RGBA8 form the legacy (r.Substrate=0) toon prepass reads,
+//     reached through MF_MoonToonFeatureSelect. Kept first so its OutputIndex 0/1/2 do not move.
+//   * one output per SLOT, named as the slot table names it -- what M_MoonToon wires straight onto
+//     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
+//     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
 Function ToonFeatureWrite_Eye(
 	in float DiffuseWrapStrength,
@@ -37,7 +44,7 @@ Function ToonFeatureWrite_Eye(
 ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugin.MoonToon")
 {
 	Settings = {
-		Description       = "Packs the Eye toon feature parameters into ToonBufferA/B/C.";
+		Description       = "The Eye toon feature's channels, named after its slot table.";
 		ExposeToLibrary   = true;
 		LibraryCategories = "MoonToon|Features";
 	}
@@ -47,9 +54,25 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 	}
 
 	Outputs = {
+		// The legacy lane: the same channels packed into the three RGBA8 ToonBuffer float4s the
+		// r.Substrate=0 toon prepass splats into its full-screen targets. FIRST, and staying first,
+		// because MF_MoonToonFeatureSelect reaches them by OutputIndex 0/1/2.
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		// The Substrate lane: one output per slot this feature's table declares, named exactly as the
+		// table names it -- which is also what UMaterialExpressionSubstrateMoonToonBSDF /
+		// UMaterialExpressionMoonToonFeature call the matching pin, so M_MoonToon can wire the closure
+		// by name instead of by lane. Order is slot-table order.
+		float DiffuseWrapStrength;
+		float LimbalDarkenStrength;
+		float SpecularShadowStrength;
+		float PrimaryRoughnessScale;
+		float SecondaryRoughnessScale;
+		float PrimaryIntensity;
+		float SecondaryIntensity;
+		float3 EyeTint;
+		float SecondaryRampOffset;
 	}
 
 	Properties = {
@@ -65,16 +88,36 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 	}
 
 	Graph = {
+		float Slot_DiffuseWrapStrength = In_Eye_DiffuseWrapStrength;
+		float Slot_LimbalDarkenStrength = In_Eye_LimbalDarkenStrength;
+		float Slot_SpecularShadowStrength = In_Eye_SpecularShadowStrength;
+		float Slot_PrimaryRoughnessScale = In_Eye_PrimaryRoughnessScale;
+		float Slot_SecondaryRoughnessScale = In_Eye_SecondaryRoughnessScale;
+		float Slot_PrimaryIntensity = In_Eye_PrimaryIntensity;
+		float Slot_SecondaryIntensity = In_Eye_SecondaryIntensity;
+		float3 Slot_EyeTint = In_Eye_EyeTintRGB.rgb;
+		float Slot_SecondaryRampOffset = In_Eye_SecondaryRampOffset;
+
 		ToonFeatureWrite_Eye(
-			In_Eye_DiffuseWrapStrength,
-			In_Eye_LimbalDarkenStrength,
-			In_Eye_SpecularShadowStrength,
-			In_Eye_PrimaryRoughnessScale,
-			In_Eye_SecondaryRoughnessScale,
-			In_Eye_PrimaryIntensity,
-			In_Eye_SecondaryIntensity,
-			In_Eye_EyeTintRGB.rgb,
-			In_Eye_SecondaryRampOffset,
+			Slot_DiffuseWrapStrength,
+			Slot_LimbalDarkenStrength,
+			Slot_SpecularShadowStrength,
+			Slot_PrimaryRoughnessScale,
+			Slot_SecondaryRoughnessScale,
+			Slot_PrimaryIntensity,
+			Slot_SecondaryIntensity,
+			Slot_EyeTint,
+			Slot_SecondaryRampOffset,
 			ToonBufferA, ToonBufferB, ToonBufferC);
+
+		DiffuseWrapStrength = Slot_DiffuseWrapStrength;
+		LimbalDarkenStrength = Slot_LimbalDarkenStrength;
+		SpecularShadowStrength = Slot_SpecularShadowStrength;
+		PrimaryRoughnessScale = Slot_PrimaryRoughnessScale;
+		SecondaryRoughnessScale = Slot_SecondaryRoughnessScale;
+		PrimaryIntensity = Slot_PrimaryIntensity;
+		SecondaryIntensity = Slot_SecondaryIntensity;
+		EyeTint = Slot_EyeTint;
+		SecondaryRampOffset = Slot_SecondaryRampOffset;
 	}
 }

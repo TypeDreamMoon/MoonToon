@@ -4,6 +4,13 @@
 // One toon feature, one material function. It declares only its own slots, so a material instance
 // that selected a different feature never shows these parameters -- that pruning is why feature
 // selection had to become static.
+//
+// Two output lanes over ONE set of parameters:
+//   * ToonBufferA/B/C -- the packed RGBA8 form the legacy (r.Substrate=0) toon prepass reads,
+//     reached through MF_MoonToonFeatureSelect. Kept first so its OutputIndex 0/1/2 do not move.
+//   * one output per SLOT, named as the slot table names it -- what M_MoonToon wires straight onto
+//     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
+//     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
 Function ToonFeatureWrite_DFFacialShadow(
 	in float ScatterStrength,
@@ -41,7 +48,7 @@ Function ToonFeatureWrite_DFFacialShadow(
 ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_DFFacialShadow", Root="Plugin.MoonToon")
 {
 	Settings = {
-		Description       = "Packs the DFFacialShadow toon feature parameters into ToonBufferA/B/C.";
+		Description       = "The DFFacialShadow toon feature's channels, named after its slot table.";
 		ExposeToLibrary   = true;
 		LibraryCategories = "MoonToon|Features";
 	}
@@ -51,9 +58,27 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_DFFacialShadow", 
 	}
 
 	Outputs = {
+		// The legacy lane: the same channels packed into the three RGBA8 ToonBuffer float4s the
+		// r.Substrate=0 toon prepass splats into its full-screen targets. FIRST, and staying first,
+		// because MF_MoonToonFeatureSelect reaches them by OutputIndex 0/1/2.
 		float4 ToonBufferA;
 		float4 ToonBufferB;
 		float4 ToonBufferC;
+		// The Substrate lane: one output per slot this feature's table declares, named exactly as the
+		// table names it -- which is also what UMaterialExpressionSubstrateMoonToonBSDF /
+		// UMaterialExpressionMoonToonFeature call the matching pin, so M_MoonToon can wire the closure
+		// by name instead of by lane. Order is slot-table order.
+		float ScatterStrength;
+		float TransmissionStrength;
+		float TransmissionPower;
+		float PrimaryRoughnessScale;
+		float SecondaryRoughnessScale;
+		float SecondaryRampOffset;
+		float OverallSpecIntensity;
+		float PrimaryLobeIntensity;
+		float SecondaryLobeIntensity;
+		float SpecShadowStrength;
+		float WarmTintStrength;
 	}
 
 	Properties = {
@@ -71,18 +96,42 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_DFFacialShadow", 
 	}
 
 	Graph = {
+		float Slot_ScatterStrength = In_SdfFace_ScatterStrength;
+		float Slot_TransmissionStrength = In_SdfFace_TransStrength;
+		float Slot_TransmissionPower = In_SdfFace_TransPower;
+		float Slot_PrimaryRoughnessScale = In_SdfFace_PrimaryRoughnessScale;
+		float Slot_SecondaryRoughnessScale = In_SdfFace_SecondaryRoughnessScale;
+		float Slot_SecondaryRampOffset = In_SdfFace_SecondaryRampOffset;
+		float Slot_OverallSpecIntensity = In_SdfFace_OverallSpecIntensity;
+		float Slot_PrimaryLobeIntensity = In_SdfFace_PrimaryLobeIntensity;
+		float Slot_SecondaryLobeIntensity = In_SdfFace_SecondaryLobeIntensity;
+		float Slot_SpecShadowStrength = In_SdfFace_SpecShadowStrength;
+		float Slot_WarmTintStrength = In_SdfFace_WarmTintStrength;
+
 		ToonFeatureWrite_DFFacialShadow(
-			In_SdfFace_ScatterStrength,
-			In_SdfFace_TransStrength,
-			In_SdfFace_TransPower,
-			In_SdfFace_PrimaryRoughnessScale,
-			In_SdfFace_SecondaryRoughnessScale,
-			In_SdfFace_SecondaryRampOffset,
-			In_SdfFace_OverallSpecIntensity,
-			In_SdfFace_PrimaryLobeIntensity,
-			In_SdfFace_SecondaryLobeIntensity,
-			In_SdfFace_SpecShadowStrength,
-			In_SdfFace_WarmTintStrength,
+			Slot_ScatterStrength,
+			Slot_TransmissionStrength,
+			Slot_TransmissionPower,
+			Slot_PrimaryRoughnessScale,
+			Slot_SecondaryRoughnessScale,
+			Slot_SecondaryRampOffset,
+			Slot_OverallSpecIntensity,
+			Slot_PrimaryLobeIntensity,
+			Slot_SecondaryLobeIntensity,
+			Slot_SpecShadowStrength,
+			Slot_WarmTintStrength,
 			ToonBufferA, ToonBufferB, ToonBufferC);
+
+		ScatterStrength = Slot_ScatterStrength;
+		TransmissionStrength = Slot_TransmissionStrength;
+		TransmissionPower = Slot_TransmissionPower;
+		PrimaryRoughnessScale = Slot_PrimaryRoughnessScale;
+		SecondaryRoughnessScale = Slot_SecondaryRoughnessScale;
+		SecondaryRampOffset = Slot_SecondaryRampOffset;
+		OverallSpecIntensity = Slot_OverallSpecIntensity;
+		PrimaryLobeIntensity = Slot_PrimaryLobeIntensity;
+		SecondaryLobeIntensity = Slot_SecondaryLobeIntensity;
+		SpecShadowStrength = Slot_SpecShadowStrength;
+		WarmTintStrength = Slot_WarmTintStrength;
 	}
 }

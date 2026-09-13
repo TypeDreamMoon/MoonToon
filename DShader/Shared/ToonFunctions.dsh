@@ -6,6 +6,10 @@
 // the odd one out failed at its call site instead of at the declaration.
 //
 // Import this instead. Declaring one that the importing file never calls costs nothing.
+//
+// The thirteen MF_ToonFeature_* and two MF_ToonModifier_* functions are NOT here: their signatures
+// are generated, because their Outputs follow the engine's slot tables. They live in the generated
+// Shared/ToonFeatureSignatures.dsh, which M_MoonToon imports to build the closure chain.
 
 VirtualFunction(Name="MF_MoonToonFeatureSelect")
 {

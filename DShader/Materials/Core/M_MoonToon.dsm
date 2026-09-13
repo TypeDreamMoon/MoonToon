@@ -1,37 +1,42 @@
 // MoonToon base material.
 //
-// Everything authorable lives in MF_MoonToonBaseInput; this material only routes that function's
-// six outputs to where the renderer expects them:
+// Everything authorable lives in MF_MoonToonBaseInput and in the thirteen MF_ToonFeature_*
+// functions; this material is the wiring that turns them into one Substrate closure.
 //
-//   Output            -> Base.MaterialAttributes      (the standard GBuffer surface)
-//   ToonBufferA       -> ToonMaterialOutput.Pin[0] |
-//   ToonBufferB       -> ToonMaterialOutput.Pin[1] | the toon buffer the Toon shading model reads
-//   ToonBufferC       -> ToonMaterialOutput.Pin[2] |
-//   FaceOverlayData   -> MoonToonFaceOverlay.Pin[0]   (see-through bangs re-blend, 眉透/瞳透)
-//   FaceOverlayParams -> MoonToonFaceOverlay.Pin[1]   (per-MI depth threshold / fade / view fade)
-//   FaceOverlayStencilIDs -> MoonToonFaceOverlay.Pin[2] (extra occluder toon-stencil IDs)
-//   ModifierData      -> ToonMaterialOutput.Pin[3] | the modifier axis: an additive layer that
-//   ModifierID        -> ToonMaterialOutput.Pin[4] | composes with whichever feature was picked
+//   Base.FrontMaterial <- a chain of the twelve "Is ..." static switches, each branch a finished
+//                         Moon toon closure: a SubstrateMoonToonBSDF of that feature's KIND, plus a
+//                         MoonToonFeature node for its TERM where the feature has one. Nothing
+//                         ticked falls through to Kind = Default, which is plain toon.
+//   Base.Opacity / OpacityMask / AmbientOcclusion / CustomizedUV1 / CustomizedUV2 / CustomData0 / 1
+//                      <- the non-shading root pins, straight from the base input's named outputs.
+//   MoonToonFaceOverlay.Pin[0..2] <- the see-through-bangs re-blend, the per-MI depth threshold /
+//                         fade tuning, and the extra occluder stencil IDs.
 //
-// ToonMaterialOutput / MoonToonFaceOverlay are UMaterialExpressionCustomOutputs: they have no
-// output pins, so they can only be reached through an Outputs expression binding, never from the
-// Graph body.
+// MoonToonFaceOverlay is a UMaterialExpressionCustomOutput: it has no output pins, so it can only be
+// reached through an Outputs expression binding, never from the Graph body. It stays a custom output
+// because it feeds a mesh pass (Moon_MeshPass_FaceOverlay) per pixel and Substrate has no equivalent.
 //
-// ONE form for both storages. Under Substrate (r.Substrate=True) the engine converts this
-// MaterialAttributes root itself: the hidden ConvertMaterialAttributes bridge sees MSM_Toon and
-// emits GetSubstrateMoonToonBSDFFromLegacyAttributes, which unpacks the five MoonEncodedAttribute
-// root pins AND reads the six ToonMaterialOutput pins above for the feature / modifier payload,
-// so the Moon closure record carries everything the toon prepass used to splat into full-screen
-// targets (that prepass is not created under Substrate at all). Nothing here is storage-specific.
+// What this replaced, and why. Until 2026-09-13 the toon surface reached the renderer as a
+// MaterialAttributes root plus ShadingModel = "Toon", and the engine converted that behind the
+// scenes: a hidden SubstrateConvertMaterialAttributes bridge saw MSM_Toon, read five bit-packed
+// MoonEncodedAttribute root pins, and went looking through the asset's expression list for a
+// ToonMaterialOutput node to take the feature payload off. Two things were wrong with it. The
+// payload never travelled along a wire, so a custom output placed inside a material function was
+// silently not found; and the bridge passed profile id 0 unconditionally, so the Moon toon profile
+// an artist attached to a material instance did nothing at all on the production path. Both are
+// gone: every value here is a pin, and the closure node carries the profile.
 //
-// History: from 2026-09-07 to 09-13 this file carried a second, DS_SUBSTRATE-only form that
-// instantiated the SubstrateMoonToonBSDF node directly on its packed EncodedAttribute0-4 /
-// FeaturePayload0-2 pins. Phase 5e of the engine retired those pins (the node now has a Kind
-// property and one named pin per field), which broke regeneration under Substrate, and the
-// generated asset had been flipping between the two forms depending on which storage last
-// regenerated it. Both branches are gone; the bridge form is what production has been running
-// on. Authoring this base on the named-pin node -- Kind as a static choice, no packed lanes --
-// is a separate follow-up, see TOON_SUBSTRATE_V2_DESIGN.md.
+// The feature parameters are still pruned per instance -- that was the only reason feature selection
+// had to be static, and it still is. GetVisibleMaterialParametersFromExpression descends the taken
+// side of a static switch and no other, so an instance shows the eleven-odd rows of the feature it
+// picked rather than all ninety-six.
+//
+// The thirteen leaves are written out rather than factored. A GraphFunction cannot take or return a
+// Substrate value (DreamShader Docs/language/graph-function.md:44 and :183), and a #define here is a
+// named value for #if to test, never a macro (Docs/language/preprocessor.md:299) -- so there is
+// nothing to factor them into. What keeps them identical is that each reads the same Surf_* locals.
+
+import "Shared/ToonFeatureSignatures.dsh";
 
 VirtualFunction(Name="MF_MoonToonBaseInput")
 {
@@ -43,6 +48,9 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 	Inputs = {
 	}
 
+	// Restated by hand, and it must stay in step with MF_MoonToonBaseInput's own Outputs block: a
+	// missing entry is an "OutputIndex is out of range" build error, and a REORDERED one is worse,
+	// because these names are what Output="..." resolves against.
 	Outputs = {
 		MaterialAttributes Output;
 		float4 ToonBufferA;
@@ -51,11 +59,42 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 FaceOverlayData;
 		float4 FaceOverlayParams;
 		float4 FaceOverlayStencilIDs;
-		// The modifier payload and the id that says how to read it. Must stay in step with
-		// MF_MoonToonBaseInput's own Outputs block -- this is a restated signature, and a missing
-		// entry is an "OutputIndex is out of range" build error.
 		float4 ModifierData;
 		float ModifierID;
+		// The Substrate lane. Everything above it is the legacy (r.Substrate=0) shape and this
+		// material reads none of it except the three face-overlay float4s, which are storage
+		// independent.
+		float3 OutBaseColor;
+		float  OutMetallic;
+		float  OutSpecular;
+		float  OutRoughness;
+		float3 OutNormal;
+		float3 OutEmissiveColor;
+		float  OutAnisotropy;
+		float3 OutTangent;
+		float  OutOpacity;
+		float  OutOpacityMask;
+		float  OutAmbientOcclusion;
+		float2 OutCustomizedUV1;
+		float2 OutCustomizedUV2;
+		float  OutCustomData0;
+		float3 OutMainLightShadowColor;
+		float  OutDiffuseColorRampIndex;
+		float  OutDiffuseRampUVOffset;
+		float3 OutSpecularColor;
+		float  OutSpecularColorRampIndex;
+		float  OutSpecularRampUVOffset;
+		float  OutReflectionIntensity;
+		float  OutStencil;
+		float  OutRayTracingShadowFlag;
+		float  OutFacialShadowSdfLeft;
+		float  OutFacialShadowSdfRight;
+		float  OutKajiyaStrandShift;
+		float4 OutGlobalMaskA;
+		float4 OutGlobalMaskB;
+		float4 OutGlobalMaskC;
+		float  OutStockingsThickness;
+		float3 OutStockingsSkinColor;
 	}
 }
 
@@ -84,11 +123,17 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// openable in the Material Editor.
 		Backend      = "Graph";
 		Domain       = "Surface";
-		// Both storages read this: the legacy GBuffer gates on MSM_Toon directly, and under
-		// Substrate it is what makes the MaterialAttributes conversion pick the Moon toon closure
-		// (SubstrateMoonToonBSDF registers SSM_Toon, which the engine folds back to MSM_Toon for
-		// every toon gate).
-		ShadingModel = "Toon";
+		// No ShadingModel line: binding Base.FrontMaterial force-sets the material to Substrate, and
+		// SubstrateMoonToonBSDF registers SSM_Toon, which the engine folds back to MSM_Toon for every
+		// toon gate. Writing anything but "Substrate" here is DSH8045.
+
+		// The per-pin form has no MaterialAttributes struct to carry the customised UVs: UMaterial
+		// compiles CustomizedUV[i] only for i < NumCustomizedUVs and passes the raw vertex UV through
+		// otherwise. MF_MoonToonBaseInput moves the head-forward / hair tangent from the vertex stage
+		// to the pixel stage through CustomizedUV1/2 (the Tangent pin reads TexCoords[1].xy +
+		// TexCoords[2].x back), so the SDF facial shadow needs UV1 and UV2 compiled -- 3 covers
+		// UV0..UV2. The attributes form got this for free.
+		NumCustomizedUVs = 3;
 		BlendMode    = "Opaque";
 
 		// Real translucency (engine-side ToonTranslucent). A translucent MI of this base gets:
@@ -112,28 +157,63 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		bUsedWithNanite       = true;
 	}
 
+	Properties = {
+		// The fourteen "pick one" static switches, declared here because the closure chain they cut
+		// is here. Every ParameterName, Group, SortPriority and Description is verbatim what
+		// MF_MoonToonFeatureSelect / MF_MoonToonModifierSelect declare (both generated by
+		// Tools/gen_feature_functions.py) -- the ParameterName is what makes a switch declared in two
+		// places ONE material parameter, which is how the 207 production instances keep their
+		// overrides. Three of them are declared a third time in MF_MoonToonBaseInput, where they also
+		// gate the tangent / CustomizedUV decode; that has always been so.
+		//
+		// Order is priority order: the first one ticked wins, because it is the outermost switch in
+		// the chain below. Nothing ticked = Kind Default = plain toon.
+		StaticSwitchParameter Is_PBRSpecular = false [ParameterName="Is PBRSpecular"; Group="30 - Shading Feature (pick one)"; SortPriority=0; Description="启用 PBR Specular 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_KajiyaHair = false [ParameterName="Is KajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=1; Description="启用 Hair Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_ToonKajiyaHair = false [ParameterName="Is ToonKajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=2; Description="启用 Hair Toon Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_DFFacialShadow = false [ParameterName="Is DFFacialShadow"; Group="30 - Shading Feature (pick one)"; SortPriority=3; Description="启用 SDF Face 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_HairHighlightMask = false [ParameterName="Is HairHighlightMask"; Group="30 - Shading Feature (pick one)"; SortPriority=4; Description="启用 Hair Highlight Mask 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_Skin = false [ParameterName="Is Skin"; Group="30 - Shading Feature (pick one)"; SortPriority=5; Description="启用 Skin 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_Stockings = false [ParameterName="Is Stockings"; Group="30 - Shading Feature (pick one)"; SortPriority=6; Description="启用 Stockings 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_NPRStockings = false [ParameterName="Is NPRStockings"; Group="30 - Shading Feature (pick one)"; SortPriority=7; Description="启用 Stockings 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_Eye = false [ParameterName="Is Eye"; Group="30 - Shading Feature (pick one)"; SortPriority=8; Description="启用 Eye 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_ClothVelvet = false [ParameterName="Is ClothVelvet"; Group="30 - Shading Feature (pick one)"; SortPriority=9; Description="启用 Cloth Velvet 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_ToonMetal = false [ParameterName="Is ToonMetal"; Group="30 - Shading Feature (pick one)"; SortPriority=10; Description="启用 Metal 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Is_EmissiveInk = false [ParameterName="Is EmissiveInk"; Group="30 - Shading Feature (pick one)"; SortPriority=11; Description="启用 Emissive Ink 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+
+		// The MODIFIER axis, the second static choice. A modifier is ADDED on top of whichever
+		// feature was picked, so it does not compete for the 30 group's single slot.
+		StaticSwitchParameter Is_Modifier_Matcap = false [ParameterName="Is Modifier Matcap"; Group="43 - Modifier (pick one)"; SortPriority=0; Description="启用 Matcap 修饰层. 修饰层叠加在着色特征之上, 与任意特征共存 —— 它不占 30 组的单选. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 无修饰层, 在面板和着色器里都不花代价."];
+		StaticSwitchParameter Is_Modifier_OilFilm = false [ParameterName="Is Modifier Oil Film"; Group="43 - Modifier (pick one)"; SortPriority=1; Description="启用 Oil Film 修饰层. 修饰层叠加在着色特征之上, 与任意特征共存 —— 它不占 30 组的单选. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 无修饰层, 在面板和着色器里都不花代价."];
+	}
+
 	Outputs = {
-		MaterialAttributes Attributes;
-		float4 ToonDataA;
-		float4 ToonDataB;
-		float4 ToonDataC;
+		Substrate ToonClosure;
+		float  Opacity;
+		float  OpacityMask;
+		float  AmbientOcclusion;
+		float2 CustomizedUV1;
+		float2 CustomizedUV2;
+		float  CustomData0;
+		float  CustomData1;
 		float4 FaceOverlay;
 		float4 FaceOverlayTuning;
 		float4 FaceOverlayStencils;
-		float4 ToonDataD;
-		float ToonDataE;
 
-		Base.MaterialAttributes = Attributes;
+		// The one shading wire. Everything the renderer needs to shade this pixel is inside it.
+		Base.FrontMaterial = ToonClosure;
 
-		Expression(Class="ToonMaterialOutput").Pin[0] = ToonDataA;
-		Expression(Class="ToonMaterialOutput").Pin[1] = ToonDataB;
-		Expression(Class="ToonMaterialOutput").Pin[2] = ToonDataC;
-		// Pins 3 and 4 are the feature-INDEPENDENT modifier axis. A/B/C only mean something in the
-		// context of the selected feature; these two survive whichever it is. Pin 3 is the payload
-		// (ToonFeatureRT4) and pin 4 the id that selects what its channels mean (ToonFeatureRT3.w),
-		// which is why they are bound next to each other and fed from one selector.
-		Expression(Class="ToonMaterialOutput").Pin[3] = ToonDataD;
-		Expression(Class="ToonMaterialOutput").Pin[4] = ToonDataE;
+		// The root pins a closure does not carry. Opacity and OpacityMask are the blend, not the
+		// surface; the customised UVs are a vertex-to-pixel channel; CustomData0 is the ray tracing
+		// payload (FMoonCustomPayload: the self-shadow and cast-shadow-on-toon bits plus the
+		// stencil), which the hit shaders read off the root on both storages.
+		Base.Opacity          = Opacity;
+		Base.OpacityMask      = OpacityMask;
+		Base.AmbientOcclusion = AmbientOcclusion;
+		Base.CustomizedUV1    = CustomizedUV1;
+		Base.CustomizedUV2    = CustomizedUV2;
+		Base.CustomData0      = CustomData0;
+		Base.CustomData1      = CustomData1;
 
 		Expression(Class="MoonToonFaceOverlay").Pin[0] = FaceOverlay;
 		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
@@ -141,8 +221,604 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 	}
 
 	Graph = {
-		MaterialAttributes Surface = MF_MoonToonBaseInput(OutputIndex=0);
+		#Region "Authored surface"
+		// One call, read many times: a VirtualFunction call with the same argument list is served
+		// from the graph builder's reuse cache, so MF_MoonToonBaseInput is one node in the generated
+		// asset however many of its outputs are read here.
+		float3 Surf_BaseColor              = MF_MoonToonBaseInput(Output="OutBaseColor");
+		float  Surf_Metallic               = MF_MoonToonBaseInput(Output="OutMetallic");
+		float  Surf_Specular               = MF_MoonToonBaseInput(Output="OutSpecular");
+		float  Surf_Roughness              = MF_MoonToonBaseInput(Output="OutRoughness");
+		float3 Surf_Normal                 = MF_MoonToonBaseInput(Output="OutNormal");
+		float3 Surf_EmissiveColor          = MF_MoonToonBaseInput(Output="OutEmissiveColor");
+		float  Surf_Anisotropy             = MF_MoonToonBaseInput(Output="OutAnisotropy");
+		float3 Surf_Tangent                = MF_MoonToonBaseInput(Output="OutTangent");
 
+		float3 Surf_MainLightShadowColor   = MF_MoonToonBaseInput(Output="OutMainLightShadowColor");
+		float  Surf_DiffuseColorRampIndex  = MF_MoonToonBaseInput(Output="OutDiffuseColorRampIndex");
+		float  Surf_DiffuseRampUVOffset    = MF_MoonToonBaseInput(Output="OutDiffuseRampUVOffset");
+		float3 Surf_SpecularColor          = MF_MoonToonBaseInput(Output="OutSpecularColor");
+		float  Surf_SpecularColorRampIndex = MF_MoonToonBaseInput(Output="OutSpecularColorRampIndex");
+		float  Surf_SpecularRampUVOffset   = MF_MoonToonBaseInput(Output="OutSpecularRampUVOffset");
+		float  Surf_ReflectionIntensity    = MF_MoonToonBaseInput(Output="OutReflectionIntensity");
+		float  Surf_Stencil                = MF_MoonToonBaseInput(Output="OutStencil");
+		float  Surf_RayTracingShadowFlag   = MF_MoonToonBaseInput(Output="OutRayTracingShadowFlag");
+		float  Surf_FacialShadowSdfLeft    = MF_MoonToonBaseInput(Output="OutFacialShadowSdfLeft");
+		float  Surf_FacialShadowSdfRight   = MF_MoonToonBaseInput(Output="OutFacialShadowSdfRight");
+
+		// What the feature functions need from the base input. These used to be the inputs of
+		// MF_MoonToonFeatureSelect, the function this chain replaces.
+		float  Surf_KajiyaStrandShift      = MF_MoonToonBaseInput(Output="OutKajiyaStrandShift");
+		float4 Surf_GlobalMaskA            = MF_MoonToonBaseInput(Output="OutGlobalMaskA");
+		float4 Surf_GlobalMaskB            = MF_MoonToonBaseInput(Output="OutGlobalMaskB");
+		float4 Surf_GlobalMaskC            = MF_MoonToonBaseInput(Output="OutGlobalMaskC");
+		float  Surf_StockingsThickness     = MF_MoonToonBaseInput(Output="OutStockingsThickness");
+		float3 Surf_StockingsSkinColor     = MF_MoonToonBaseInput(Output="OutStockingsSkinColor");
+		#EndRegion
+
+		#Region "Modifier"
+		// The modifier is feature-INDEPENDENT: it composes with whichever leaf the chain below picks,
+		// so it is resolved once and handed to every leaf's two modifier pins.
+		//
+		// Two MoonToonModifier nodes per modifier rather than one, because the payload output is a
+		// float4 and the id output a float, and UE.Expression's node-reuse key carries the declared
+		// OutputType. The id node's channel pins are dead -- the node answers that output with a
+		// compile-time constant -- so the second node costs nothing in the shader.
+		float4 ModifierPayload_Matcap = UE.Expression(
+			Class = "MoonToonModifier", OutputType = "float4", Output = "Modifier Payload",
+			Modifier    = "Matcap",
+			Color       = MF_ToonModifier_Matcap(Surf_Normal, Output="Color"),
+			LightingMix = MF_ToonModifier_Matcap(Surf_Normal, Output="LightingMix"));
+		float ModifierId_Matcap = UE.Expression(
+			Class = "MoonToonModifier", OutputType = "float", Output = "Modifier Id",
+			Modifier    = "Matcap",
+			Color       = MF_ToonModifier_Matcap(Surf_Normal, Output="Color"),
+			LightingMix = MF_ToonModifier_Matcap(Surf_Normal, Output="LightingMix"));
+
+		float4 ModifierPayload_OilFilm = UE.Expression(
+			Class = "MoonToonModifier", OutputType = "float4", Output = "Modifier Payload",
+			Modifier       = "OilFilm",
+			Intensity      = MF_ToonModifier_OilFilm(Output="Intensity"),
+			HighlightScale = MF_ToonModifier_OilFilm(Output="HighlightScale"),
+			FalloffPower   = MF_ToonModifier_OilFilm(Output="FalloffPower"),
+			HueShift       = MF_ToonModifier_OilFilm(Output="HueShift"));
+		float ModifierId_OilFilm = UE.Expression(
+			Class = "MoonToonModifier", OutputType = "float", Output = "Modifier Id",
+			Modifier       = "OilFilm",
+			Intensity      = MF_ToonModifier_OilFilm(Output="Intensity"),
+			HighlightScale = MF_ToonModifier_OilFilm(Output="HighlightScale"),
+			FalloffPower   = MF_ToonModifier_OilFilm(Output="FalloffPower"),
+			HueShift       = MF_ToonModifier_OilFilm(Output="HueShift"));
+
+		// Nothing ticked is the normal state and it is free: id 0 is MOON_TOON_MODIFIER_ID_NONE,
+		// which the engine's dispatcher answers with no module at all.
+		float4 ModifierPayload = Is_Modifier_Matcap(
+			True = ModifierPayload_Matcap,
+			False = Is_Modifier_OilFilm(
+				True = ModifierPayload_OilFilm,
+				False = float4(0.0, 0.0, 0.0, 0.0)));
+		float ModifierId = Is_Modifier_Matcap(
+			True = ModifierId_Matcap,
+			False = Is_Modifier_OilFilm(
+				True = ModifierId_OilFilm,
+				False = 0.0));
+		#EndRegion
+
+		#Region "Closure leaves"
+		// One per legacy shading feature id, built from MOON_TOON_LEGACY_FEATURE_MAP
+		// (Engine/Shaders/Shared/MoonToonFeatureRegistry.h): id -> Kind, Terms, Variants. The Moon
+		// toon PROFILE is deliberately left off every node. A node with no profile still emits the
+		// Guid-free profile scalar parameter, which is what lets a material INSTANCE attach one --
+		// and the instance is where all 207 production materials would attach it.
+		//
+		// The eyebrow id (12) has no leaf: it routes to the Default module, shades as plain toon, and
+		// has no selector switch to reach it with. The node's bEyebrow property is what would tag it,
+		// and nothing authors that today -- the eyebrow-through-hair effect ships as the
+		// MoonToonFaceOverlay custom output bound above.
+		// 0 DEFAULT -- what a material with nothing ticked shades as.
+		Substrate Leaf_Default = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			MultiBandCelEnable = MF_ToonFeature_Default(Output="MultiBandCelEnable"),
+			TerminatorWidth    = MF_ToonFeature_Default(Output="TerminatorWidth"),
+			BloomWeight        = MF_ToonFeature_Default(Output="BloomWeight"),
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		// 1 PBR_SPECULAR -- Kind Default + term PBR Specular. The base leaves the three
+		// Default channels unconnected on purpose: the term writes the same lanes, and an
+		// unconnected channel takes the slot table's own default rather than nothing.
+		Substrate Base_PBRSpecular = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_PBRSpecular = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "PBRSpecular",
+			MoonToonMaterial = Base_PBRSpecular,
+			BloomWeight = MF_ToonFeature_PBRSpecular(Output="BloomWeight"));
+
+		// 2 KAJIYA_HAIR_SPECULAR -- Kind Default + term Hair Kajiya Kay.
+		Substrate Base_KajiyaHair = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_KajiyaHair = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "Kajiya",
+			MoonToonMaterial = Base_KajiyaHair,
+			TangentRotate       = MF_ToonFeature_KajiyaHair(Output="TangentRotate"),
+			SecondaryShift      = MF_ToonFeature_KajiyaHair(Output="SecondaryShift"),
+			SecondaryMask       = MF_ToonFeature_KajiyaHair(Output="SecondaryMask"),
+			PrimaryShift        = MF_ToonFeature_KajiyaHair(Output="PrimaryShift"),
+			PrimaryExpScale     = MF_ToonFeature_KajiyaHair(Output="PrimaryExpScale"),
+			SecondaryExpScale   = MF_ToonFeature_KajiyaHair(Output="SecondaryExpScale"),
+			OverallIntensity    = MF_ToonFeature_KajiyaHair(Output="OverallIntensity"),
+			PrimaryIntensity    = MF_ToonFeature_KajiyaHair(Output="PrimaryIntensity"),
+			SecondaryIntensity  = MF_ToonFeature_KajiyaHair(Output="SecondaryIntensity"),
+			SecondaryShiftScale = MF_ToonFeature_KajiyaHair(Output="SecondaryShiftScale"),
+			ShadowStrength      = MF_ToonFeature_KajiyaHair(Output="ShadowStrength"));
+
+		// 5 TOON_KAJIYA_HAIR_SPECULAR -- the same term, toon-ramp VARIANT. The variant is
+		// not a second pin: the Term enum spells it out as its own entry.
+		Substrate Base_ToonKajiyaHair = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_ToonKajiyaHair = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "KajiyaToon",
+			MoonToonMaterial = Base_ToonKajiyaHair,
+			TangentRotate       = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="TangentRotate"),
+			SecondaryShift      = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="SecondaryShift"),
+			SecondaryMask       = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="SecondaryMask"),
+			PrimaryShift        = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="PrimaryShift"),
+			PrimaryExpScale     = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="PrimaryExpScale"),
+			SecondaryExpScale   = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="SecondaryExpScale"),
+			OverallIntensity    = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="OverallIntensity"),
+			PrimaryIntensity    = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="PrimaryIntensity"),
+			SecondaryIntensity  = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="SecondaryIntensity"),
+			SecondaryShiftScale = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="SecondaryShiftScale"),
+			ShadowStrength      = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="ShadowStrength"));
+
+		// 3 DISTANCE_FIELD_FACIAL_SHADOW -- Kind Skin with the SDF pair CONNECTED. Connecting
+		// them is the switch; there is no second flag, which is what the old id-3-versus-id-6
+		// pair could disagree about.
+		Substrate Leaf_DFFacialShadow = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Skin",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Facial_Shadow_SDF_Left  = Surf_FacialShadowSdfLeft,
+			Facial_Shadow_SDF_Right = Surf_FacialShadowSdfRight,
+			ScatterStrength         = MF_ToonFeature_DFFacialShadow(Output="ScatterStrength"),
+			TransmissionStrength    = MF_ToonFeature_DFFacialShadow(Output="TransmissionStrength"),
+			TransmissionPower       = MF_ToonFeature_DFFacialShadow(Output="TransmissionPower"),
+			PrimaryRoughnessScale   = MF_ToonFeature_DFFacialShadow(Output="PrimaryRoughnessScale"),
+			SecondaryRoughnessScale = MF_ToonFeature_DFFacialShadow(Output="SecondaryRoughnessScale"),
+			SecondaryRampOffset     = MF_ToonFeature_DFFacialShadow(Output="SecondaryRampOffset"),
+			OverallSpecIntensity    = MF_ToonFeature_DFFacialShadow(Output="OverallSpecIntensity"),
+			PrimaryLobeIntensity    = MF_ToonFeature_DFFacialShadow(Output="PrimaryLobeIntensity"),
+			SecondaryLobeIntensity  = MF_ToonFeature_DFFacialShadow(Output="SecondaryLobeIntensity"),
+			SpecShadowStrength      = MF_ToonFeature_DFFacialShadow(Output="SpecShadowStrength"),
+			WarmTintStrength        = MF_ToonFeature_DFFacialShadow(Output="WarmTintStrength"),
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		// 4 HAIR_HIGHLIGHT_MASK -- Kind Default + term Hair Highlight Mask.
+		Substrate Base_HairHighlightMask = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_HairHighlightMask = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "HairHighlightMask",
+			MoonToonMaterial = Base_HairHighlightMask,
+			Mask            = MF_ToonFeature_HairHighlightMask(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Output="Mask"),
+			Intensity       = MF_ToonFeature_HairHighlightMask(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Output="Intensity"),
+			ShadowIntensity = MF_ToonFeature_HairHighlightMask(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Output="ShadowIntensity"),
+			ViewAnchorBlend = MF_ToonFeature_HairHighlightMask(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Output="ViewAnchorBlend"));
+
+		// 6 SKIN -- the same Kind as the SDF face, without the pair wired.
+		Substrate Leaf_Skin = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Skin",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			ScatterStrength         = MF_ToonFeature_Skin(Output="ScatterStrength"),
+			TransmissionStrength    = MF_ToonFeature_Skin(Output="TransmissionStrength"),
+			TransmissionPower       = MF_ToonFeature_Skin(Output="TransmissionPower"),
+			PrimaryRoughnessScale   = MF_ToonFeature_Skin(Output="PrimaryRoughnessScale"),
+			SecondaryRoughnessScale = MF_ToonFeature_Skin(Output="SecondaryRoughnessScale"),
+			SecondaryRampOffset     = MF_ToonFeature_Skin(Output="SecondaryRampOffset"),
+			OverallSpecIntensity    = MF_ToonFeature_Skin(Output="OverallSpecIntensity"),
+			PrimaryLobeIntensity    = MF_ToonFeature_Skin(Output="PrimaryLobeIntensity"),
+			SecondaryLobeIntensity  = MF_ToonFeature_Skin(Output="SecondaryLobeIntensity"),
+			SpecShadowStrength      = MF_ToonFeature_Skin(Output="SpecShadowStrength"),
+			WarmTintStrength        = MF_ToonFeature_Skin(Output="WarmTintStrength"),
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		// 7 PBR_STOCKINGS -- Kind Skin + term Stockings, PBR variant. The Skin channels stay
+		// unconnected: the stockings table is FULL, so the term writes every lane anyway.
+		Substrate Base_Stockings = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Skin",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_Stockings = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "StockingsPBR",
+			MoonToonMaterial = Base_Stockings,
+			Density                = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="Density"),
+			FresnelPower           = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="FresnelPower"),
+			TransmissionStrength   = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="TransmissionStrength"),
+			TransmissionDistortion = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="TransmissionDistortion"),
+			SpecularIntensity      = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="SpecularIntensity"),
+			ShadowStrength         = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="ShadowStrength"),
+			GrazingDarkenStrength  = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="GrazingDarkenStrength"),
+			SkinColor              = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="SkinColor"),
+			GrazingSpecBoost       = MF_ToonFeature_Stockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="GrazingSpecBoost"));
+
+		// 14 NPR_STOCKINGS -- the same term and the same parameter names, no PBR variant bit.
+		Substrate Base_NPRStockings = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Skin",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_NPRStockings = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "Stockings",
+			MoonToonMaterial = Base_NPRStockings,
+			Density                = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="Density"),
+			FresnelPower           = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="FresnelPower"),
+			TransmissionStrength   = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="TransmissionStrength"),
+			TransmissionDistortion = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="TransmissionDistortion"),
+			SpecularIntensity      = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="SpecularIntensity"),
+			ShadowStrength         = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="ShadowStrength"),
+			GrazingDarkenStrength  = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="GrazingDarkenStrength"),
+			SkinColor              = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="SkinColor"),
+			GrazingSpecBoost       = MF_ToonFeature_NPRStockings(Surf_StockingsThickness, Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Surf_StockingsSkinColor, Output="GrazingSpecBoost"));
+
+		// 8 EYE
+		Substrate Leaf_Eye = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Eye",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			DiffuseWrapStrength     = MF_ToonFeature_Eye(Output="DiffuseWrapStrength"),
+			LimbalDarkenStrength    = MF_ToonFeature_Eye(Output="LimbalDarkenStrength"),
+			SpecularShadowStrength  = MF_ToonFeature_Eye(Output="SpecularShadowStrength"),
+			PrimaryRoughnessScale   = MF_ToonFeature_Eye(Output="PrimaryRoughnessScale"),
+			SecondaryRoughnessScale = MF_ToonFeature_Eye(Output="SecondaryRoughnessScale"),
+			PrimaryIntensity        = MF_ToonFeature_Eye(Output="PrimaryIntensity"),
+			SecondaryIntensity      = MF_ToonFeature_Eye(Output="SecondaryIntensity"),
+			EyeTint                 = MF_ToonFeature_Eye(Output="EyeTint"),
+			SecondaryRampOffset     = MF_ToonFeature_Eye(Output="SecondaryRampOffset"),
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		// 9 CLOTH_VELVET -- Kind Default + term Cloth Velvet.
+		Substrate Base_ClothVelvet = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_ClothVelvet = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "Cloth",
+			MoonToonMaterial = Base_ClothVelvet,
+			WrapStrength          = MF_ToonFeature_ClothVelvet(Output="WrapStrength"),
+			SheenPower            = MF_ToonFeature_ClothVelvet(Output="SheenPower"),
+			SheenShadowStrength   = MF_ToonFeature_ClothVelvet(Output="SheenShadowStrength"),
+			RoughnessScale        = MF_ToonFeature_ClothVelvet(Output="RoughnessScale"),
+			SheenIntensity        = MF_ToonFeature_ClothVelvet(Output="SheenIntensity"),
+			RetroDiffuseStrength  = MF_ToonFeature_ClothVelvet(Output="RetroDiffuseStrength"),
+			GrazingDarkenStrength = MF_ToonFeature_ClothVelvet(Output="GrazingDarkenStrength"),
+			SheenTint             = MF_ToonFeature_ClothVelvet(Output="SheenTint"),
+			RimBias               = MF_ToonFeature_ClothVelvet(Output="RimBias"));
+
+		// 10 TOON_METAL
+		Substrate Leaf_ToonMetal = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Metal",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			DiffuseIntensity    = MF_ToonFeature_ToonMetal(Output="DiffuseIntensity"),
+			ShadowSpecularFloor = MF_ToonFeature_ToonMetal(Output="ShadowSpecularFloor"),
+			RampOffset          = MF_ToonFeature_ToonMetal(Output="RampOffset"),
+			RoughnessScale      = MF_ToonFeature_ToonMetal(Output="RoughnessScale"),
+			SpecularIntensity   = MF_ToonFeature_ToonMetal(Output="SpecularIntensity"),
+			EdgeBoost           = MF_ToonFeature_ToonMetal(Output="EdgeBoost"),
+			SpecularContrast    = MF_ToonFeature_ToonMetal(Output="SpecularContrast"),
+			MetalTint           = MF_ToonFeature_ToonMetal(Output="MetalTint"),
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		// 11 TOON_EMISSIVE_INK -- Kind Default + term Emissive Ink.
+		Substrate Base_EmissiveInk = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_EmissiveInk = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "Ink",
+			MoonToonMaterial = Base_EmissiveInk,
+			LightInfluence    = MF_ToonFeature_EmissiveInk(Output="LightInfluence"),
+			ShadowLift        = MF_ToonFeature_EmissiveInk(Output="ShadowLift"),
+			InkDarkenStrength = MF_ToonFeature_EmissiveInk(Output="InkDarkenStrength"),
+			RoughnessScale    = MF_ToonFeature_EmissiveInk(Output="RoughnessScale"),
+			SpecularIntensity = MF_ToonFeature_EmissiveInk(Output="SpecularIntensity"),
+			EdgeBoost         = MF_ToonFeature_EmissiveInk(Output="EdgeBoost"),
+			InkBlend          = MF_ToonFeature_EmissiveInk(Output="InkBlend"),
+			InkTint           = MF_ToonFeature_EmissiveInk(Output="InkTint"),
+			RimBias           = MF_ToonFeature_EmissiveInk(Output="RimBias"));
+		#EndRegion
+
+		#Region "Feature selection"
+		// The twelve switches, outermost first, so the topmost ticked one wins -- the same priority
+		// MF_MoonToonFeatureSelect had, and the same convention: exactly one SHOULD be ticked, and
+		// nothing enforces it.
+		//
+		// The engine resolves these while it builds the material topology tree
+		// (UMaterialExpressionStaticSwitchParameter::SubstrateGenerateMaterialTopologyTree) and
+		// descends only the taken side, so the translator sees ONE closure however many leaves are
+		// wired here. DreamShader used to refuse this outright (DSH7103); it now refuses only a
+		// switch that MIXES a closure with a number.
+		ToonClosure = Is_PBRSpecular(
+			True = Leaf_PBRSpecular,
+			False = Is_KajiyaHair(
+				True = Leaf_KajiyaHair,
+				False = Is_ToonKajiyaHair(
+					True = Leaf_ToonKajiyaHair,
+					False = Is_DFFacialShadow(
+						True = Leaf_DFFacialShadow,
+						False = Is_HairHighlightMask(
+							True = Leaf_HairHighlightMask,
+							False = Is_Skin(
+								True = Leaf_Skin,
+								False = Is_Stockings(
+									True = Leaf_Stockings,
+									False = Is_NPRStockings(
+										True = Leaf_NPRStockings,
+										False = Is_Eye(
+											True = Leaf_Eye,
+											False = Is_ClothVelvet(
+												True = Leaf_ClothVelvet,
+												False = Is_ToonMetal(
+													True = Leaf_ToonMetal,
+													False = Is_EmissiveInk(
+														True = Leaf_EmissiveInk,
+														False = Leaf_Default))))))))))));
+		#EndRegion
+
+		#Region "Root pins and custom outputs"
 		// Retired: dithered translucent shadow, which faked translucency on a MASKED material by
 		// turning the shadow into a dithered opacity mask. Superseded by real toon translucency
 		// (see Settings above). The dither could not do what that does -- it wrote full depth and
@@ -150,20 +826,21 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// history (noise and smear on fast motion or a cut), and it had no colour, only present or
 		// absent. MF_MoonToonTranslucencyShadow.dsf is kept, unreferenced, so an MI that still
 		// wants the old look can be rebuilt from it.
-		// Attributes = MF_MoonToonTranslucencyShadow(Surface);
 		//
-		// MF_MoonToonBaseInput already writes both channels: Attributes.Opacity for the translucent
-		// blend and Attributes.OpacityMask ("Shadow Opacity" x "Apply Opacity to Shadow") for the
-		// masked shadow, so passing Surface straight through keeps masked materials working.
-		Attributes = Surface;
+		// MF_MoonToonBaseInput writes both channels: OutOpacity for the translucent blend and
+		// OutOpacityMask (the sampled alpha, with "Shadow Opacity" x "Apply Opacity to Shadow"
+		// substituted in the shadow pass) for the masked cutout.
+		Opacity          = MF_MoonToonBaseInput(Output="OutOpacity");
+		OpacityMask      = MF_MoonToonBaseInput(Output="OutOpacityMask");
+		AmbientOcclusion = MF_MoonToonBaseInput(Output="OutAmbientOcclusion");
+		CustomizedUV1    = MF_MoonToonBaseInput(Output="OutCustomizedUV1");
+		CustomizedUV2    = MF_MoonToonBaseInput(Output="OutCustomizedUV2");
+		CustomData0      = MF_MoonToonBaseInput(Output="OutCustomData0");
+		CustomData1      = 1.0;
 
-		ToonDataA = MF_MoonToonBaseInput(OutputIndex=1);
-		ToonDataB = MF_MoonToonBaseInput(OutputIndex=2);
-		ToonDataC = MF_MoonToonBaseInput(OutputIndex=3);
-		FaceOverlay = MF_MoonToonBaseInput(OutputIndex=4);
-		FaceOverlayTuning = MF_MoonToonBaseInput(OutputIndex=5);
-		FaceOverlayStencils = MF_MoonToonBaseInput(OutputIndex=6);
-		ToonDataD = MF_MoonToonBaseInput(OutputIndex=7);
-		ToonDataE = MF_MoonToonBaseInput(OutputIndex=8);
+		FaceOverlay         = MF_MoonToonBaseInput(Output="FaceOverlayData");
+		FaceOverlayTuning   = MF_MoonToonBaseInput(Output="FaceOverlayParams");
+		FaceOverlayStencils = MF_MoonToonBaseInput(Output="FaceOverlayStencilIDs");
+		#EndRegion
 	}
 }
