@@ -116,6 +116,29 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 // 	}
 // }
 
+// The closure's COVERAGE weight, decided by the material's blend mode at shader-compile time.
+//
+// Under Substrate a translucent blend takes its alpha from the closure's coverage; the root's Opacity
+// pin is ignored for BLEND_Translucent and only read for AlphaComposite -- and only when the PARENT
+// material's own blend mode is AlphaComposite (UMaterial::IsPropertyActive), so an instance's blend-mode
+// override never reaches it. The legacy bridge folded Opacity into coverage on its way to the hidden
+// closure; the node form has to say so itself, or every translucent instance renders at coverage 1.
+//
+// It must NOT apply to opaque and masked instances: their "Opacity" is the base colour map's alpha
+// by default ("Opacity From Base Color Map"), which is not 1 everywhere on production textures, and
+// a coverage below 1 on an opaque closure darkens it. The graph cannot see the blend mode, but the
+// shader can: MATERIALBLENDING_* are compile-time defines of every material permutation, including
+// the ones an instance's blend-mode override produces, so this Custom node is the one place that
+// can make the weight a no-op for opaque and the opacity for translucent.
+Function float MoonToonCoverageWeight(in float Opacity)
+{
+#if MATERIALBLENDING_TRANSLUCENT || MATERIALBLENDING_ADDITIVE || MATERIALBLENDING_ALPHACOMPOSITE
+	return Opacity;
+#else
+	return 1.0f;
+#endif
+}
+
 Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 {
 	Settings = {
@@ -189,6 +212,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 
 	Outputs = {
 		Substrate ToonClosure;
+		Substrate ToonSurface;
 		float  Opacity;
 		float  OpacityMask;
 		float  AmbientOcclusion;
@@ -201,7 +225,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 FaceOverlayStencils;
 
 		// The one shading wire. Everything the renderer needs to shade this pixel is inside it.
-		Base.FrontMaterial = ToonClosure;
+		Base.FrontMaterial = ToonSurface;
 
 		// The root pins a closure does not carry. Opacity and OpacityMask are the blend, not the
 		// surface; the customised UVs are a vertex-to-pixel channel; CustomData0 is the ray tracing
@@ -832,6 +856,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// substituted in the shadow pass) for the masked cutout.
 		Opacity          = MF_MoonToonBaseInput(Output="OutOpacity");
 		OpacityMask      = MF_MoonToonBaseInput(Output="OutOpacityMask");
+		// Coverage: the opacity for translucent blends, 1 for opaque and masked -- see
+		// MoonToonCoverageWeight at the top of this file for why that has to be decided in HLSL.
+		ToonSurface = Substrate.Weight(A = ToonClosure, Weight = MoonToonCoverageWeight(Opacity));
 		AmbientOcclusion = MF_MoonToonBaseInput(Output="OutAmbientOcclusion");
 		CustomizedUV1    = MF_MoonToonBaseInput(Output="OutCustomizedUV1");
 		CustomizedUV2    = MF_MoonToonBaseInput(Output="OutCustomizedUV2");
