@@ -250,6 +250,8 @@ VirtualFunction(Name="MF_ToonSeeThroughOverlay")
 		float4 FaceOverlayData;
 		float4 FaceOverlayParams;
 		float4 FaceOverlayStencilIDs;
+		// Engine #10: this material's own FaceOverlay occluder class (0 = not an occluder).
+		float FaceOverlayOccluderClass;
 	}
 }
 VirtualFunction(Name="MF_ToonStockingsSheenMask")

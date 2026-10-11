@@ -74,6 +74,7 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 OutGlobalMaskC;
 		float  OutStockingsThickness;
 		float3 OutStockingsSkinColor;
+		float  FaceOverlayOccluderClass;
 	}
 }
 

@@ -42,9 +42,14 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		// x = depth threshold cm (0 = global CVar), y = depth fade cm, z/w = view fade start/end.
 		// Never affects pass enrollment; only read where FaceOverlayData survives.
 		float4 FaceOverlayParams;
-		// Extra occluder toon-stencil IDs (0-255 authoring space, -1 = unused). z/w reserved so
-		// two more slots can be added without touching the engine node.
+		// Extra accepted occluder CLASSES (1-255, -1 = unused), on top of the engine default
+		// (r.MoonToon.FaceOverlay.HairStencil, 8). z/w reserved for two more slots. Since engine #10
+		// these are FaceOverlay occluder classes, no longer CustomDepth stencil values.
 		float4 FaceOverlayStencilIDs;
+		// This material's own occluder class (engine #10): non-zero registers its meshes in the
+		// FaceOverlay occluder layer (Moon_MeshPass_FaceOverlayOccluder). Constant zero while
+		// 'Is Face Overlay Occluder' is off, which keeps the material out of that pass entirely.
+		float FaceOverlayOccluderClass;
 	}
 
 	Properties = {
@@ -88,13 +93,13 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			ParameterName="Through Hair Occluder ID A";
 			Group="24 - See Through Overlay";
 			SortPriority=40;
-			Description="Extra occluder to show through, named by its CustomDepth stencil value (0-255) -- i.e. the occluder material's 'Material Stencil Value' override. The occluder's mesh also needs 'Render CustomDepth Pass' enabled. Use for occluders that are NOT hair-shaded: hat brims, hair accessories, glasses frames. -1 = unused. Hair shading features (2/4/5) always pass regardless of this.";
+			Description="Extra occluder to show through, named by its FaceOverlay occluder CLASS (1-255) -- the 'Face Overlay Occluder Class' the occluder's material sets with 'Is Face Overlay Occluder' on. Use for occluders other than front hair: hat brims, hair accessories, glasses frames. -1 = unused. (Engine #10: no longer a CustomDepth stencil value; the occluder needs no custom depth.)";
 		];
 		ScalarParameter Through_Hair_Occluder_ID_B = -1.0 [
 			ParameterName="Through Hair Occluder ID B";
 			Group="24 - See Through Overlay";
 			SortPriority=41;
-			Description="Second accepted occluder CustomDepth stencil value. -1 = unused.";
+			Description="Second accepted occluder class. -1 = unused.";
 		];
 		// --- Front-hair depth gate (verbatim port of Game DShader/Functions/MF_TransparentFrontHair) ---
 		// Requires the CustomDepth stencil convention (eye/brow=1, face=2, hair=8, authored per
@@ -130,6 +135,17 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			Group="24 - See Through Overlay";
 			SortPriority=54;
 			Description="World-space head forward, same parameter name MF_HeadVector binds, so a character BP driving 'HeadForward' on its MIDs feeds this too. Zero (default) disables just the view-fade term. Ignored when 'Head Forward From Baked Face UV' is on.";
+		];
+
+		// --- Registered occluder (engine #10) ---
+		// Set on the OCCLUDER's material (front hair, a hat brim...), not on the eye / brow: the
+		// FaceOverlay pass reads a dedicated occluder layer these materials write, instead of
+		// CustomDepth / CustomStencil, which stay free for the project.
+		ScalarParameter Face_Overlay_Occluder_Class = 8.0 [
+			ParameterName="Face Overlay Occluder Class";
+			Group="24 - See Through Overlay";
+			SortPriority=61;
+			Description="(配合 Is Face Overlay Occluder 开关) 把这个材质登记为眉透/瞳透的遮挡物(通常是前发), 写入 FaceOverlay 专用遮挡层, 不再需要 CustomDepth / CustomStencil. 遮挡类别(1-255). 默认 8 = 引擎默认接受的'前发'类别(r.MoonToon.FaceOverlay.HairStencil). 帽檐/发饰等可用其他类别, 再在眉眼材质的 Through Hair Occluder ID A/B 里接受它.\r\n(With the Is Face Overlay Occluder switch) registers this material as a see-through occluder, usually front hair, in the FaceOverlay occluder layer -- no CustomDepth / CustomStencil needed. Occluder class (1-255). 8 is the class the engine accepts as front hair by default; give hat brims / accessories another class and accept it on the brow / eye material's Occluder ID A/B.";
 		];
 
 		ScalarParameter Through_Hair_Mask_Source = 0.0 [
@@ -237,5 +253,15 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			);
 		FaceOverlayParams = float4(Through_Hair_Depth_Threshold, Through_Hair_Depth_Fade, Through_Hair_View_Fade_Start, Through_Hair_View_Fade_End);
 		FaceOverlayStencilIDs = float4(Through_Hair_Occluder_ID_A, Through_Hair_Occluder_ID_B, -1.0, -1.0);
+		FaceOverlayOccluderClass =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=Face_Overlay_Occluder_Class,
+				False=0.0,
+				Group="24 - See Through Overlay",
+				SortPriority=60,
+				ParameterName="Is Face Overlay Occluder"
+			);
 	}
 }

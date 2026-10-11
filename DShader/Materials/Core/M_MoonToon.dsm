@@ -9,8 +9,9 @@
 //                         ticked falls through to Kind = Default, which is plain toon.
 //   Base.Opacity / OpacityMask / AmbientOcclusion / CustomizedUV1 / CustomizedUV2 / CustomData0 / 1
 //                      <- the non-shading root pins, straight from the base input's named outputs.
-//   MoonToonFaceOverlay.Pin[0..2] <- the see-through-bangs re-blend, the per-MI depth threshold /
-//                         fade tuning, and the extra occluder stencil IDs.
+//   MoonToonFaceOverlay.Pin[0..3] <- the see-through-bangs re-blend, the per-MI depth threshold /
+//                         fade tuning, the extra accepted occluder classes, and this material's own
+//                         occluder class (engine #10: the overlay's occluder layer, not CustomStencil).
 //
 // MoonToonFaceOverlay is a UMaterialExpressionCustomOutput: it has no output pins, so it can only be
 // reached through an Outputs expression binding, never from the Graph body. It stays a custom output
@@ -95,6 +96,7 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 OutGlobalMaskC;
 		float  OutStockingsThickness;
 		float3 OutStockingsSkinColor;
+		float  FaceOverlayOccluderClass;
 	}
 }
 
@@ -223,6 +225,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 FaceOverlay;
 		float4 FaceOverlayTuning;
 		float4 FaceOverlayStencils;
+		float  FaceOverlayOccluder;
 
 		// The one shading wire. Everything the renderer needs to shade this pixel is inside it.
 		Base.FrontMaterial = ToonSurface;
@@ -242,6 +245,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		Expression(Class="MoonToonFaceOverlay").Pin[0] = FaceOverlay;
 		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
 		Expression(Class="MoonToonFaceOverlay").Pin[2] = FaceOverlayStencils;
+		Expression(Class="MoonToonFaceOverlay").Pin[3] = FaceOverlayOccluder;
 	}
 
 	Graph = {
@@ -868,6 +872,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		FaceOverlay         = MF_MoonToonBaseInput(Output="FaceOverlayData");
 		FaceOverlayTuning   = MF_MoonToonBaseInput(Output="FaceOverlayParams");
 		FaceOverlayStencils = MF_MoonToonBaseInput(Output="FaceOverlayStencilIDs");
+		FaceOverlayOccluder = MF_MoonToonBaseInput(Output="FaceOverlayOccluderClass");
 		#EndRegion
 	}
 }

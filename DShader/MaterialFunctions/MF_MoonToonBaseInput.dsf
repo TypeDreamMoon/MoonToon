@@ -538,6 +538,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float4 OutGlobalMaskC;
 		float  OutStockingsThickness;
 		float3 OutStockingsSkinColor;
+		// Engine #10: this material's FaceOverlay occluder class (0 = not an occluder). Appended last
+		// so every existing Output index stays where the two materials' restatements expect it.
+		float  FaceOverlayOccluderClass;
 	}
 
 	Graph = {
@@ -1591,6 +1594,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float4 Face_Overlay_Data = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=0);
 		float4 Face_Overlay_Params = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=1);
 		float4 Face_Overlay_Stencil_IDs = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=2);
+		float Face_Overlay_Occluder_Class = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=3);
 		#EndRegion
 
 		Output = Attributes;
@@ -1643,6 +1647,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		OutGlobalMaskC = Sampled_Global_Mask_Map_3;
 		OutStockingsThickness = Stockings_Thickness_Map.r;
 		OutStockingsSkinColor = BodyBaseColor.rgb;
+		FaceOverlayOccluderClass = Face_Overlay_Occluder_Class;
 		#EndRegion
 	}
 }
