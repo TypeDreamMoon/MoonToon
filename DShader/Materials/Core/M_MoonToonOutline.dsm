@@ -75,6 +75,7 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float  OutStockingsThickness;
 		float3 OutStockingsSkinColor;
 		float  FaceOverlayOccluderClass;
+		float  FaceOverlayPart;
 	}
 }
 
@@ -162,6 +163,29 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			SortPriority=43;
 			Description="Multiplies the region-derived colour. Keep near white: darkening is Gamma's job, and a dark multiplier would crush every region back to black.";
 		];
+
+		// --- See-through (FaceOverlay) ---
+		// Two independent opt-ins, both static switches so an outline instance that uses neither
+		// stays out of the FaceOverlay passes entirely (the hull of every section is a mesh batch of
+		// its own, and an enrolled hull is rasterised again by the ordering prepass).
+		ScalarParameter Through_Hair_Opacity = 1.0 [
+			ParameterName="Through Hair Opacity";
+			Group="10 - See Through";
+			SortPriority=10;
+			Description="(配合 Enable See Through Overlay) 眉毛/眼睛的描边被前发挡住时, 以这个不透明度透到头发上面, 跟眉眼本体一起透. 一般和对应眉眼材质的 Through Hair Opacity 设成一样.\r\n(With Enable See Through Overlay) the opacity this brow / eye outline re-blends with where front hair covers it, so the line reads through together with the part it outlines.";
+		];
+		ScalarParameter Through_Hair_Part = 1.0 [
+			ParameterName="Through Hair Part";
+			Group="10 - See Through";
+			SortPriority=11;
+			Description="这条描边在角色眉眼透视档位里算眉(1)还是眼(2). 描边外壳没有眉毛标记, 自动(0)会算成眼.\r\nWhich see-through group this outline follows in the per-character tier: 1 = brow, 2 = eye. The hull carries no eyebrow tag, so auto (0) reads as eye.";
+		];
+		ScalarParameter Face_Overlay_Occluder_Class = 9.0 [
+			ParameterName="Face Overlay Occluder Class";
+			Group="10 - See Through";
+			SortPriority=21;
+			Description="(配合 Is Face Overlay Occluder) 把头发描边登记进 FaceOverlay 遮挡层. 用一个眉眼材质不接受的类别(默认 9), 透出的眉眼就会在描边处让开, 发丝轮廓线保留在最上面. 前提: 头发本体也要以 8 登记(Is Face Overlay Occluder), 否则发片内部最近的登记面就是描边外壳, 眉眼会整片不透.\r\n(With Is Face Overlay Occluder) registers a HAIR outline in the FaceOverlay occluder layer under a class the brows / eyes do not accept (9 by default), so the see-through parts step aside along the hair's silhouette line and it stays on top. The hair itself must be registered too (class 8), otherwise the hull is the nearest registered surface inside every strand and nothing reads through.";
+		];
 	}
 
 	Outputs = {
@@ -182,6 +206,17 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		Base.CustomizedUV2       = CustomizedUV2;
 		Base.CustomData0         = CustomData0;
 		Base.CustomData1         = CustomData1;
+
+		float4 FaceOverlay;
+		float4 FaceOverlayTuning;
+		float4 FaceOverlayStencils;
+		float  FaceOverlayOccluder;
+		float  FaceOverlayPart;
+		Expression(Class="MoonToonFaceOverlay").Pin[0] = FaceOverlay;
+		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
+		Expression(Class="MoonToonFaceOverlay").Pin[2] = FaceOverlayStencils;
+		Expression(Class="MoonToonFaceOverlay").Pin[3] = FaceOverlayOccluder;
+		Expression(Class="MoonToonFaceOverlay").Pin[4] = FaceOverlayPart;
 	}
 
 	Graph = {
@@ -435,6 +470,37 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		CustomizedUV2    = MF_MoonToonBaseInput(Output="OutCustomizedUV2");
 		CustomData0      = MF_MoonToonBaseInput(Output="OutCustomData0");
 		CustomData1      = 1.0;
+		#EndRegion
+
+		#Region "See through"
+		// rgb is the unlit outline colour: the overlay pass lights it like the hull would be lit.
+		FaceOverlay =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=float4(OutlineColor, Through_Hair_Opacity),
+				False=float4(0.0, 0.0, 0.0, 0.0),
+				Group="10 - See Through",
+				SortPriority=5,
+				ParameterName="Enable See Through Overlay"
+			);
+		// z/w = a view fade that can never bite: the hull is drawn as BACK faces, so its normal
+		// points away from the camera and the engine's N.V fade would read 0 everywhere.
+		// smoothstep(-1, -0.5, saturate(NoV)) is 1 for every NoV.
+		FaceOverlayTuning = float4(0.0, 0.0, -1.0, -0.5);
+		// No extra accepted occluder classes: the hull follows the part it outlines.
+		FaceOverlayStencils = float4(-1.0, -1.0, -1.0, -1.0);
+		FaceOverlayOccluder =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=Face_Overlay_Occluder_Class,
+				False=0.0,
+				Group="10 - See Through",
+				SortPriority=20,
+				ParameterName="Is Face Overlay Occluder"
+			);
+		FaceOverlayPart = Through_Hair_Part;
 		#EndRegion
 	}
 }

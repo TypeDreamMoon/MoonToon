@@ -9,9 +9,10 @@
 //                         ticked falls through to Kind = Default, which is plain toon.
 //   Base.Opacity / OpacityMask / AmbientOcclusion / CustomizedUV1 / CustomizedUV2 / CustomData0 / 1
 //                      <- the non-shading root pins, straight from the base input's named outputs.
-//   MoonToonFaceOverlay.Pin[0..3] <- the see-through-bangs re-blend, the per-MI depth threshold /
-//                         fade tuning, the extra accepted occluder classes, and this material's own
-//                         occluder class (engine #10: the overlay's occluder layer, not CustomStencil).
+//   MoonToonFaceOverlay.Pin[0..4] <- the see-through-bangs re-blend, the per-MI depth threshold /
+//                         fade tuning, the extra accepted occluder classes, this material's own
+//                         occluder class (engine #10: the overlay's occluder layer, not CustomStencil),
+//                         and its see-through group (brow / eye) for the per-character tier.
 //
 // MoonToonFaceOverlay is a UMaterialExpressionCustomOutput: it has no output pins, so it can only be
 // reached through an Outputs expression binding, never from the Graph body. It stays a custom output
@@ -97,6 +98,7 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float  OutStockingsThickness;
 		float3 OutStockingsSkinColor;
 		float  FaceOverlayOccluderClass;
+		float  FaceOverlayPart;
 	}
 }
 
@@ -226,6 +228,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 FaceOverlayTuning;
 		float4 FaceOverlayStencils;
 		float  FaceOverlayOccluder;
+		float  FaceOverlayPart;
 
 		// The one shading wire. Everything the renderer needs to shade this pixel is inside it.
 		Base.FrontMaterial = ToonSurface;
@@ -246,6 +249,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
 		Expression(Class="MoonToonFaceOverlay").Pin[2] = FaceOverlayStencils;
 		Expression(Class="MoonToonFaceOverlay").Pin[3] = FaceOverlayOccluder;
+		Expression(Class="MoonToonFaceOverlay").Pin[4] = FaceOverlayPart;
 	}
 
 	Graph = {
@@ -873,6 +877,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		FaceOverlayTuning   = MF_MoonToonBaseInput(Output="FaceOverlayParams");
 		FaceOverlayStencils = MF_MoonToonBaseInput(Output="FaceOverlayStencilIDs");
 		FaceOverlayOccluder = MF_MoonToonBaseInput(Output="FaceOverlayOccluderClass");
+		FaceOverlayPart     = MF_MoonToonBaseInput(Output="FaceOverlayPart");
 		#EndRegion
 	}
 }

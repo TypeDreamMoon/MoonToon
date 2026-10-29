@@ -252,6 +252,8 @@ VirtualFunction(Name="MF_ToonSeeThroughOverlay")
 		float4 FaceOverlayStencilIDs;
 		// Engine #10: this material's own FaceOverlay occluder class (0 = not an occluder).
 		float FaceOverlayOccluderClass;
+		// See-through group for the per-character tier: 0 auto, 1 brow, 2 eye.
+		float FaceOverlayPart;
 	}
 }
 VirtualFunction(Name="MF_ToonStockingsSheenMask")

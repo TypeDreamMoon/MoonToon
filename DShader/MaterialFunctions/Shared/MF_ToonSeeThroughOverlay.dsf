@@ -50,6 +50,10 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		// FaceOverlay occluder layer (Moon_MeshPass_FaceOverlayOccluder). Constant zero while
 		// 'Is Face Overlay Occluder' is off, which keeps the material out of that pass entirely.
 		float FaceOverlayOccluderClass;
+		// Which see-through group this material is in, for the per-character tier on
+		// MoonToonActorComponent (Face Overlay Mode): 0 = auto (eyebrow-tagged = brow, else eye),
+		// 1 = brow, 2 = eye. Appended last so every existing output index stays put.
+		float FaceOverlayPart;
 	}
 
 	Properties = {
@@ -148,6 +152,12 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			Description="(配合 Is Face Overlay Occluder 开关) 把这个材质登记为眉透/瞳透的遮挡物(通常是前发), 写入 FaceOverlay 专用遮挡层, 不再需要 CustomDepth / CustomStencil. 遮挡类别(1-255). 默认 8 = 引擎默认接受的'前发'类别(r.MoonToon.FaceOverlay.HairStencil). 帽檐/发饰等可用其他类别, 再在眉眼材质的 Through Hair Occluder ID A/B 里接受它.\r\n(With the Is Face Overlay Occluder switch) registers this material as a see-through occluder, usually front hair, in the FaceOverlay occluder layer -- no CustomDepth / CustomStencil needed. Occluder class (1-255). 8 is the class the engine accepts as front hair by default; give hat brims / accessories another class and accept it on the brow / eye material's Occluder ID A/B.";
 		];
 
+		ScalarParameter Through_Hair_Part = 0.0 [
+			ParameterName="Through Hair Part";
+			Group="24 - See Through Overlay";
+			SortPriority=8;
+			Description="这个材质在角色'眉眼透视档位'(MoonToonActorComponent 的 Face Overlay Mode: 不透/仅透眉/半透/全透)里算眉还是算眼: 0 = 自动(标了眉毛特性的算眉, 其余算眼), 1 = 眉, 2 = 眼(瞳孔/睫毛/眼白/高光). 睫毛卡片用普通 toon 着色时请手动设 2.\r\nWhich see-through group the per-character tier (Face Overlay Mode on MoonToonActorComponent: none / brows only / half / full) treats this material as: 0 = auto (eyebrow-tagged is a brow, everything else an eye), 1 = brow, 2 = eye (iris, lashes, eye white, highlights).";
+		];
 		ScalarParameter Through_Hair_Mask_Source = 0.0 [
 			ParameterName="Through Hair Mask Source";
 			Group="24 - See Through Overlay";
@@ -263,5 +273,6 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 				SortPriority=60,
 				ParameterName="Is Face Overlay Occluder"
 			);
+		FaceOverlayPart = Through_Hair_Part;
 	}
 }
