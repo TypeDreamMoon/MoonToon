@@ -211,6 +211,13 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// The MODIFIER axis, the second static choice. A modifier is ADDED on top of whichever
 		// feature was picked, so it does not compete for the 30 group's single slot.
 		StaticSwitchParameter Is_Modifier_Matcap = false [ParameterName="Is Modifier Matcap"; Group="43 - Modifier (pick one)"; SortPriority=0; Description="启用 Matcap 修饰层. 修饰层叠加在着色特征之上, 与任意特征共存 —— 它不占 30 组的单选. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 无修饰层, 在面板和着色器里都不花代价."];
+		// Coplanar layers: imported characters often carry a decal-like section (a forehead mark, blush,
+		// a tattoo) whose triangles are an exact copy of the skin under it. Both surfaces then have the
+		// same depth to the last bit and the depth test flips between them frame to frame -- the
+		// flicker. The fix belongs on the LAYER: nudge it toward the camera by a hair. A static switch,
+		// so every other instance keeps a constant-zero WPO that the translator folds away.
+		ScalarParameter Coplanar_Depth_Bias = 0.05 [ParameterName="Coplanar Depth Bias"; Group="14 - Coplanar Layer"; SortPriority=1; Description="(配合 Use Coplanar Depth Bias) 这个材质的顶点沿指向相机的方向前移的距离, cm. 用于和皮肤完全共面的贴片层(额头印记/腮红/纹身)消除深度打架造成的闪烁. 0.02~0.1 足够, 太大会在侧视时看出贴片浮起.\r\n(With Use Coplanar Depth Bias) how far, in cm, this material's vertices move toward the camera. For decal-like layers that sit exactly on the skin (a forehead mark, blush, a tattoo), which otherwise z-fight with it and flicker."];
+		StaticSwitchParameter Use_Coplanar_Depth_Bias = false [ParameterName="Use Coplanar Depth Bias"; Group="14 - Coplanar Layer"; SortPriority=0; Description="把这个材质当作共面贴片层: 顶点朝相机前移 Coplanar Depth Bias, 消除和下面皮肤的深度打架(闪烁). 只给贴片层开, 不要给皮肤本体开.\r\nTreat this material as a coplanar layer: its vertices move toward the camera by Coplanar Depth Bias so it stops z-fighting (flickering) with the surface under it. Enable on the layer, never on the skin itself."];
 		StaticSwitchParameter Is_Modifier_OilFilm = false [ParameterName="Is Modifier Oil Film"; Group="43 - Modifier (pick one)"; SortPriority=1; Description="启用 Oil Film 修饰层. 修饰层叠加在着色特征之上, 与任意特征共存 —— 它不占 30 组的单选. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 无修饰层, 在面板和着色器里都不花代价."];
 	}
 
@@ -229,6 +236,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 FaceOverlayStencils;
 		float  FaceOverlayOccluder;
 		float  FaceOverlayPart;
+		float3 WorldPositionOffset;
 
 		// The one shading wire. Everything the renderer needs to shade this pixel is inside it.
 		Base.FrontMaterial = ToonSurface;
@@ -244,6 +252,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		Base.CustomizedUV2    = CustomizedUV2;
 		Base.CustomData0      = CustomData0;
 		Base.CustomData1      = CustomData1;
+		Base.WorldPositionOffset = WorldPositionOffset;
 
 		Expression(Class="MoonToonFaceOverlay").Pin[0] = FaceOverlay;
 		Expression(Class="MoonToonFaceOverlay").Pin[1] = FaceOverlayTuning;
@@ -878,6 +887,15 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		FaceOverlayStencils = MF_MoonToonBaseInput(Output="FaceOverlayStencilIDs");
 		FaceOverlayOccluder = MF_MoonToonBaseInput(Output="FaceOverlayOccluderClass");
 		FaceOverlayPart     = MF_MoonToonBaseInput(Output="FaceOverlayPart");
+
+		// Coplanar layer bias (see the property). Toward the camera rather than along the normal, so
+		// the layer's silhouette does not grow; constant zero while the switch is off.
+		float3 CoplanarBias_CameraPos = UE.Expression(Class="CameraPositionWS", OutputType="float3");
+		float3 CoplanarBias_WorldPos  = UE.Expression(Class="WorldPosition", OutputType="float3");
+		float3 CoplanarBias_ToCamera  = normalize(CoplanarBias_CameraPos - CoplanarBias_WorldPos);
+		WorldPositionOffset = Use_Coplanar_Depth_Bias(
+			True = (CoplanarBias_ToCamera * Coplanar_Depth_Bias),
+			False = float3(0.0, 0.0, 0.0));
 		#EndRegion
 	}
 }
