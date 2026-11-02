@@ -60,6 +60,8 @@ public class MoonToonEditor : ModuleRules
 				// Mesh import-data read/write, MikkTSpace tangents, curvature. Lives in the engine
 				// plugin MoonToonScripts, which is EnabledByDefault.
 				"MoonToonEditorScripts",
+				// FAssetRegistryModule::AssetCreated, when the sub-material table bakes a new T_<table>.
+				"AssetRegistry",
 			}
 		);
 	}
