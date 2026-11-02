@@ -891,7 +891,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#EndRegion
 
 		float Opacity_1 = Multiply_8;
-		Attributes.Opacity = Sampled_Opacity;
+		Attributes.Opacity = Opacity_1;
 		#Region "Translucency"
 		float LinearInterpolate_1 = lerp(1.0, Opacity_1, Apply_Opacity_to_Shadow);
 		float Multiply_9 = (LinearInterpolate_1 * Shadow_Opacity);
@@ -1698,7 +1698,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		OutEmissiveColor = Emission;
 		OutAnisotropy = Anisotropy_Output;
 		OutTangent = TangentWS;
-		OutOpacity = Sampled_Opacity;
+		OutOpacity = Opacity_1;
 		OutOpacityMask = Opacity_Mask;
 		OutAmbientOcclusion = AO;
 		OutCustomizedUV1 = Custom_Vertex_UV1;
