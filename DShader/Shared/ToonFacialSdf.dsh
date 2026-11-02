@@ -1,0 +1,12 @@
+// Face-SDF material functions that only M_MoonToon calls. Kept out of ToonFunctions.dsh on purpose:
+// every function that imports that header is regenerated when it changes.
+
+VirtualFunction(Name="MF_ToonFacialSdfExt")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonFacialSdfExt");
+		Description = "Face-SDF payload extension (T24 / T26 / T27): 16-bit SDF pair, real-N.L mask, soft shadow ramp in RT4.";
+	}
+	Inputs = { float SdfLeft; float SdfRight; }
+	Outputs = { float4 Result; float HiLeft; float HiRight; }
+}

@@ -1,0 +1,96 @@
+// MF_ToonFacialSdfExt -- the face-SDF payload extension (MoonToon T24 / T26 / T27, gap G26).
+//
+// The classic SDF face hands its threshold pair to the deferred lights through two 8-bit channels
+// (ToonFeatureRT3.xy / Substrate record Data8), so a 16-bit or R+G map is cut back to 1/255 there: the
+// terminator moves in 0.7-degree steps of light azimuth and draws contour terraces where the map is
+// flat. The RT4 lane (Substrate Data9) is this extension's, unconditionally, since the matcap and the
+// oil film moved into the material (T29 / T30); DecodeToonDataFromBuffer reads it for every pixel, and a
+// material that does not write it leaves zeros, which decode as "no extension":
+//
+//   SDF pins (RT3.xy)   the HIGH bytes, floor(v * 255)
+//   Result.xy (RT4.xy)  the residual bytes -> v to 1/65025 for every light, the secondary ones included
+//   Result.z  (RT4.z)   real-N.L blend mask (T26, Endfield's mask.G): 1 = the face goes back to the
+//                       light's own N.L band there -- ears, neck, hairline
+//   Result.w  (RT4.w)   soft shadow-side ramp (T27, Wuthering Waves' B channel): byte 0 = off,
+//                       1..255 = coordinate x2 of (b - 1) / 255
+//
+// Every byte is written as (n + 0.25) / 255: the Substrate packer truncates (uint(x * 255)) and an RGBA8
+// target rounds, and both store that as n.
+//
+// M_MoonToon applies it behind the static switch "Facial SDF Extended Payload" on the classic SDF leaf
+// only. Off = exactly the graph before.
+
+/// @name Facial SDF NoL Mask   @group 02 - Distance Field Facial Shadow   @sort 40   @sampler LinearColor
+/// @default /MoonToon/Textures/T_Black_Linear
+/// @desc 真实 N·L 混合遮罩(关 sRGB): 1 = 这里回到灯自己的 N·L 明暗(耳朵 / 脖子 / 发际线, 学终末地 mask.G). 需要打开 Facial SDF Extended Payload. Real-N.L blend mask (sRGB off): 1 = back to the light's own N.L band (ears, neck, hairline). Needs Facial SDF Extended Payload.
+uniform Texture2D Facial_SDF_NoL_Mask;
+
+/// @name Facial SDF NoL Mask Channel   @group 02 - Distance Field Facial Shadow   @sort 41   @slider 0 3
+/// @desc 遮罩在哪个通道: 0 R, 1 G, 2 B, 3 A. Channel of the mask.
+uniform float Facial_SDF_NoL_Mask_Channel = 0.0;
+
+/// @name Facial SDF NoL Mask Strength   @group 02 - Distance Field Facial Shadow   @sort 42   @slider 0 1
+/// @desc 遮罩强度(乘到遮罩上). Multiplies the mask.
+uniform float Facial_SDF_NoL_Mask_Strength = 1.0;
+
+/// @name Facial SDF Soft Ramp   @group 02 - Distance Field Facial Shadow   @sort 43   @slider 0 1
+/// @desc 1 = 阴影内的 ramp 坐标改由软渐变图决定(学鸣潮 B 通道), 硬阴影边缘不动. 0 = 关. 1 = inside the shadow the ramp coordinate comes from the soft map (Wuthering Waves' B channel); the hard edge stays. 0 = off.
+uniform float Facial_SDF_Soft_Ramp = 0.0;
+
+/// @name Facial SDF Soft Map   @group 02 - Distance Field Facial Shadow   @sort 44   @sampler LinearColor
+/// @default /MoonToon/Textures/T_White_Linear
+/// @desc 软渐变图(关 sRGB): 0 = 最深的阴影色, 1 = 靠近明暗交界的阴影色. Soft gradient map (sRGB off): 0 = deepest shadow, 1 = shadow next to the terminator.
+uniform Texture2D Facial_SDF_Soft_Map;
+
+/// @name Facial SDF Soft Map Channel   @group 02 - Distance Field Facial Shadow   @sort 45   @slider 0 3
+/// @desc 软渐变在哪个通道: 0 R, 1 G, 2 B, 3 A. Channel of the soft gradient.
+uniform float Facial_SDF_Soft_Map_Channel = 0.0;
+
+/// @name Facial SDF Soft Power   @group 02 - Distance Field Facial Shadow   @sort 46   @slider 0.1 4
+/// @desc 软渐变的幂(鸣潮用 1.5). Power applied to the soft gradient (Wuthering Waves uses 1.5).
+uniform float Facial_SDF_Soft_Power = 1.5;
+
+/// @name Facial SDF Soft Range   @group 02 - Distance Field Facial Shadow   @sort 47
+/// @desc x = 软渐变 0 处, y = 1 处的阴影 ramp 位置(0..1 = 阴影半边的 ramp 0..0.5). x / y = where 0 / 1 of the soft gradient land on the shadow half of the ramp (0..1 = ramp U 0..0.5).
+uniform float4 Facial_SDF_Soft_Range = float4(0.0, 1.0, 0.0, 0.0);
+
+/// @custom
+float4 MoonToonFacialSdfChannelPick(float Channel)
+{
+	return float4(1.0 - step(0.5, Channel), step(0.5, Channel) - step(1.5, Channel), step(1.5, Channel) - step(2.5, Channel), step(2.5, Channel));
+}
+
+/// @custom
+float MoonToonFacialSdfByte(float N)
+{
+	// n -> (n + 0.25) / 255: stored as n by a truncating packer and by a rounding RGBA8 target alike.
+	return (clamp(N, 0.0, 255.0) + 0.25) / 255.0;
+}
+
+/// @library MoonToon|Shared
+/// @param  SdfLeft   The left SDF value (MF_ToonDFFacialShadow), full precision.
+/// @param  SdfRight  The right one.
+/// @return The RT4 payload (Modifier Payload pin). HiLeft / HiRight go to the SDF pins.
+export float4 MF_ToonFacialSdfExt(float SdfLeft, float SdfRight, out float HiLeft, out float HiRight)
+{
+	float L = saturate(SdfLeft) * 255.0;
+	float R = saturate(SdfRight) * 255.0;
+	float KL = floor(L);
+	float KR = floor(R);
+	HiLeft = MoonToonFacialSdfByte(KL);
+	HiRight = MoonToonFacialSdfByte(KR);
+
+	float2 UV = UE.TexCoord(Index = 0);
+	float Mask = saturate(dot(Facial_SDF_NoL_Mask.Sample(UV), MoonToonFacialSdfChannelPick(Facial_SDF_NoL_Mask_Channel)) * Facial_SDF_NoL_Mask_Strength);
+	float Soft = saturate(dot(Facial_SDF_Soft_Map.Sample(UV), MoonToonFacialSdfChannelPick(Facial_SDF_Soft_Map_Channel)));
+	float SoftU = saturate(lerp(Facial_SDF_Soft_Range.x, Facial_SDF_Soft_Range.y, pow(Soft, max(Facial_SDF_Soft_Power, 0.01))));
+	// Byte 0 is "off" (what a face without the extension leaves); on, 1 + the coordinate, which stops at
+	// 254 / 255 so the shadow side stays below the edge.
+	float SoftByte = step(0.5, Facial_SDF_Soft_Ramp) * (1.0 + min(floor(SoftU * 255.0 + 0.5), 254.0));
+
+	return float4(
+		MoonToonFacialSdfByte(floor((L - KL) * 255.0 + 0.5)),
+		MoonToonFacialSdfByte(floor((R - KR) * 255.0 + 0.5)),
+		MoonToonFacialSdfByte(floor(Mask * 255.0 + 0.5)),
+		MoonToonFacialSdfByte(SoftByte));
+}
