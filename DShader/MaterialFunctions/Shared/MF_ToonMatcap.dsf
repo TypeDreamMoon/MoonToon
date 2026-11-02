@@ -4,8 +4,9 @@
 // packed float4 out, and seven parameters nothing else reads. Keeping it there only meant that
 // touching the matcap frame required scrolling past sixteen hundred lines of everything else.
 //
-// The engine ADDS what comes out of here, and the switch collapses the whole thing to a constant
-// zero, so "off" costs nothing in the shader and nothing in the GBuffer.
+// M_MoonToon adds what comes out of here to its emissive and base colour (T29; it used to ride the
+// deferred modifier lane), and the switch collapses the whole thing to a constant zero, so "off" costs
+// nothing in the shader and nothing in the GBuffer.
 
 import "Shared/ToonFunctions.dsh";
 
@@ -24,10 +25,9 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonMatcap", Root="Plugin.MoonT
 	}
 
 	Outputs = {
-		// One output per MODIFIER SLOT, not one packed float4. The packing -- which channel of
-		// ToonFeatureRT4 each of these lands in -- is stated once, in the engine's
-		// MOON_TOON_MOD_SLOTS_MATCAP table, and MF_ToonModifier_Matcap is generated from it. A
-		// float4 here would be a second, hand-written copy of that layout.
+		// Colour (mask and intensity folded in) and the lighting mix, which M_MoonToon splits between
+		// the emissive and the base colour. The generated legacy MF_ToonModifier_Matcap still packs them
+		// for the retired modifier lane until the next C++ batch removes it.
 		float3 MatcapColor;
 		float MatcapLightingMix;
 	}
@@ -100,10 +100,10 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonMatcap", Root="Plugin.MoonT
 		// engine only ever multiplies them, so this keeps the mask texture entirely on the authoring
 		// side and costs the GBuffer nothing.
 		float3 Matcap_RGB = ((Matcap_Sampled * Matcap_Mask_Sampled.r) * Matcap_Intensity);
-		// No on/off switch here any more. "Is Modifier Matcap" in MF_MoonToonModifierSelect is the
-		// one that decides now, and being static it prunes this whole function -- parameters,
-		// texture fetches and all -- when it is off. A second switch would only be a second box an
-		// artist has to remember to tick in agreement with the first.
+		// No on/off switch here. "Use Matcap" in M_MoonToon decides (T29: the unlit share goes to the
+		// emissive, the lit share to the base colour), and being static it prunes this whole function --
+		// parameters, texture fetches and all -- when it is off. A second switch would only be a second
+		// box an artist has to remember to tick in agreement with the first.
 		MatcapColor = Matcap_RGB;
 		MatcapLightingMix = Matcap_Lighting_Mix;
 	}
