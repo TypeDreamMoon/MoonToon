@@ -117,6 +117,21 @@ float MoonSdf360Evaluate(Texture2D Atlas, float2 FaceUv, float3 Light, float3 Fw
 	return lerp(lerp(S00, S10, Tt), lerp(S01, S11, Tt), Tp);
 }
 
+// The view's style preset, face group (G26, R2b): the terminator's half-width in normalised SDF units,
+// or -1 when the preset did not change the group (MOONTOON_STYLE_FLAG_FACE) -- then the material's own
+// Soft Texels stand and nothing below changes.
+/// @custom
+float MoonToonStyleFaceSoftness()
+{
+#include "/Engine/Shared/MoonToonStyleDefinitions.h"
+	const uint StyleFlags = (uint)max(Scene.ZMoonToon.StyleBuffer[MOONTOON_STYLE_SLOT_FLAGS].x, 0.0f);
+	if ((StyleFlags & MOONTOON_STYLE_FLAG_ENABLE) == 0u || (StyleFlags & MOONTOON_STYLE_FLAG_FACE) == 0u)
+	{
+		return -1.0f;
+	}
+	return max(Scene.ZMoonToon.StyleBuffer[MOONTOON_STYLE_SLOT_FACE].x, 0.0f);
+}
+
 float3 FullAngleSdfSafeNormalize(float3 V, float3 Fallback)
 {
 	float L = length(V);
@@ -138,5 +153,8 @@ export float MF_ToonFullAngleSDF(float2 FaceUV, float3 LightDirWS, float3 Forwar
 	float4 Layout = float4(Full_Angle_SDF_Cell_Size.x, Full_Angle_SDF_Cell_Size.y, Full_Angle_SDF_Padding, Full_Angle_SDF_Mirror);
 	float S = MoonSdf360Evaluate(Full_Angle_SDF_Atlas, FaceUV, L, Fwd, Up, Grid, Layout);
 	float Gain = Full_Angle_SDF_Spread_Texels / (2.0 * max(Full_Angle_SDF_Soft_Texels, 0.001));
+	// A preset's Facial Shadow Softness h replaces it: 0..1 over S in [-h, h].
+	float StyleSoftness = MoonToonStyleFaceSoftness();
+	Gain = lerp(Gain, 1.0 / (2.0 * max(StyleSoftness, 0.001)), step(0.0, StyleSoftness));
 	return saturate(0.5 + S * Gain);
 }

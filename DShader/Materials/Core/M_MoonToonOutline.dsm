@@ -518,19 +518,36 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			lerp(Width_Ramp.r, Outline_World_Width, saturate(Outline_Width_Space)),
 			Outline_Pixel_Width * OutlineWorldPerPixel,
 			saturate(Outline_Width_Space - 1.0));
-		float WidthUnclamped = (SpaceBase * Outline_Width);
+		// The view's style preset, outline group (G04, R2b): (width scale, min px, max px). (1, 0, 0) unless
+		// the preset changed the group (MOONTOON_STYLE_FLAG_OUTLINE), so with no preset every line below
+		// computes exactly what it did before. Read from the Scene UB like MF_MoonToonKeyLight does.
+		float4 OutlineStyle =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float4",
+				Code="#include \"/Engine/Shared/MoonToonStyleDefinitions.h\"\r\nconst uint StyleFlags = (uint)max(Scene.ZMoonToon.StyleBuffer[MOONTOON_STYLE_SLOT_FLAGS].x, 0.0f);\r\nif ((StyleFlags & MOONTOON_STYLE_FLAG_ENABLE) == 0u || (StyleFlags & MOONTOON_STYLE_FLAG_OUTLINE) == 0u)\r\n{\r\n\treturn float4(1.0f, 0.0f, 0.0f, 0.0f);\r\n}\r\nconst float4 O = Scene.ZMoonToon.StyleBuffer[MOONTOON_STYLE_SLOT_OUTLINE];\r\nreturn float4(max(O.x, 0.0f), max(O.y, 0.0f), max(O.z, 0.0f), 1.0f);",
+				Description="Outline v2: style preset outline group (width scale, min px, max px)"
+			);
+		float WidthUnclamped = (SpaceBase * Outline_Width * OutlineStyle.x);
+		// The preset's pixel floor raises the material's; its ceiling lowers the material's, and either
+		// one alone stands when the other is 0 (= none).
+		float OutlineMinPx = max(Outline_Min_Pixels, OutlineStyle.y);
+		float OutlineMaxPx = lerp(
+			OutlineStyle.z,
+			lerp(Outline_Max_Pixels, min(Outline_Max_Pixels, OutlineStyle.z), step(0.0001, OutlineStyle.z)),
+			step(0.0001, Outline_Max_Pixels));
 		// Pixel floor / ceiling, in any space. Selected rather than always applied, so with both at 0
 		// the width is exactly the unclamped value (no divide-multiply round trip).
 		float OutlinePixels = WidthUnclamped / max(OutlineWorldPerPixel, 1e-6);
 		// No ceiling (0) means +infinity, not "the unclamped width": min() against the unclamped value
 		// would undo the floor (found on the test map, 2026-11-02).
 		float OutlinePixelsClamped = min(
-			max(OutlinePixels, Outline_Min_Pixels),
-			lerp(100000000.0, Outline_Max_Pixels, step(0.0001, Outline_Max_Pixels)));
+			max(OutlinePixels, OutlineMinPx),
+			lerp(100000000.0, OutlineMaxPx, step(0.0001, OutlineMaxPx)));
 		float WidthClamped = lerp(
 			WidthUnclamped,
 			OutlinePixelsClamped * OutlineWorldPerPixel,
-			step(0.0001, Outline_Min_Pixels + Outline_Max_Pixels));
+			step(0.0001, OutlineMinPx + OutlineMaxPx));
 		float Width = (WidthClamped * WidthMask);
 		#EndRegion
 
@@ -617,9 +634,13 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		// surface's, so a hull that does end up lit reads like the material it wraps rather than like
 		// a default grey. The three Default channel pins are left unconnected, which means the slot
 		// table's own defaults rather than zero.
+		// bOutlineHull marks the record (Data10[13]) so the trunk knows this is an outline: its shading
+		// mode stays Toon Lit here, which follows the view's preset (OUTLINE .w) and is the old look
+		// without one.
 		ToonClosure = UE.Expression(
 			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
 			Kind = "Default",
+			bOutlineHull = true,
 			BaseColor               = OutlineColor,
 			Metallic                = Surf_Metallic,
 			Specular                = Surf_Specular,
