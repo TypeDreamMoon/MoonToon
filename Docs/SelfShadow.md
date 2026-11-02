@@ -66,8 +66,9 @@ only the receiver's own extent does.
 
 ## The RT gate — stencil groups, now backed by the actor id
 
-The ray-traced path always had a self-shadow test, keyed on the **toon stencil** (`ID Offset` /
-ID Map, 5-bit fold): a caster with `Disable Self Shadow` whose stencil equals the receiver's is
+The ray-traced path always had a self-shadow test, keyed on the **toon stencil** (`Shadow Group ID Offset` /
+`Shadow Group ID Map`, 5-bit fold; named `ID Offset` / `ID Map(R)` before the T22 rename,
+`Tools/SubMaterial/migrate_shadow_group_params.py` moves old overrides): a caster with `Disable Self Shadow` whose stencil equals the receiver's is
 ignored. It has a structural weakness: the receiver's stencil comes from the **rasterized**
 GBuffer while the caster's is **re-evaluated by the hit shader**, and ID sources like vertex
 colour or an ID map can produce different values in the two pipelines. A character's mouth
@@ -81,8 +82,8 @@ into 11 spare payload bits, and the hit shader compares it against the caster's
 nothing can diverge, and no per-material stencil authoring is needed. Characters without a
 `MoonToonActorComponent` have id 0 and fall back to the stencil-only behaviour.
 
-Verified on SK_Lin: teeth shadow gone under `r.RayTracing.Shadows 1` with all `ID Offset` at 0
-(the previously-broken state). Diagnosis trick for stencil divergence: set `ID Offset 255` on both
+Verified on SK_Lin: teeth shadow gone under `r.RayTracing.Shadows 1` with all `Shadow Group ID Offset` at 0
+(the previously-broken state). Diagnosis trick for stencil divergence: set `Shadow Group ID Offset` 255 on both
 materials — the 5-bit fold clamps both sides to 31, and if the shadow disappears the mechanism
 works and the stencils simply disagree.
 

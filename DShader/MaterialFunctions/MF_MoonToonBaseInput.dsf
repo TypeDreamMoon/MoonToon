@@ -116,7 +116,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Group="20 - Normal";
 		];
 		TextureObjectParameter ID_Map_R_ = Path(Plugins.MoonToon, "Textures/T_Black_Linear") [
-			ParameterName="ID Map(R)";
+			ParameterName="Shadow Group ID Map";
 			Group="13 - Ray Tracing Shadow";
 			Description="ID Map是指将角色的不同部位填充不同的颜色, 以便在制作贴图或者后期效果时方便抠图.\r\n在影视工作流中通常是必备的贴图, 其分辨率可以很低, 只要保证不溢出UV边界即可.\r\n不同的值代表不同的ID, ID之间至少要有0.031(也就是8/255)的数值差.\r\n颜色空间: 线性.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID Map refers to filling different parts of the character with different colors to facilitate cutout when making textures or post-effects.\r\nID Map are usually necessary in film production workflows, and their resolution can be very low, as long as they do not overflow the UV boundary.\r\nDifferent values ​​represent different IDs, and there must be at least a numerical difference of 0.031 (that is, 8/255) between IDs.\r\nColor space: linear.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.";
 		];
@@ -314,19 +314,19 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Group="20 - Normal";
 		];
 		ScalarParameter ID_Offset = 0.0 [
-			ParameterName="ID Offset";
+			ParameterName="Shadow Group ID Offset";
 			Group="13 - Ray Tracing Shadow";
 			SortPriority=50;
 			Description="可以在没有ID Map或顶点色输入的情况下使用ID偏移来指定整个材质的ID.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID offsets can be used to specify IDs for the entire material without ID Map or vertex color input.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.";
 		];
 		ChannelMaskParameter ID_Channel = float4(1.0, 0.0, 0.0, 0.0) [
-			ParameterName="ID Channel";
+			ParameterName="Shadow Group ID Channel";
 			Group="13 - Ray Tracing Shadow";
 			SortPriority=34;
 			MaskChannel=Red
 		];
 		ScalarParameter ID_Map_UV_Channel = 0.0 [
-			ParameterName="ID Map UV Channel";
+			ParameterName="Shadow Group ID Map UV Channel";
 			Group="13 - Ray Tracing Shadow";
 			SortPriority=33;
 		];
@@ -1215,7 +1215,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=StaticSwitchParameter_36,
 				Group="13 - Ray Tracing Shadow",
 				SortPriority=31,
-				ParameterName="ID From Global Mask Map"
+				ParameterName="Shadow Group ID From Global Mask Map"
 			);
 		float4 StaticSwitchParameter_38 =
 			UE.Expression(
@@ -1225,7 +1225,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=StaticSwitchParameter_37,
 				Group="13 - Ray Tracing Shadow",
 				SortPriority=30,
-				ParameterName="ID From Vertex Color"
+				ParameterName="Shadow Group ID From Vertex Color"
 			);
 		#EndRegion
 
