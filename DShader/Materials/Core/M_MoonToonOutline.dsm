@@ -19,6 +19,14 @@
 // Both nodes are gone with the packing: the shadow colour is a pin now, so overriding it is an
 // assignment.
 
+// Hair-tip mask (T12 / G27), shared with M_MoonToon so the outline hull leaves the same tips out.
+VirtualFunction(Name="MF_ToonHairTip")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonHairTip"); }
+	Inputs = { float2 UV; }
+	Outputs = { float Result; float Tip; float Gradient; float Keep; }
+}
+
 VirtualFunction(Name="MF_MoonToonBaseInput")
 {
 	Options = {
@@ -164,6 +172,75 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			SortPriority=43;
 			Description="Multiplies the region-derived colour. Keep near white: darkening is Gamma's job, and a dark multiplier would crush every region back to black.";
 		];
+
+		// --- Outline v2 (G04, task T07). Every default reproduces the outline as it was. ---
+		ScalarParameter Outline_Width_Space = 0.0 [
+			ParameterName="Outline Width Space";
+			Group="01 - Outline v2";
+			SortPriority=10;
+			Description="描边宽度用什么空间算: 0 = 距离曲线(Outline Width Ramp Map, 原来的做法), 1 = 世界宽度(Outline World Width), 2 = 屏幕像素(Outline Pixel Width, 按 FOV 和 1080p 归一, 鸣潮/终末地式). 小数 = 相邻两种之间混合.\r\nWidth space: 0 = distance ramp (as before), 1 = world width, 2 = screen pixels (FOV- and 1080p-normalised). Fractions blend the two neighbours.";
+		];
+		ScalarParameter Outline_World_Width = 0.1 [
+			ParameterName="Outline World Width";
+			Group="01 - Outline v2";
+			SortPriority=11;
+			Description="(Width Space 1) 世界宽度, cm. 乘 Outline Width 之前的值不变, 只是换了来源. World width in cm.";
+		];
+		ScalarParameter Outline_Pixel_Width = 1.5 [
+			ParameterName="Outline Pixel Width";
+			Group="01 - Outline v2";
+			SortPriority=12;
+			Description="(Width Space 2) 屏幕宽度, 像素(1080p 基准: 1440p 下自动变 1.33 倍). Screen width in pixels at a 1080p reference.";
+		];
+		ScalarParameter Outline_Min_Pixels = 0.0 [
+			ParameterName="Outline Min Pixels";
+			Group="01 - Outline v2";
+			SortPriority=13;
+			Description="任何宽度空间下的最小像素宽度(1080p 基准), 0 = 不限. 少前2 1.2, 终末地 0.5. Floor in pixels (1080p reference), 0 = none.";
+		];
+		ScalarParameter Outline_Max_Pixels = 0.0 [
+			ParameterName="Outline Max Pixels";
+			Group="01 - Outline v2";
+			SortPriority=14;
+			Description="任何宽度空间下的最大像素宽度(1080p 基准), 0 = 不限. 少前2 2.5. Ceiling in pixels (1080p reference), 0 = none.";
+		];
+		ScalarParameter Outline_Push_Back = 0.0 [
+			ParameterName="Outline Push Back";
+			Group="01 - Outline v2";
+			SortPriority=20;
+			Description="沿视线把外壳往后推多少 cm(屏幕位置不变, 只是更远), 用来压掉脸上的内描线. 终末地: 头发 0.1, 脸最多 7.5. 乘 Push Back 通道(若开了顶点色映射).\r\nPushes the hull away from the camera along the view ray, in cm, so it hides behind the face instead of drawing inner lines. Scaled by the push-back channel when vertex colour mapping is on.";
+		];
+		ScalarParameter Outline_Width_Channel = 4.0 [
+			ParameterName="Outline Width Channel";
+			Group="01 - Outline v2";
+			SortPriority=31;
+			Description="(Use Vertex Color Mapping) 宽度读顶点色哪个通道: 0 = 不读, 1 R, 2 G, 3 B, 4 A. 鸣潮拆包: G. Vertex colour channel for width: 0 none, 1 R, 2 G, 3 B, 4 A.";
+		];
+		ScalarParameter Outline_Push_Back_Channel = 0.0 [
+			ParameterName="Outline Push Back Channel";
+			Group="01 - Outline v2";
+			SortPriority=32;
+			Description="(Use Vertex Color Mapping) 后推读哪个通道: 0 = 不读(=1), 1 R, 2 G, 3 B, 4 A. 鸣潮拆包: B. Channel scaling the push back: 0 none (1), 1 R, 2 G, 3 B, 4 A.";
+		];
+		ScalarParameter Outline_Clip_Channel = 0.0 [
+			ParameterName="Outline Clip Channel";
+			Group="01 - Outline v2";
+			SortPriority=33;
+			Description="(Use Vertex Color Mapping) 裁剪读哪个通道: 0 = 不裁, 1 R, 2 G, 3 B, 4 A. 低于 Clip Threshold 的地方不画描边(例如薄纱). 鸣潮拆包: A. Channel that clips the outline: 0 none, 1 R, 2 G, 3 B, 4 A.";
+		];
+		ScalarParameter Outline_Clip_Threshold = 0.5 [
+			ParameterName="Outline Clip Threshold";
+			Group="01 - Outline v2";
+			SortPriority=34;
+			Description="(Use Vertex Color Mapping) 裁剪通道低于这个值时不画描边. The clip channel below this value removes the outline.";
+		];
+		StaticSwitchParameter Use_Hair_Tip_Translucency = false [
+			ParameterName="Use Hair Tip Translucency";
+			Group="21 - Translucency|Hair Tip";
+			SortPriority=50;
+			Description="发梢区域不画描边: 用和头发材质同一张 Hair Tip Mask(同通道、同阈值)裁掉外壳, 发梢由半透明重画负责. 详见 MoonToon/Docs/HairTipTranslucency.md.\r\nNo outline on the hair tips: the hull is cut by the same Hair Tip Mask (channel, threshold) as the hair material, and the translucent redraw owns the tips.";
+		];
+
 
 		// --- See-through (FaceOverlay) ---
 		// Two independent opt-ins, both static switches so an outline instance that uses neither
@@ -360,7 +437,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		// outline disappears. And alpha 0 collapses the hull exactly onto the surface, which
 		// z-fights rather than cleanly vanishing -- paint a small floor instead of true black
 		// anywhere the outline is meant to be absent.
-		float WidthMask =
+		float WidthMaskLegacy =
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float",
@@ -369,6 +446,42 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				ParameterName="Use Vertex Color A as Outline Width",
 				Group="00 - Outline",
 				SortPriority=12
+			);
+
+		// Outline v2: configurable vertex colour mapping (G04). One switch for the whole mapping so a
+		// mesh without a colour stream never pays the fetch; with it off, width keeps the legacy
+		// "A as width" switch above and push-back / clip read 1 (no effect). Channel index: 0 none,
+		// 1 R, 2 G, 3 B, 4 A -- none means "this mapping is not used" (width 1, push 1, no clip).
+		float4 OutlineVC = UE.Expression(Class="VertexColor", OutputType="float4");
+		float4 OutlineMappedChannels =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float4",
+				Code="float4 C = float4(VC.r, VC.g, VC.b, VC.a);\r\nfloat Pick[5] = { 1.0f, C.r, C.g, C.b, C.a };\r\nuint3 Index = (uint3)clamp(round(Channels), 0.0f, 4.0f);\r\nreturn float4(Pick[Index.x], Pick[Index.y], Pick[Index.z], 0.0f);",
+				Description="Outline v2 vertex colour mapping: width / push-back / clip channel picks",
+				VC=OutlineVC,
+				Channels=float3(Outline_Width_Channel, Outline_Push_Back_Channel, Outline_Clip_Channel)
+			);
+		float3 OutlineMapping =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=OutlineMappedChannels.rgb,
+				False=float3(1.0, 1.0, 1.0),
+				ParameterName="Use Vertex Color Mapping",
+				Group="01 - Outline v2",
+				SortPriority=30
+			);
+		// With the mapping on, its width channel replaces the legacy A switch (both on = mapping wins).
+		float WidthMask =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=OutlineMapping.r,
+				False=WidthMaskLegacy,
+				ParameterName="Use Vertex Color Mapping",
+				Group="01 - Outline v2",
+				SortPriority=30
 			);
 
 		// Ramp the width by camera distance so the outline keeps a roughly constant screen weight.
@@ -385,7 +498,40 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				Texture=Path(Plugins.MoonToon, "Assets/OutlineWidthRamps/CA_OutlineWidthRamp"),
 				SamplerType="SAMPLERTYPE_LinearColor"
 			);
-		float Width = (Width_Ramp.r * Outline_Width * WidthMask);
+		// Outline v2 width spaces (G04). World units per pixel at this depth, against a 1080-pixel-tall
+		// reference: perspective 2d / (P11 * 1080), orthographic 2 / (P11 * 1080). P11 = cot(half FOV y),
+		// so a narrower FOV gets a thinner world width for the same pixels -- the FOV normalisation
+		// Wuthering Waves / Endfield / Girls' Frontline 2 all do. The 1080 reference (not the real
+		// viewport height) keeps "pixels" resolution-relative: 1440p draws 1.33x the pixels, like GF2.
+		// Depth from the camera along its forward axis, built from positions: PixelDepth read through a
+		// Custom input in the vertex stage came back 0 (2026-11-02 test map: an 8 px request drew ~1 px).
+		float3 OutlineCamToVertex = (UE.WorldPosition() - UE.CameraPositionWS());
+		float OutlineWorldPerPixel =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float",
+				Code="const float P11 = View.ViewToClip[1][1];\r\nconst bool bOrtho = View.ViewToClip[3][3] >= 1.0f;\r\nconst float Depth = max(dot(CamToVertex, View.ViewForward), 0.0f);\r\nreturn 2.0f * (bOrtho ? 1.0f : Depth) / max(P11 * 1080.0f, 1e-4f);",
+				Description="Outline v2: world units per 1080p pixel at the vertex depth",
+				CamToVertex=OutlineCamToVertex
+			);
+		float SpaceBase = lerp(
+			lerp(Width_Ramp.r, Outline_World_Width, saturate(Outline_Width_Space)),
+			Outline_Pixel_Width * OutlineWorldPerPixel,
+			saturate(Outline_Width_Space - 1.0));
+		float WidthUnclamped = (SpaceBase * Outline_Width);
+		// Pixel floor / ceiling, in any space. Selected rather than always applied, so with both at 0
+		// the width is exactly the unclamped value (no divide-multiply round trip).
+		float OutlinePixels = WidthUnclamped / max(OutlineWorldPerPixel, 1e-6);
+		// No ceiling (0) means +infinity, not "the unclamped width": min() against the unclamped value
+		// would undo the floor (found on the test map, 2026-11-02).
+		float OutlinePixelsClamped = min(
+			max(OutlinePixels, Outline_Min_Pixels),
+			lerp(100000000.0, Outline_Max_Pixels, step(0.0001, Outline_Max_Pixels)));
+		float WidthClamped = lerp(
+			WidthUnclamped,
+			OutlinePixelsClamped * OutlineWorldPerPixel,
+			step(0.0001, Outline_Min_Pixels + Outline_Max_Pixels));
+		float Width = (WidthClamped * WidthMask);
 		#EndRegion
 
 		#Region "Outline colour"
@@ -429,6 +575,42 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		float3 OutlineShadowColor = (OutlineColor * Surf_MainLightShadowColor);
 		#EndRegion
 
+		#Region "Outline v2: face-camera normal"
+		// The hull's visible pixels are its BACK faces, so its normal points away from the camera and
+		// the line is lit like the far side of the silhouette. Reflecting the normal into the camera's
+		// hemisphere (N - 2 min(N.V, 0) V) gives the normal of the front surface next to the line at the
+		// silhouette, where the two agree, and keeps the line's light side on the body's light side.
+		// Off by default (the hull keeps the surface normal, as before).
+		float3 OutlineSurfNormalWS =
+			UE.Expression(
+				Class="Transform",
+				OutputType="float3",
+				Input=Surf_Normal,
+				TransformSourceType="TRANSFORMSOURCE_Tangent",
+				TransformType="TRANSFORM_World"
+			);
+		float3 OutlineView = UE.CameraVectorWS();
+		float3 OutlineFacingNormalWS = (OutlineSurfNormalWS - (OutlineView * (2.0 * min(dot(OutlineSurfNormalWS, OutlineView), 0.0))));
+		float3 OutlineFacingNormalTS =
+			UE.Expression(
+				Class="Transform",
+				OutputType="float3",
+				Input=OutlineFacingNormalWS,
+				TransformSourceType="TRANSFORMSOURCE_World",
+				TransformType="TRANSFORM_Tangent"
+			);
+		float3 OutlineNormal =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=OutlineFacingNormalTS,
+				False=Surf_Normal,
+				ParameterName="Outline Face Camera Normal",
+				Group="01 - Outline v2",
+				SortPriority=40
+			);
+		#EndRegion
+
 		#Region "Closure"
 		// Kind = Default and nothing stacked on it: the hull has no shading feature and no modifier.
 		// Two pins carry the outline -- the flat colour and the shadow tint -- and the rest is the
@@ -442,7 +624,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			Metallic                = Surf_Metallic,
 			Specular                = Surf_Specular,
 			Roughness               = Surf_Roughness,
-			Normal                  = Surf_Normal,
+			Normal                  = OutlineNormal,
 			Emissive_Color          = Surf_EmissiveColor,
 			Anisotropy              = Surf_Anisotropy,
 			Tangent                 = Surf_Tangent,
@@ -458,13 +640,26 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		#EndRegion
 
 		#Region "Root pins"
-		WorldPositionOffset = (OffsetDir * Width);
+		// Outline v2 push-back: along the view ray, away from the camera, so the screen position
+		// stays put and only the depth moves (the hull hides behind the face instead of drawing an
+		// inner line). CameraVectorWS points from the vertex to the camera. 0 cm = exactly the old WPO.
+		// The vertex stage has no CameraVectorWS: build the vertex -> camera direction from positions.
+		float3 OutlineToCamera = normalize(UE.CameraPositionWS() - UE.WorldPosition());
+		float3 OutlinePushBack = (OutlineToCamera * (-Outline_Push_Back * OutlineMapping.g));
+		WorldPositionOffset = ((OffsetDir * Width) + OutlinePushBack);
 
 		// The hull is cut by the surface opacity, not by what MF_MoonToonBaseInput left on
 		// OpacityMask -- that pin carries the SHADOW opacity (opacity folded through
 		// "Apply Opacity to Shadow" and then scaled by "Shadow Opacity"), which is a different
 		// quantity and would cut the hull to the shadow's silhouette rather than the surface's.
-		OpacityMask = Surf_Opacity;
+		// Outline v2 clip: the mapped clip channel below its threshold removes the hull there (a
+		// gauze region with no outline). Mapping off = the channel reads 1 = no clip.
+		float OutlineClipMask = (Surf_Opacity * step(Outline_Clip_Threshold, OutlineMapping.b));
+		// Hair-tip translucency (T12): the hull leaves the tips to the translucent redraw.
+		float2 HairTip_UV = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=0);
+		OpacityMask = Use_Hair_Tip_Translucency(
+			True = (OutlineClipMask * (1.0 - MF_ToonHairTip(HairTip_UV, Output="Tip"))),
+			False = OutlineClipMask);
 
 		AmbientOcclusion = MF_MoonToonBaseInput(Output="OutAmbientOcclusion");
 		CustomizedUV1    = MF_MoonToonBaseInput(Output="OutCustomizedUV1");

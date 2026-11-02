@@ -1025,6 +1025,16 @@ def check_bloom_weight_list(tables):
     return problems
 
 
+# Modules no legacy feature ID routes to: they are reached through a shading TERM plus a per-term
+# variant bit instead (MoonToonFeatureRegistry.h), and authored on a Moon Toon Feature node rather than
+# through a per-id MF_ToonFeature_* function. Listed with the route so the exemption explains itself.
+MODULES_REACHED_BY_VARIANT = {
+    # R1 (2026-11-01): the new angel ring replaces HairHighlightMask through the same term bit and
+    # MOON_TOON_VARIANT_ANGEL_RING; its material side is MF_ToonAngelRing (DShader/MaterialFunctions/Shared).
+    "AngelRing": "term HAIR_HIGHLIGHT_MASK + MOON_TOON_VARIANT_ANGEL_RING",
+}
+
+
 def check_registry_agreement():
     """The engine registry and this generator must describe the same set of features.
 
@@ -1052,7 +1062,7 @@ def check_registry_agreement():
 
     routed = set(features.values())
     for module in sorted(modules):
-        if module not in routed:
+        if module not in routed and module not in MODULES_REACHED_BY_VARIANT:
             problems.append("module %s is in MOON_TOON_MODULE_LIST but no id routes to it" % module)
 
     return problems

@@ -96,6 +96,137 @@ VirtualFunction(Name="MF_UVChannelSwitch")
 		float2 Result;
 	}
 }
+// R-batch material functions written as 2.0 sources (DShader/MaterialFunctions/Shared/*.dss). A .dss
+// export's return value is the output named Result; out parameters follow in declaration order.
+VirtualFunction(Name="MF_ToonShadowColorLUT")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonShadowColorLUT");
+		Description = "Shadow colour from a 32^3 albedo LUT (T08 / G22).";
+	}
+
+	Inputs = {
+		float3 BaseColor;
+		float3 ShadowColorIn;
+	}
+
+	Outputs = {
+		float3 Result;
+	}
+}
+
+VirtualFunction(Name="MF_ToonAngelRing")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonAngelRing");
+		Description = "The new angel ring (T06 / G08): ring colour, dark band and the per-material constants of the Angel Ring term.";
+	}
+
+	Inputs = {
+		float3 NormalWS;
+		float2 UV0;
+		float2 UV1;
+		float  Mask;
+		float3 HeadUpWS;
+		float3 KeyLightDirWS;
+		float3 SpecNormalWS;
+	}
+
+	Outputs = {
+		float3 RingColor;
+		float  DarkBand;
+		float  IntensityEncoded;
+		float  ShadowFloor;
+		float  ColorMode;
+	}
+}
+
+VirtualFunction(Name="MF_MoonToonKeyLight")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_MoonToonKeyLight");
+		Description = "The character's key light as the trunk resolves it (R2, G02 / G10): face direction, key direction, head frame.";
+	}
+	Inputs = { }
+	Outputs = { float3 FaceDirection; float3 KeyDirection; float3 HeadForward; float3 HeadUp; }
+}
+
+VirtualFunction(Name="MF_ToonFullAngleSDF")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonFullAngleSDF");
+		Description = "Full-angle face SDF (T18 / G26): SdfLeft for the key light from a Tools/SDF360 atlas.";
+	}
+	Inputs = { float2 FaceUV; float3 LightDirWS; float3 ForwardWS; float3 UpWS; }
+	Outputs = { float Result; }
+}
+
+VirtualFunction(Name="MF_ToonHairTip")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonHairTip");
+		Description = "Hair-tip mask (T12 / G27): raw value, tip flag and the root-to-end gradient inside the tip.";
+	}
+	Inputs = { float2 UV; }
+	Outputs = { float Result; float Tip; float Gradient; float Keep; }
+}
+
+// Effect functions (T09-T11), DShader/MaterialFunctions/FX/*.dss.
+VirtualFunction(Name="MF_ToonFX_Glitter")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_Glitter"); }
+	Inputs = { float2 UV; float3 BaseColor; float Mask; float SpecMask; }
+	Outputs = { float3 Result; float Coverage; }
+}
+VirtualFunction(Name="MF_ToonFX_FlowLight")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_FlowLight"); }
+	Inputs = { float2 UV; float Mask; }
+	Outputs = { float3 Result; }
+}
+VirtualFunction(Name="MF_ToonFX_Reveal")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_Reveal"); }
+	Inputs = { float2 UV; float Mask; }
+	Outputs = { float3 Result; float Coverage; }
+}
+VirtualFunction(Name="MF_ToonFX_Pulse")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_Pulse"); }
+	Inputs = { float3 BaseColor; float Mask; }
+	Outputs = { float3 Result; }
+}
+VirtualFunction(Name="MF_ToonFX_ViewHueShift")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_ViewHueShift"); }
+	Inputs = { float3 BaseColor; float3 NormalWS; float2 UV; float Mask; }
+	Outputs = { float3 Result; }
+}
+VirtualFunction(Name="MF_ToonFX_Dissolve")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_Dissolve"); }
+	Inputs = { float2 UV; float Mask; }
+	Outputs = { float3 Result; float Coverage; }
+}
+VirtualFunction(Name="MF_ToonFX_Wet")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_Wet"); }
+	Inputs = { float3 BaseColor; float Roughness; float Specular; float3 NormalWS; float Mask; }
+	Outputs = { float3 Result; float RoughnessOut; float SpecularOut; }
+}
+VirtualFunction(Name="MF_ToonFX_Hologram")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_Hologram"); }
+	Inputs = { float3 BaseColor; float3 NormalWS; float Mask; }
+	Outputs = { float3 Result; float3 BaseColorOut; float Coverage; }
+}
+VirtualFunction(Name="MF_ToonFX_Flicker")
+{
+	Options = { Asset = Path(Plugins.MoonToon, "MaterialFunctions/FX/MF_ToonFX_Flicker"); }
+	Inputs = { float3 Emissive; float2 UV; float Mask; }
+	Outputs = { float3 Result; }
+}
+
 VirtualFunction(Name="MF_MoonMainLightDirection")
 {
 	Options = {
@@ -254,6 +385,8 @@ VirtualFunction(Name="MF_ToonSeeThroughOverlay")
 		float FaceOverlayOccluderClass;
 		// See-through group for the per-character tier: 0 auto, 1 brow, 2 eye.
 		float FaceOverlayPart;
+		// Hair-thickness falloff, cm (0 = engine default).
+		float FaceOverlayThickness;
 	}
 }
 VirtualFunction(Name="MF_ToonStockingsSheenMask")

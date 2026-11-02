@@ -1,0 +1,48 @@
+// MF_ToonHairTip -- where the hair tips are (task T12, gap G27; Arknights: Endfield draws its fringe
+// tips this way). One texture says which part of a hair section is "tip"; the opaque pass cuts that
+// part out, and a translucent redraw of the same section fills it back in with the albedo alpha, so
+// brows and eyes read through the thin ends of the fringe while the root stays solid.
+//
+// Mask convention (Docs/HairTipTranslucency.md):
+//   value <  Threshold          not a tip: drawn opaque, never by the translucent redraw
+//   value >= Threshold          tip: cut from every opaque pass, drawn by the translucent redraw
+//   Threshold .. 1              optional gradient inside the tip, root -> end (Hair Tip Root / End
+//                               Opacity in M_MoonToon). A plain binary mask (0 / 1) is fine.
+// Every vertex of a tip triangle must read >= Threshold: the translucent redraw pushes vertices
+// below the threshold out of the way (see M_MoonToon), so a tip island is best authored as its own
+// UV island, or baked per triangle and dilated (Tools/HairTip/bake_hair_tip_mask.py).
+//
+// The mask is read with UV0 in both the vertex and the pixel shader, so it must not depend on
+// anything pixel-only -- which is why it is its own texture and not one of the Global Mask Maps.
+
+/// @name Hair Tip Mask   @group 21 - Translucency|Hair Tip   @sort 51   @sampler LinearColor
+/// @default /MoonToon/Textures/T_Black_Linear
+/// @desc 发梢遮罩(UV0): 大于等于 Hair Tip Threshold 的地方是发梢 —— 不透明 pass 裁掉, 半透明重画补上. 默认全黑 = 没有发梢. Tip mask on UV0: at or above Hair Tip Threshold is tip.
+uniform Texture2D Hair_Tip_Mask;
+
+/// @name Hair Tip Mask Channel   @group 21 - Translucency|Hair Tip   @sort 52   @slider 0 3
+/// @desc 遮罩读哪个通道: 0 R, 1 G, 2 B, 3 A. Channel of Hair Tip Mask: 0 R, 1 G, 2 B, 3 A.
+uniform float Hair_Tip_Mask_Channel = 0.0;
+
+/// @name Hair Tip Threshold   @group 21 - Translucency|Hair Tip   @sort 53   @slider 0.01 1
+/// @desc 遮罩值达到多少算发梢(终末地: 0.5). Mask value at which a texel counts as tip.
+uniform float Hair_Tip_Threshold = 0.5;
+
+/// @library MoonToon|Shared
+/// @param UV  Mesh UV0 (vertex or pixel).
+/// @return    The raw mask value. Tip: 1 inside the tip. Gradient: 0 at the threshold -> 1 at value 1.
+///            Keep: 1 inside the tip, falling to 0 at value 0.
+export float MF_ToonHairTip(float2 UV, out float Tip, out float Gradient, out float Keep)
+{
+    float4 M = Hair_Tip_Mask.Sample(UV);
+    float C = Hair_Tip_Mask_Channel;
+    float4 Pick = float4(1.0 - step(0.5, C), step(0.5, C) - step(1.5, C), step(1.5, C) - step(2.5, C), step(2.5, C));
+    float Value = dot(M, Pick);
+    float Thr = max(Hair_Tip_Threshold, 0.0001);
+    Tip = step(Thr, Value);
+    Gradient = saturate((Value - Thr) / max(1.0 - Thr, 0.0001));
+    // 1 at and above the threshold, falling to 0 at value 0: how much of a vertex the translucent
+    // redraw keeps where it is (M_MoonToon pushes the rest back by 1 - Keep).
+    Keep = saturate(Value / Thr);
+    return Value;
+}

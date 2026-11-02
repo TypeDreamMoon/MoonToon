@@ -1,0 +1,316 @@
+// MF_ToonAngelRing -- the new angel ring (hair halo), task T06 / gap G08. Replaces the painted
+// HairHighlightMask band. Design: DevTest/Plan/MoonToon/MoonToon_风格化扩展设计方案_v1.md section 8.
+//
+// Everything about WHERE the ring is and WHAT it looks like is computed here, in the material, from the
+// view, the head frame and the key light's elevation -- nothing that needs a per-light loop. The engine
+// side (R2, task T17) only multiplies the result by the key light once (shadow floor, light colour or a
+// fixed colour) and multiplies the dark band into the key light's diffuse. Feed the outputs to the
+// Angel Ring term of a Moon Toon Feature node (slot table MOON_TOON_SLOTS_ANGEL_RING):
+//
+//   RingColor        -> RingColor  (per pixel: ring colour x shape, thin line and hue drift included)
+//   DarkBand         -> DarkBand   (per pixel: how much the key light's diffuse is pressed down)
+//   IntensityEncoded -> Intensity  (the record lane is unorm8; the engine decodes x8, so 0..8)
+//   ShadowFloor      -> ShadowFloor
+//   ColorMode        -> ColorMode
+//
+// Two ways to place the band (static switch "Angel Ring Mode B"):
+//   A  (Wuthering Waves) -- a coordinate along the strand (UV1.y, or a flow map's G) slid by the view:
+//      k1 * dot(V, head up) + k2 * (1 - N.V), looked up in a 1D LUT (bright ring / dark band / thin line
+//      rows). Sub-option "Legacy Mask": sample the old painted mask instead of the LUT, with the same
+//      view slide -- the migration path for HairHighlightMask materials.
+//   B  (Arknights: Endfield) -- Kajiya-Kay with the strand direction = head up projected onto the
+//      highlight normal, lit by a FAKE light: the camera's azimuth around the head at the key light's
+//      elevation, so the ring follows the shot instead of the sun. The main lobe goes through a 2D LUT
+//      (hard on the facing side, soft on the other); a second lobe is the thin colour line and a third,
+//      broad and noisy one, is the dark band.
+//
+// Until R1's light rig is in use the head frame is approximated: head up = the object's up axis
+// (ObjectOrientation) unless HeadUpWS is connected, and the key light = MF_MoonMainLightDirection.
+
+/// @asset /MoonToon/MaterialFunctions/MF_MoonMainLightDirection
+extern float3 MF_MoonMainLightDirection();
+
+// ---------------------------------------------------------------------------------------------------
+// Mode
+
+/// @group 33 - Feature: Angel Ring   @sort 0   @static
+/// @desc 关 = 模式 A(鸣潮式: 沿发丝坐标 + 视角滑动 + LUT); 开 = 模式 B(终末地式: 相机方位 + 关键光仰角的假光 + Kajiya + 2D LUT). Off = mode A, on = mode B.
+/// @name Angel Ring Mode B
+uniform bool Angel_Ring_Mode_B = false;
+
+// ---------------------------------------------------------------------------------------------------
+// Common look
+
+/// @group 33 - Feature: Angel Ring   @sort 10   @desc 亮环颜色(线性). Ring colour (linear).
+/// @name Angel Ring Color
+uniform float4 Angel_Ring_Color = float4(1.0, 0.97, 0.92, 1.0);
+
+/// @group 33 - Feature: Angel Ring   @sort 11   @slider 0 8
+/// @desc 亮环强度, 0 = 关. 引擎侧解码范围 0-8. Ring intensity; 0 = off. Range 0-8.
+/// @name Angel Ring Intensity
+uniform float Angel_Ring_Intensity = 1.0;
+
+/// @group 33 - Feature: Angel Ring   @sort 12   @slider 0 1
+/// @desc 阴影里保留多少: 强度 = lerp(下限, 1, 受光). 少前2 0.1, 终末地 0.35. How much survives in shadow.
+/// @name Angel Ring Shadow Floor
+uniform float Angel_Ring_Shadow_Floor = 0.35;
+
+/// @group 33 - Feature: Angel Ring   @sort 13   @slider 0 1
+/// @desc 0 = 乘关键光颜色, 1 = 固定颜色(不随光变色), 中间值混合. 0 = times the key light colour, 1 = fixed colour.
+/// @name Angel Ring Color Mode
+uniform float Angel_Ring_Color_Mode = 0.0;
+
+/// @group 33 - Feature: Angel Ring   @sort 20   @slider 0 1
+/// @desc 暗带强度: 亮环旁边压暗漫反射(乘法). Dark band strength (multiplies the diffuse down next to the ring).
+/// @name Angel Ring Dark Band Strength
+uniform float Angel_Ring_Dark_Band_Strength = 0.0;
+
+/// @group 33 - Feature: Angel Ring   @sort 30   @slider 0 0.5
+/// @desc 逐缕抖动: 用 flow 图 R(或噪声图 R)让每一缕的环位置错开. Per-strand jitter of the ring position.
+/// @name Angel Ring Strand Jitter
+uniform float Angel_Ring_Strand_Jitter = 0.0;
+
+/// @group 33 - Feature: Angel Ring   @sort 40   @slider 0 3.1416
+/// @desc 色相漂移: 按 1-N.V 旋转色相的弧度. Hue drift by 1 - N.V, radians.
+/// @name Angel Ring Hue Drift
+uniform float Angel_Ring_Hue_Drift = 0.0;
+
+/// @group 33 - Feature: Angel Ring   @sort 41   @slider 0 3.1416
+/// @desc 色相漂移: 按 UV.x 旋转色相的弧度. Hue drift along UV.x, radians.
+/// @name Angel Ring Hue Drift UV
+uniform float Angel_Ring_Hue_Drift_UV = 0.0;
+
+/// @group 33 - Feature: Angel Ring   @sort 50   @desc 细色线颜色(线性). Thin colour line colour (linear).
+/// @name Angel Ring Line Color
+uniform float4 Angel_Ring_Line_Color = float4(1.0, 0.55, 0.65, 1.0);
+
+/// @group 33 - Feature: Angel Ring   @sort 51   @slider 0 4
+/// @desc 细色线强度, 0 = 关. Thin colour line intensity; 0 = off.
+/// @name Angel Ring Line Intensity
+uniform float Angel_Ring_Line_Intensity = 0.0;
+
+/// @group 33 - Feature: Angel Ring   @sort 60   @slider 0 1
+/// @desc 朝向淡出起点(N.V): 低于它环完全消失. Facing fade: N.V where the ring is gone.
+/// @name Angel Ring Facing Fade Start
+uniform float Angel_Ring_Facing_Fade_Start = 0.05;
+
+/// @group 33 - Feature: Angel Ring   @sort 61   @slider 0 1
+/// @desc 朝向淡出终点(N.V): 高于它环完整. Facing fade: N.V where the ring is whole.
+/// @name Angel Ring Facing Fade End
+uniform float Angel_Ring_Facing_Fade_End = 0.35;
+
+// ---------------------------------------------------------------------------------------------------
+// Mode A
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 100   @static
+/// @desc 沿发丝坐标取自 flow 图 G 通道(否则取 UV1.y). Strand coordinate from the flow map's G (else UV1.y).
+/// @name Angel Ring Strand From Flow Map
+uniform bool Angel_Ring_Strand_From_Flow_Map = false;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 101   @static
+/// @desc 旧遮罩模式: 直接采样画好的遮罩, 只加视角滑动(给 HairHighlightMask 迁移用). Legacy painted mask + view slide.
+/// @name Angel Ring Legacy Mask
+uniform bool Angel_Ring_Legacy_Mask = false;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 102   @sampler LinearColor
+/// @default /MoonToon/Textures/T_Black_Linear
+/// @desc Flow 图: G = 沿发丝坐标, R = 逐缕抖动. Flow map: G along the strand, R per-strand jitter.
+/// @name Angel Ring Flow Map
+uniform Texture2D Angel_Ring_Flow_Map;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 103   @sampler LinearColor
+/// @default /MoonToon/Textures/AngelRing/T_AngelRing_LUT_A
+/// @desc 1D LUT(256x4): 行 0 亮环, 行 1 暗带, 行 2 细色线. Rows: 0 ring, 1 dark band, 2 thin line.
+/// @name Angel Ring LUT A
+uniform Texture2D Angel_Ring_LUT_A;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 104   @sampler Color
+/// @default /Engine/EngineResources/Black
+/// @desc 旧遮罩模式的遮罩贴图(R). The legacy painted mask (R).
+/// @name Angel Ring Legacy Mask Map
+uniform Texture2D Angel_Ring_Legacy_Mask_Map;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 110   @slider 0 1
+/// @desc 环中心在发丝坐标上的位置. Ring centre on the strand coordinate.
+/// @name Angel Ring Center
+uniform float Angel_Ring_Center = 0.35;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 111   @slider 0.01 1
+/// @desc 环的宽度(LUT 覆盖的发丝坐标跨度). Band width (span of the strand coordinate the LUT covers).
+/// @name Angel Ring Width
+uniform float Angel_Ring_Width = 0.25;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 112   @slider -0.5 0.5
+/// @desc 视角滑动 k1 · dot(V, 头部上方向)(相机俯仰). View slide k1 * dot(V, head up).
+/// @name Angel Ring View Slide Up
+uniform float Angel_Ring_View_Slide_Up = 0.12;
+
+/// @group 33 - Feature: Angel Ring|Mode A   @sort 113   @slider -0.5 0.5
+/// @desc 视角滑动 k2 · (1 - N.V)(边缘处). View slide k2 * (1 - N.V).
+/// @name Angel Ring View Slide Edge
+uniform float Angel_Ring_View_Slide_Edge = 0.05;
+
+// ---------------------------------------------------------------------------------------------------
+// Mode B
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 200   @sampler LinearColor
+/// @default /MoonToon/Textures/AngelRing/T_AngelRing_LUT_B
+/// @desc 2D LUT: x = 主瓣 x 遮罩, y = 朝向 x 光在哪一侧. x = lobe x mask, y = facing x light side.
+/// @name Angel Ring LUT B
+uniform Texture2D Angel_Ring_LUT_B;
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 201   @slider 1 400
+/// @desc 主瓣 Kajiya 指数(终末地 200). Main lobe exponent.
+/// @name Angel Ring Lobe Exponent
+uniform float Angel_Ring_Lobe_Exponent = 200.0;
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 202   @slider 1 400
+/// @desc 细色线瓣指数(终末地 204). Thin line lobe exponent.
+/// @name Angel Ring Line Exponent
+uniform float Angel_Ring_Line_Exponent = 204.0;
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 203   @slider -0.5 0.5
+/// @desc 细色线沿高光法线的偏移(终末地 0.1). Thin line shift along the highlight normal.
+/// @name Angel Ring Line Shift
+uniform float Angel_Ring_Line_Shift = 0.1;
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 204   @slider 1 100
+/// @desc 暗化瓣指数(终末地 29). Dark lobe exponent.
+/// @name Angel Ring Dark Exponent
+uniform float Angel_Ring_Dark_Exponent = 29.0;
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 205   @slider -0.5 0.5
+/// @desc 暗化瓣偏移. Dark lobe shift.
+/// @name Angel Ring Dark Shift
+uniform float Angel_Ring_Dark_Shift = 0.1;
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 206   @slider 0 1
+/// @desc 假光高度跟随关键光仰角的程度(0 = 固定在 0.5). How much the fake light's height follows the key light's elevation.
+/// @name Angel Ring Fake Light Elevation
+uniform float Angel_Ring_Fake_Light_Elevation = 1.0;
+
+/// @group 33 - Feature: Angel Ring|Mode B   @sort 207   @sampler LinearColor
+/// @default /MoonToon/Textures/T_White_Linear
+/// @desc 发丝噪声(R), 调制暗化瓣与逐缕抖动. Strand noise (R) for the dark lobe and jitter.
+/// @name Angel Ring Strand Noise
+uniform Texture2D Angel_Ring_Strand_Noise;
+
+// ---------------------------------------------------------------------------------------------------
+// Helpers (inlined)
+
+float3 AngelRingSafeNormalize(float3 V, float3 Fallback)
+{
+    float L = length(V);
+    return L > 0.0001 ? V / L : Fallback;
+}
+
+// Kajiya-Kay lobe sqrt(1 - (T.H)^2)^e.
+float AngelRingKK(float3 T, float3 H, float Exponent)
+{
+    float TH = dot(T, H);
+    return pow(saturate(sqrt(saturate(1.0 - TH * TH))), Exponent);
+}
+
+// Hue rotation about the grey axis (Rodrigues).
+float3 AngelRingHueRotate(float3 C, float Angle)
+{
+    float3 K = float3(0.57735027, 0.57735027, 0.57735027);
+    float Cs = cos(Angle);
+    float Sn = sin(Angle);
+    return C * Cs + cross(K, C) * Sn + K * (dot(K, C) * (1.0 - Cs));
+}
+
+// ---------------------------------------------------------------------------------------------------
+
+/// @library MoonToon|Shared
+/// @param NormalWS       World shading normal. Unconnected (zero) = the vertex normal.
+/// @param UV0            Mesh UV for the flow map / masks.
+/// @param UV1            Strand UV (mode A reads .y unless the flow map is on).
+/// @param Mask           Ring mask (a painted / packed mask channel); multiplies the ring.
+/// @param HeadUpWS       Head up, world. Unconnected (zero) = the object's up axis.
+/// @param KeyLightDirWS  Key light direction (toward the light). Unconnected (zero) = MF_MoonMainLightDirection.
+/// @param SpecNormalWS   Mode B highlight normal. Unconnected (zero) = NormalWS.
+export void MF_ToonAngelRing(
+    float3 NormalWS,
+    float2 UV0,
+    float2 UV1,
+    float Mask,
+    float3 HeadUpWS,
+    float3 KeyLightDirWS,
+    float3 SpecNormalWS,
+    out float3 RingColor,
+    out float DarkBand,
+    out float IntensityEncoded,
+    out float ShadowFloor,
+    out float ColorMode)
+{
+    float3 N = AngelRingSafeNormalize(NormalWS, UE.VertexNormalWS());
+    float3 V = normalize(UE.CameraVectorWS());
+    float3 Up = AngelRingSafeNormalize(HeadUpWS, UE.Expression(Class = "ObjectOrientation"));
+    float3 L = AngelRingSafeNormalize(KeyLightDirWS, MF_MoonMainLightDirection());
+    float NoV = saturate(dot(N, V));
+
+    float Ring = 0.0;
+    float Line = 0.0;
+    float Dark = 0.0;
+
+    if (Angel_Ring_Mode_B)
+    {
+        // ---- mode B: fake-light Kajiya-Kay (Endfield) ----
+        float3 Ns = AngelRingSafeNormalize(SpecNormalWS, N);
+        // Strand direction = head up projected onto the highlight normal's plane (Endfield's
+        // Nspec * dot(Nspec, up) - up, normalised).
+        float3 T = AngelRingSafeNormalize(Ns * dot(Ns, Up) - Up, float3(0.0, 0.0, 1.0));
+        // Fake light: the camera's azimuth around the head, at the key light's elevation.
+        float3 VFlat = V - Up * dot(V, Up);
+        float Height = lerp(0.5, dot(L, Up), Angel_Ring_Fake_Light_Elevation);
+        float3 FakeL = AngelRingSafeNormalize(VFlat + Up * Height, Up);
+        float3 H = normalize(normalize(2.0 * FakeL + L) + V);
+        float Noise = Angel_Ring_Strand_Noise.SampleLevel(UV0, 0.0).r;
+
+        float Lobe = saturate(Mask * AngelRingKK(T, H, Angel_Ring_Lobe_Exponent));
+        float Side = NoV * NoV * step(0.0, dot(T, H));
+        Ring = Angel_Ring_LUT_B.SampleLevel(float2(Lobe, Side), 0.0).r * Lobe * NoV;
+
+        float3 TLine = AngelRingSafeNormalize(T + Ns * Angel_Ring_Line_Shift, T);
+        Line = AngelRingKK(TLine, H, Angel_Ring_Line_Exponent) * Mask;
+
+        float3 TDark = AngelRingSafeNormalize(T + Ns * Angel_Ring_Dark_Shift, T);
+        Dark = AngelRingKK(TDark, H, Angel_Ring_Dark_Exponent) * Mask * Noise;
+    }
+    else
+    {
+        // ---- mode A: strand coordinate + view slide + LUT (Wuthering Waves) ----
+        float4 Flow = Angel_Ring_Flow_Map.SampleLevel(UV0, 0.0);
+        float Slide = Angel_Ring_View_Slide_Up * dot(V, Up) + Angel_Ring_View_Slide_Edge * (1.0 - NoV);
+        float Jitter = Angel_Ring_Strand_Jitter * (Flow.r - 0.5);
+
+        if (Angel_Ring_Legacy_Mask)
+        {
+            // The old painted band, moved by the view only (no LUT, no dark band, no line).
+            Ring = Angel_Ring_Legacy_Mask_Map.Sample(UV0 + float2(0.0, Slide + Jitter)).r * Mask;
+        }
+        else
+        {
+            float StrandCoord = UV1.y;
+            if (Angel_Ring_Strand_From_Flow_Map)
+            {
+                StrandCoord = Flow.g;
+            }
+            float U = (StrandCoord + Slide + Jitter - Angel_Ring_Center) / max(Angel_Ring_Width, 0.001) * 0.5 + 0.5;
+            Ring = Angel_Ring_LUT_A.SampleLevel(float2(U, 0.125), 0.0).r * Mask;
+            Dark = Angel_Ring_LUT_A.SampleLevel(float2(U, 0.375), 0.0).r * Mask;
+            Line = Angel_Ring_LUT_A.SampleLevel(float2(U, 0.625), 0.0).r * Mask;
+        }
+    }
+
+    float Facing = smoothstep(Angel_Ring_Facing_Fade_Start, Angel_Ring_Facing_Fade_End, NoV);
+    float HueAngle = Angel_Ring_Hue_Drift * (1.0 - NoV) + Angel_Ring_Hue_Drift_UV * UV0.x;
+    float3 RingTint = AngelRingHueRotate(Angel_Ring_Color.rgb, HueAngle);
+
+    RingColor = saturate((RingTint * Ring + Angel_Ring_Line_Color.rgb * (Line * Angel_Ring_Line_Intensity)) * Facing);
+    DarkBand = saturate(Dark * Angel_Ring_Dark_Band_Strength);
+    IntensityEncoded = saturate(Angel_Ring_Intensity * 0.125);
+    ShadowFloor = saturate(Angel_Ring_Shadow_Floor);
+    ColorMode = saturate(Angel_Ring_Color_Mode);
+}

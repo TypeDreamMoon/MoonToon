@@ -1,0 +1,161 @@
+// MoonToon effect functions, batch 2 (task T10, gap G06): flow light, reveal, pulse, view hue shift.
+// Each `export` builds its own function asset in this folder. Conventions: Shared/ToonFXCommon.dsh.
+//
+// Sources (RenderDoc, Toon/Diagrams/Wuwa/notes/body.md section 6, face_eye.md):
+//   flow light  -- a caustic texture at uv0 * (25, 5), scrolled by time * (0, -0.15) after fmod 600,
+//                  self-distorted by its own R * 0.2, pow 1, times (0.15, 0.2375, 0.5), times a mask.
+//   reveal      -- the forehead ornament: a texture with a "reveal progress" parameter whose edge is
+//                  disturbed by two time-scrolled noises.
+//   pulse       -- gem emissive: base * mask * colour, pulsing (cos(t * speed) + 0.5) * 2.
+//   view hue    -- the "laser" foil: Rodrigues hue rotation of the base colour by
+//                  2pi * (1 + Scale * (Bias + Range * N.V)), optional uv.x bands.
+
+#include "Shared/ToonFXCommon.dsh"
+
+// ------------------------------------------------------------------------------------------- flow
+
+/// @name FX Flow Texture   @group 51 - FX: Flow Light   @sort 0   @sampler LinearColor
+/// @default /MoonToon/Textures/FX/T_ToonFX_Caustic
+/// @desc 流光纹理(R). Flow texture (R).
+uniform Texture2D FX_Flow_Texture;
+
+/// @name FX Flow Tiling   @group 51 - FX: Flow Light   @sort 1
+/// @desc 平铺(鸣潮 25, 5). Tiling.
+uniform float4 FX_Flow_Tiling = float4(25.0, 5.0, 0.0, 0.0);
+
+/// @name FX Flow Speed   @group 51 - FX: Flow Light   @sort 2
+/// @desc 滚动速度 UV/秒(鸣潮 0, -0.15). Scroll speed in UV per second.
+uniform float4 FX_Flow_Speed = float4(0.0, -0.15, 0.0, 0.0);
+
+/// @name FX Flow Distortion   @group 51 - FX: Flow Light   @sort 3   @slider 0 1
+/// @desc 自扭曲强度(鸣潮 0.2). Self-distortion by its own R.
+uniform float FX_Flow_Distortion = 0.2;
+
+/// @name FX Flow Power   @group 51 - FX: Flow Light   @sort 4   @slider 0.1 8
+/// @desc 对比度(幂). Contrast power.
+uniform float FX_Flow_Power = 1.0;
+
+/// @name FX Flow Color   @group 51 - FX: Flow Light   @sort 5
+/// @desc 流光颜色(鸣潮 0.15, 0.2375, 0.5). Flow colour.
+uniform float4 FX_Flow_Color = float4(0.15, 0.2375, 0.5, 1.0);
+
+/// @name FX Flow Intensity   @group 51 - FX: Flow Light   @sort 6   @slider 0 20
+uniform float FX_Flow_Intensity = 1.0;
+
+/// @library MoonToon|FX
+/// @param UV    Mesh UV.
+/// @param Mask  Where the flow lives (0..1).
+export float3 MF_ToonFX_FlowLight(float2 UV, float Mask = 1.0)
+{
+    float2 Base = UV * FX_Flow_Tiling.xy + ToonFXTime() * FX_Flow_Speed.xy;
+    float Warp = FX_Flow_Texture.Sample(Base).r * FX_Flow_Distortion;
+    float F = pow(saturate(FX_Flow_Texture.Sample(Base + Warp).r), FX_Flow_Power);
+    return FX_Flow_Color.rgb * (F * Mask * FX_Flow_Intensity);
+}
+
+// ----------------------------------------------------------------------------------------- reveal
+
+/// @name FX Reveal Order Map   @group 52 - FX: Reveal   @sort 0   @sampler LinearColor
+/// @default /MoonToon/Textures/T_Black_Linear
+/// @desc 显现顺序图(R): 0 先出现, 1 最后出现. Reveal order (R): 0 appears first, 1 last.
+uniform Texture2D FX_Reveal_Order_Map;
+
+/// @name FX Reveal Noise   @group 52 - FX: Reveal   @sort 1   @sampler LinearColor
+/// @default /MoonToon/Textures/FX/T_ToonFX_Noise
+/// @desc 扰动边缘的噪声(R, G 两层). Edge noise (two layers in R and G).
+uniform Texture2D FX_Reveal_Noise;
+
+/// @name FX Reveal Progress   @group 52 - FX: Reveal   @sort 2   @slider 0 1
+/// @desc 显现进度: 0 = 全隐, 1 = 全显. Reveal progress: 0 hidden, 1 shown.
+uniform float FX_Reveal_Progress = 1.0;
+
+/// @name FX Reveal Edge Width   @group 52 - FX: Reveal   @sort 3   @slider 0 0.5
+uniform float FX_Reveal_Edge_Width = 0.06;
+
+/// @name FX Reveal Noise Strength   @group 52 - FX: Reveal   @sort 4   @slider 0 0.5
+uniform float FX_Reveal_Noise_Strength = 0.1;
+
+/// @name FX Reveal Noise Tiling   @group 52 - FX: Reveal   @sort 5   @slider 0.1 16
+uniform float FX_Reveal_Noise_Tiling = 3.0;
+
+/// @name FX Reveal Noise Speed   @group 52 - FX: Reveal   @sort 6
+/// @desc 两层噪声各自的滚动速度(xy 第一层, zw 第二层). Scroll speed of the two noise layers.
+uniform float4 FX_Reveal_Noise_Speed = float4(0.05, 0.0, -0.03, 0.04);
+
+/// @name FX Reveal Edge Color   @group 52 - FX: Reveal   @sort 7
+uniform float4 FX_Reveal_Edge_Color = float4(1.0, 0.8, 0.4, 1.0);
+
+/// @name FX Reveal Edge Intensity   @group 52 - FX: Reveal   @sort 8   @slider 0 50
+uniform float FX_Reveal_Edge_Intensity = 4.0;
+
+/// @library MoonToon|FX
+/// @param UV    Mesh UV.
+/// @param Mask  Where the reveal applies; outside it the surface is always shown.
+export float3 MF_ToonFX_Reveal(float2 UV, float Mask = 1.0, out float Coverage)
+{
+    float T = ToonFXTime();
+    float2 NUV = UV * FX_Reveal_Noise_Tiling;
+    float N1 = FX_Reveal_Noise.Sample(NUV + T * FX_Reveal_Noise_Speed.xy).r;
+    float N2 = FX_Reveal_Noise.Sample(NUV * 1.7 + T * FX_Reveal_Noise_Speed.zw).g;
+    float Order = FX_Reveal_Order_Map.Sample(UV).r + (N1 + N2 - 1.0) * FX_Reveal_Noise_Strength;
+    // Progress is widened by the edge so 0 hides everything and 1 shows everything.
+    float P = FX_Reveal_Progress * (1.0 + FX_Reveal_Edge_Width * 2.0) - FX_Reveal_Edge_Width;
+    float Shown = step(Order, P);
+    float Edge = saturate(1.0 - abs(Order - P) / max(FX_Reveal_Edge_Width, 0.0001)) * Shown;
+    Coverage = lerp(1.0, Shown, Mask);
+    return FX_Reveal_Edge_Color.rgb * (Edge * Mask * FX_Reveal_Edge_Intensity);
+}
+
+// ------------------------------------------------------------------------------------------ pulse
+
+/// @name FX Pulse Color   @group 53 - FX: Pulse   @sort 0
+/// @desc 自发光颜色(乘底色)(鸣潮宝石 1, 0.358, 0.3). Emissive colour, times the base colour.
+uniform float4 FX_Pulse_Color = float4(1.0, 0.358, 0.3, 1.0);
+
+/// @name FX Pulse Speed   @group 53 - FX: Pulse   @sort 1   @slider 0 20
+/// @desc 脉冲角速度, 弧度/秒. 0 = 常亮(x3). Pulse angular speed; 0 = steady.
+uniform float FX_Pulse_Speed = 3.0;
+
+/// @name FX Pulse Intensity   @group 53 - FX: Pulse   @sort 2   @slider 0 20
+uniform float FX_Pulse_Intensity = 1.0;
+
+/// @library MoonToon|FX
+/// @param BaseColor  The surface's base colour.
+/// @param Mask       Where it glows (Wuthering Waves: base colour alpha > 0.9).
+export float3 MF_ToonFX_Pulse(float3 BaseColor, float Mask = 1.0)
+{
+    float Pulse = (cos(ToonFXTime() * FX_Pulse_Speed) + 0.5) * 2.0;
+    return BaseColor * FX_Pulse_Color.rgb * (Pulse * Mask * FX_Pulse_Intensity);
+}
+
+// -------------------------------------------------------------------------------------- view hue
+
+/// @name FX View Hue Tint   @group 54 - FX: View Hue Shift   @sort 0
+/// @desc 镭射底色(鸣潮 0.769, 0.884, 0.912). Foil base tint.
+uniform float4 FX_View_Hue_Tint = float4(0.769, 0.884, 0.912, 1.0);
+
+/// @name FX View Hue Turns   @group 54 - FX: View Hue Shift   @sort 1   @slider 0 10
+/// @desc N.V 从 0 到 1 色相转几圈(鸣潮 4). Hue turns as N.V goes 0 to 1.
+uniform float FX_View_Hue_Turns = 4.0;
+
+/// @name FX View Hue Bias   @group 54 - FX: View Hue Shift   @sort 2   @slider 0 1
+/// @desc 起始相位(圈). Phase offset, turns.
+uniform float FX_View_Hue_Bias = 0.5;
+
+/// @name FX View Hue UV Bands   @group 54 - FX: View Hue Shift   @sort 3   @slider 0 20
+/// @desc 沿 UV.x 再叠加几圈(条带). Extra turns along UV.x (bands).
+uniform float FX_View_Hue_UV_Bands = 0.0;
+
+/// @library MoonToon|FX
+/// @param BaseColor  The surface's base colour.
+/// @param NormalWS   World normal; zero = the vertex normal.
+/// @param UV         Mesh UV (bands).
+/// @param Mask       Where the foil is (0..1).
+export float3 MF_ToonFX_ViewHueShift(float3 BaseColor, float3 NormalWS, float2 UV, float Mask = 1.0)
+{
+    float3 N = length(NormalWS) > 0.0001 ? normalize(NormalWS) : UE.VertexNormalWS();
+    float NoV = saturate(dot(N, normalize(UE.CameraVectorWS())));
+    float Angle = 6.2831853 * (FX_View_Hue_Bias + FX_View_Hue_Turns * NoV + FX_View_Hue_UV_Bands * UV.x);
+    float3 Foil = ToonFXHueRotate(FX_View_Hue_Tint.rgb, Angle);
+    return lerp(BaseColor, BaseColor * Foil, Mask);
+}

@@ -1,0 +1,30 @@
+// MF_MoonToonKeyLight -- this character's key light, as the trunk sees it (R2; G02 light rig, G10 face
+// light). One Custom node that includes Engine/Shaders/Private/Toon/MoonToonCharacterLight.ush and asks
+// MoonToonMaterialKeyLight(Parameters) -- the SAME resolver the deferred light passes run, on the same
+// per-character table (Scene.ZMoonToon), so a material that evaluates something for the key light
+// (the full-angle face SDF, the angel ring) agrees with the band the trunk draws.
+//
+// Without a light rig on the character (and none on the view) this is the scene's toon main light,
+// with no head frame: HeadForward = 0, HeadUp = (0, 0, 1). Mesh materials only (the Scene uniform
+// buffer is not bound for post process or light function materials).
+
+/// @custom
+void MoonToonKeyLightResolve(out float3 FaceDirection, out float3 KeyDirection, out float3 HeadForward, out float3 HeadUp)
+{
+#include "/Engine/Private/Toon/MoonToonCharacterLight.ush"
+	const FMoonToonKeyLight Key = MoonToonMaterialKeyLight(Parameters);
+	FaceDirection = Key.FaceDirection;
+	KeyDirection = Key.Direction;
+	HeadForward = Key.HeadForward;
+	HeadUp = Key.HeadUp;
+}
+
+/// @library MoonToon|Shared
+/// @param FaceDirection  What the face SDF should be evaluated for (toward the light, world space).
+/// @param KeyDirection   The key light the body's band uses (toward the light, world space).
+/// @param HeadForward    The character's head forward (0 without a head frame).
+/// @param HeadUp         The character's head up ((0, 0, 1) without a head frame).
+export void MF_MoonToonKeyLight(out float3 FaceDirection, out float3 KeyDirection, out float3 HeadForward, out float3 HeadUp)
+{
+	MoonToonKeyLightResolve(FaceDirection, KeyDirection, HeadForward, HeadUp);
+}

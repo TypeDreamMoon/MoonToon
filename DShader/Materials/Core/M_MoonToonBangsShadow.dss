@@ -1,0 +1,70 @@
+// M_MoonToonBangsShadow -- the fringe's drawn shadow on the face (task T20, gap G23).
+//
+// Girls' Frontline 2 / NTE draw the bangs' shadow on the forehead as a LAYER, not as a cast shadow: the
+// fringe is drawn a second time, shifted away from the light in screen space, and multiplied onto
+// what lies under it. This is that layer:
+//
+//   * set it as the bangs slot's Overlay Material (mesh component -> Material Slots Overlay Material,
+//     index = the bangs' material slot), so it redraws exactly the fringe;
+//   * the vertices move AWAY from the key light, projected onto the screen plane (Shadow Shift), and a
+//     little away from the camera (Shadow Push Back) -- the copy then sits behind the real fringe, so
+//     the fringe itself fails the depth test and stays clean, and the face around it passes;
+//   * Modulate: the pixel multiplies the scene by lerp(1, Shadow Color, mask), and only where the
+//     surface under it is within Shadow Depth Range of the copy (the face right behind the bangs, not
+//     the back wall seen through a gap);
+//   * the mask is the copy's own UV0 texture (Shadow Mask, white = full), so an artist can paint
+//     which strands cast and how hard.
+//
+// Not a cast shadow: it does not depend on the shadow maps, and it shows on the side the light faces.
+// Use it with the screen-space hair shadow off on that face, or the two darken twice.
+
+#pragma material(Domain = Surface, ShadingModel = Unlit, BlendMode = Modulate, TwoSided = true, bUsedWithSkeletalMesh = true, bUsedWithMorphTargets = true, Backend = Graph)
+
+/// @asset /MoonToon/MaterialFunctions/MF_MoonMainLightDirection
+extern float3 MF_MoonMainLightDirection();
+
+/// @name Shadow Color   @group 01 - Bangs Shadow   @sort 0
+/// @desc 投影颜色(乘到下面的脸上, 线性). The colour multiplied onto the face (linear).
+uniform float4 Shadow_Color = float4(0.78, 0.62, 0.62, 1.0);
+
+/// @name Shadow Strength   @group 01 - Bangs Shadow   @sort 1   @slider 0 1
+uniform float Shadow_Strength = 1.0;
+
+/// @name Shadow Shift   @group 01 - Bangs Shadow   @sort 2   @slider 0 10
+/// @desc 沿屏幕平面背向光的偏移, cm. How far the copy moves away from the light in the screen plane, cm.
+uniform float Shadow_Shift = 1.2;
+
+/// @name Shadow Push Back   @group 01 - Bangs Shadow   @sort 3   @slider 0 5
+/// @desc 往相机反方向推的距离, cm: 让副本落到刘海后面, 不压暗刘海本身. Away from the camera, cm, so the copy sits behind the real fringe.
+uniform float Shadow_Push_Back = 0.5;
+
+/// @name Shadow Depth Range   @group 01 - Bangs Shadow   @sort 4   @slider 0.5 30
+/// @desc 只压暗副本身后这么深以内的表面, cm. Only surfaces within this depth behind the copy are darkened, cm.
+uniform float Shadow_Depth_Range = 4.0;
+
+/// @name Shadow Mask   @group 01 - Bangs Shadow   @sort 5   @sampler LinearColor
+/// @default /MoonToon/Textures/T_White_Linear
+/// @desc 哪些发缕投影(UV0, R, 白 = 全投). Which strands cast (UV0, R, white = full).
+uniform Texture2D Shadow_Mask;
+
+export void M_MoonToonBangsShadow(inout material m)
+{
+	// Vertex stage: away from the light in the screen plane, then a hair away from the camera.
+	float3 WorldPos = UE.WorldPosition();
+	float3 ToVertex = normalize(WorldPos - UE.CameraPositionWS());
+	float3 AwayFromLight = -MF_MoonMainLightDirection();
+	float3 InScreenPlane = AwayFromLight - ToVertex * dot(AwayFromLight, ToVertex);
+	float PlaneLength = length(InScreenPlane);
+	float3 ShiftDir = PlaneLength > 0.0001 ? InScreenPlane / PlaneLength : float3(0.0, 0.0, 0.0);
+	m.WorldPositionOffset = ShiftDir * Shadow_Shift + ToVertex * Shadow_Push_Back;
+
+	// Pixel stage: how much shadow, gated to the surface right behind the copy.
+	float2 UV0 = UE.TexCoord(Index = 0);
+	float Mask = Shadow_Mask.Sample(UV0).r;
+	float SceneZ = UE.Expression(Class = "SceneDepth");
+	float CopyZ = UE.Expression(Class = "PixelDepth");
+	float Behind = SceneZ - CopyZ;
+	float Gate = saturate(1.0 - Behind / max(Shadow_Depth_Range, 0.01)) * step(0.0, Behind);
+	float Amount = saturate(Mask * Shadow_Strength * Gate);
+	m.EmissiveColor = lerp(float3(1.0, 1.0, 1.0), Shadow_Color.rgb, Amount);
+}

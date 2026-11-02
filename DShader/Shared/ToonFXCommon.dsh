@@ -1,0 +1,37 @@
+// Shared helpers for the MoonToon effect functions (MaterialFunctions/FX/MF_ToonFX_*.dss, tasks
+// T09-T11, gaps G05 / G06). Design: DevTest/Plan/MoonToon/MoonToon_风格化扩展设计方案_v1.md section 6.1.
+//
+// Conventions every effect follows, so they stack freely and never take the modifier slot:
+//   * ONE time source: ToonFXTime() -- engine game time, wrapped every 600 s so long sessions keep
+//     float precision (Wuthering Waves wraps at 600 s too). Effects never read UE.Time() directly.
+//   * ONE mask convention: every effect takes a Mask input (0 = off, 1 = full). Selecting which part
+//     of a material an effect lives on (a sub-material ID, a painted channel) is the caller's job.
+//   * Outputs only add to Emissive, multiply / replace BaseColor, or raise Coverage (what the sheer
+//     dither and masked opacity read). Nothing here touches lighting or the closure record.
+
+float ToonFXTime()
+{
+    return fmod(UE.Time(), 600.0);
+}
+
+// Hue rotation about the grey axis (Rodrigues). Angle in radians.
+float3 ToonFXHueRotate(float3 C, float Angle)
+{
+    float3 K = float3(0.57735027, 0.57735027, 0.57735027);
+    float Cs = cos(Angle);
+    float Sn = sin(Angle);
+    return C * Cs + cross(K, C) * Sn + K * (dot(K, C) * (1.0 - Cs));
+}
+
+float ToonFXLuminance(float3 C)
+{
+    return dot(C, float3(0.2126, 0.7152, 0.0722));
+}
+
+// Integer-lattice hash in [0,1) -- for per-cell randomness that must not depend on a texture.
+float ToonFXHash21(float2 P)
+{
+    float3 P3 = frac(float3(P.x, P.y, P.x) * 0.1031);
+    P3 = P3 + dot(P3, float3(P3.y, P3.z, P3.x) + 33.33);
+    return frac((P3.x + P3.y) * P3.z);
+}

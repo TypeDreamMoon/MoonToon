@@ -1198,13 +1198,84 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// uniform-buffer fill time and returns its slice, so the material never hand-picks an index.
 		// The static switch keeps the legacy hand-authored index as the default, which is why existing
 		// material instances are untouched -- and the unused branch is culled at translation.
-		float Custom_Diffuse_Ramp_Slice =
+		float Custom_Diffuse_Ramp_Slice_Plain =
 			UE.Expression(
 				Class="ToonRampAtlas",
 				OutputType="float1",
 				RampTexture=Custom_Diffuse_Ramp,
 				Row=Custom_Diffuse_Ramp_Row,
 				bSpecularRamp=false
+			);
+		// R2 (G18 / G24): the same ramp with segment rows. The layout is a property of the node (it
+		// travels in the uniform expression as the slice's SegmentLayoutCode), so each layout is its own
+		// node and two static switches pick one; both off is the node above, unchanged.
+		//   Time Of Day Rows  -- NTE: rows r, r+1, r+2 = day (main), night, dusk.
+		//   Component Rows    -- GF2: rows r, r+4, r+8, r+12 = diffuse (main), specular, rim, secondary.
+		//   both              -- day, night, dusk, specular, rim, secondary in consecutive rows.
+		float Custom_Diffuse_Ramp_Slice_TimeOfDay =
+			UE.Expression(
+				Class="ToonRampAtlas",
+				OutputType="float1",
+				RampTexture=Custom_Diffuse_Ramp,
+				Row=Custom_Diffuse_Ramp_Row,
+				bSpecularRamp=false,
+				SegmentLayout="TimeOfDay",
+				SegmentStride=1
+			);
+		float Custom_Diffuse_Ramp_Slice_Components =
+			UE.Expression(
+				Class="ToonRampAtlas",
+				OutputType="float1",
+				RampTexture=Custom_Diffuse_Ramp,
+				Row=Custom_Diffuse_Ramp_Row,
+				bSpecularRamp=false,
+				SegmentLayout="Components",
+				SegmentStride=4
+			);
+		float Custom_Diffuse_Ramp_Slice_Both =
+			UE.Expression(
+				Class="ToonRampAtlas",
+				OutputType="float1",
+				RampTexture=Custom_Diffuse_Ramp,
+				Row=Custom_Diffuse_Ramp_Row,
+				bSpecularRamp=false,
+				SegmentLayout="TimeOfDayAndComponents",
+				SegmentStride=1
+			);
+		float Custom_Diffuse_Ramp_Slice_NoComponents =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float1",
+				True=Custom_Diffuse_Ramp_Slice_TimeOfDay,
+				False=Custom_Diffuse_Ramp_Slice_Plain,
+				Group="10 - Diffuse",
+				SortPriority=3,
+				ParameterName="Custom Ramp Time Of Day Rows",
+				DefaultValue=false,
+				Desc="(配合 Use Custom Diffuse Ramp) 自定义 ramp 从 Row 起连续三行是 日/夜/晨昏(异环), 按风格预设的时段插值.\r\n(With Use Custom Diffuse Ramp) rows Row, Row+1, Row+2 are day / night / dusk (NTE), blended by the style preset's time of day."
+			);
+		float Custom_Diffuse_Ramp_Slice_WithComponents =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float1",
+				True=Custom_Diffuse_Ramp_Slice_Both,
+				False=Custom_Diffuse_Ramp_Slice_Components,
+				Group="10 - Diffuse",
+				SortPriority=3,
+				ParameterName="Custom Ramp Time Of Day Rows",
+				DefaultValue=false
+			);
+		float Custom_Diffuse_Ramp_Slice =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float1",
+				True=Custom_Diffuse_Ramp_Slice_WithComponents,
+				False=Custom_Diffuse_Ramp_Slice_NoComponents,
+				Group="10 - Diffuse",
+				SortPriority=4,
+				ParameterName="Custom Ramp Component Rows",
+				DefaultValue=false,
+				Desc="(配合 Use Custom Diffuse Ramp) 自定义 ramp 的 Row、Row+4、Row+8、Row+12 行分别是 漫反射/高光/边缘/附加光(少前2 的 256x16 图集, Row = 2). 和时段同开时六段依次相邻.\r\n(With Use Custom Diffuse Ramp) rows Row, Row+4, Row+8, Row+12 are diffuse / specular / rim / secondary (the GF2 256x16 atlas, Row = 2). With the time-of-day rows as well, the six segments are consecutive."
 			);
 		float Diffuse_Ramp_Index =
 			UE.Expression(

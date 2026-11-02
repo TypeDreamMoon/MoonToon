@@ -1,0 +1,101 @@
+// MF_ToonFX_Glitter -- sparkling glitter (task T09, gap G05), after Wuthering Waves' gauze robe
+// (RenderDoc 2026-10-30, Toon/Diagrams/Wuwa/notes/body.md section 6):
+//
+//   two layers of the same dot texture, both at uv * Tiling; the second also shifted by the view
+//   (V.xy * Parallax + ParallaxOffset) and scrolled by time, so any camera move re-rolls which dots
+//   line up -> it sparkles when the view moves and holds still when it does not;
+//   I = R1^2 * R2 * lerp(Near, Far, saturate(camera distance / Distance)) -- distant glitter is
+//   amplified so it does not vanish into sub-pixel dots; lit where I >= Threshold (binary);
+//   colour = base * Tint, hue-jittered per dot by G1^2 * G2 * HueJitter; times an optional
+//   specular-region mask and an FOV compensation (a zoomed-in camera sees bigger dots).
+//
+// Outputs: Emissive (add to the material's emissive) and Coverage (max it into the sheer dither /
+// masked coverage so a sparkle on gauze stays solid, as Wuthering Waves does).
+
+#include "Shared/ToonFXCommon.dsh"
+
+/// @name FX Glitter Texture   @group 50 - FX: Glitter   @sort 0   @sampler LinearColor
+/// @default /MoonToon/Textures/FX/T_ToonFX_GlitterDots
+/// @desc 点阵贴图: R = 闪点强度, G = 色相随机. Dot pattern: R intensity, G hue random.
+uniform Texture2D FX_Glitter_Texture;
+
+/// @name FX Glitter Tiling   @group 50 - FX: Glitter   @sort 1   @slider 1 64
+/// @desc 点阵平铺次数(鸣潮 6). Dot tiling.
+uniform float FX_Glitter_Tiling = 6.0;
+
+/// @name FX Glitter Parallax   @group 50 - FX: Glitter   @sort 2   @slider 0 1
+/// @desc 第二层随视角偏移的强度(鸣潮 0.2). How far the second layer slides with the view.
+uniform float FX_Glitter_Parallax = 0.2;
+
+/// @name FX Glitter Parallax Offset   @group 50 - FX: Glitter   @sort 3   @slider 0 1
+/// @desc 第二层的固定偏移(鸣潮 0.4). Constant offset of the second layer.
+uniform float FX_Glitter_Parallax_Offset = 0.4;
+
+/// @name FX Glitter Scroll Speed   @group 50 - FX: Glitter   @sort 4   @slider -0.1 0.1
+/// @desc 第二层随时间滚动的速度(鸣潮 -0.01). Second layer's scroll speed.
+uniform float FX_Glitter_Scroll_Speed = -0.01;
+
+/// @name FX Glitter Threshold   @group 50 - FX: Glitter   @sort 5   @slider 0 1
+/// @desc 点亮阈值(鸣潮 0.8), 越低点越多. Lit when the product is above this.
+uniform float FX_Glitter_Threshold = 0.8;
+
+/// @name FX Glitter Near Gain   @group 50 - FX: Glitter   @sort 6   @slider 0 20
+/// @desc 近处增益(鸣潮 1.5). Gain at the camera.
+uniform float FX_Glitter_Near_Gain = 1.5;
+
+/// @name FX Glitter Far Gain   @group 50 - FX: Glitter   @sort 7   @slider 0 40
+/// @desc 远处增益(鸣潮 15), 让远处的闪点不消失. Gain at Distance.
+uniform float FX_Glitter_Far_Gain = 15.0;
+
+/// @name FX Glitter Distance   @group 50 - FX: Glitter   @sort 8   @slider 100 5000
+/// @desc 增益从近到远过渡的相机距离, cm(鸣潮 1000). Camera distance of the far gain, cm.
+uniform float FX_Glitter_Distance = 1000.0;
+
+/// @name FX Glitter Tint   @group 50 - FX: Glitter   @sort 9
+/// @desc 闪点颜色 = 底色 x 此色(鸣潮 1.105, 1.22, 1.3). Sparkle colour = base colour x this.
+uniform float4 FX_Glitter_Tint = float4(1.105, 1.22, 1.3, 1.0);
+
+/// @name FX Glitter Intensity   @group 50 - FX: Glitter   @sort 10   @slider 0 20
+/// @desc 自发光强度. Emissive intensity.
+uniform float FX_Glitter_Intensity = 1.0;
+
+/// @name FX Glitter Hue Jitter   @group 50 - FX: Glitter   @sort 11   @slider 0 6.2832
+/// @desc 每个点的色相随机旋转幅度, 弧度(鸣潮 2pi x 0.02). Per-dot hue jitter, radians.
+uniform float FX_Glitter_Hue_Jitter = 0.1257;
+
+/// @name FX Glitter FOV Compensation   @group 50 - FX: Glitter   @sort 12   @slider 0 1
+/// @desc FOV 补偿强度: 镜头拉近(FOV 变小)时压暗, 避免近景点阵过亮. FOV compensation strength.
+uniform float FX_Glitter_FOV_Compensation = 0.0;
+
+/// @library MoonToon|FX
+/// @param UV         Mesh UV for the dot pattern.
+/// @param BaseColor  The surface's base colour (the sparkle takes its hue from it).
+/// @param Mask       Where the glitter lives (0..1).
+/// @param SpecMask   Optional specular-region mask; Wuthering Waves gates by smoothstep(-0.7, 1.3, it). 1 = everywhere.
+export float3 MF_ToonFX_Glitter(float2 UV, float3 BaseColor, float Mask = 1.0, float SpecMask = 1.0, out float Coverage)
+{
+    float3 VTS = UE.TransformVector(UE.CameraVectorWS(), Source = World, Destination = Tangent);
+    float2 UV1 = UV * FX_Glitter_Tiling;
+    float2 UV2 = UV1 + VTS.xy * FX_Glitter_Parallax + FX_Glitter_Parallax_Offset + ToonFXTime() * FX_Glitter_Scroll_Speed;
+    float4 L1 = FX_Glitter_Texture.Sample(UV1);
+    float4 L2 = FX_Glitter_Texture.Sample(UV2);
+
+    float CamDist = length(UE.CameraPositionWS() - UE.WorldPosition());
+    float Gain = lerp(FX_Glitter_Near_Gain, FX_Glitter_Far_Gain, saturate(CamDist / max(FX_Glitter_Distance, 1.0)));
+    float I = L1.r * L1.r * L2.r * Gain;
+    float Lit = step(FX_Glitter_Threshold, I);
+
+    // FOV compensation: 1 at a 90-degree horizontal FOV, smaller as the camera zooms in.
+    // Wuthering Waves: saturate((atan(ClipToView00) * 4 / pi)^5), ClipToView00 = tan(half FOV x).
+    float2 TanHalfFov = UE.Expression(Class = "ViewProperty", Property = "TanHalfFieldOfView").Property;
+    float HalfFovX = atan(TanHalfFov.x);
+    float FovNorm = saturate(pow(saturate(HalfFovX * 1.2732395), 5.0));
+    float Fov = lerp(1.0, FovNorm, FX_Glitter_FOV_Compensation);
+
+    float HueAngle = L1.g * L1.g * L2.g * FX_Glitter_Hue_Jitter;
+    float3 Color = ToonFXHueRotate(BaseColor * FX_Glitter_Tint.rgb, HueAngle);
+    float Gate = Mask * smoothstep(-0.7, 1.3, SpecMask) * Fov;
+
+    Coverage = saturate(Lit * Gate);
+    return Color * (Lit * Gate * FX_Glitter_Intensity);
+}

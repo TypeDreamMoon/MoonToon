@@ -40,6 +40,7 @@
 // nothing to factor them into. What keeps them identical is that each reads the same Surf_* locals.
 
 import "Shared/ToonFeatureSignatures.dsh";
+import "Shared/ToonFunctions.dsh";
 
 VirtualFunction(Name="MF_MoonToonBaseInput")
 {
@@ -145,6 +146,43 @@ Function float MoonToonCoverageWeight(in float Opacity)
 #endif
 }
 
+// Hair-tip translucency (T12 / G27, "Use Hair Tip Translucency"). One switch, two roles, and the
+// blend mode picks the role the same way MoonToonCoverageWeight does:
+//   opaque / masked (the section's own material) -- the CUT: the tip leaves OpacityMask, so the
+//     masked base pass, depth and the inner lines all see the fringe without its ends;
+//   translucent (a child instance set as the slot's Overlay Material) -- the REDRAW: only the tip
+//     has opacity. Every vertex below the tip threshold is pushed back along its own camera ray --
+//     the screen footprint does not move, only the depth -- so it sits behind the opaque section it
+//     duplicates: the translucent pass rejects it at the depth test (no forward shading for the
+//     whole fringe at opacity 0) and the toon translucent prepass, which ignores opacity, records it
+//     as hidden rather than as a layer in front.
+Function float MoonToonHairTipOpacity(in float Opacity, in float Tip, in float TipOpacity)
+{
+#if MATERIALBLENDING_TRANSLUCENT || MATERIALBLENDING_ADDITIVE || MATERIALBLENDING_ALPHACOMPOSITE
+	return Opacity * Tip * TipOpacity;
+#else
+	return Opacity;
+#endif
+}
+
+Function float MoonToonHairTipCut(in float OpacityMask, in float Tip)
+{
+#if MATERIALBLENDING_TRANSLUCENT || MATERIALBLENDING_ADDITIVE || MATERIALBLENDING_ALPHACOMPOSITE
+	return OpacityMask;
+#else
+	return OpacityMask * (1.0f - Tip);
+#endif
+}
+
+Function float3 MoonToonHairTipPush(in float3 AwayFromCamera, in float Keep, in float Push)
+{
+#if MATERIALBLENDING_TRANSLUCENT || MATERIALBLENDING_ADDITIVE || MATERIALBLENDING_ALPHACOMPOSITE
+	return AwayFromCamera * (Push * (1.0f - Keep));
+#else
+	return float3(0.0f, 0.0f, 0.0f);
+#endif
+}
+
 Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 {
 	Settings = {
@@ -201,6 +239,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		StaticSwitchParameter Is_KajiyaHair = false [ParameterName="Is KajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=1; Description="启用 Hair Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 		StaticSwitchParameter Is_ToonKajiyaHair = false [ParameterName="Is ToonKajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=2; Description="启用 Hair Toon Kajiya Kay 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 		StaticSwitchParameter Is_DFFacialShadow = false [ParameterName="Is DFFacialShadow"; Group="30 - Shading Feature (pick one)"; SortPriority=3; Description="启用 SDF Face 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
+		StaticSwitchParameter Use_Full_Angle_SDF = false [ParameterName="Use Full Angle SDF"; Group="32 - SDF Face|Full Angle"; SortPriority=-1; Description="(配合 Is DFFacialShadow) 脸部阴影改用全角度 SDF 图集(Tools/SDF360 烘焙, T18): 材质按关键光(含灯光装配/脸角度覆盖)求值, 主干直接用结果, 顶光/底光/背光都对. 图集参数从 sdf360.json 抄.\r\n(With Is DFFacialShadow) the face shadow from a full-angle SDF atlas (Tools/SDF360, T18): evaluated in the material for the key light (light rig and face override included), used by the trunk as is, so top, bottom and back light all work."];
+		StaticSwitchParameter Is_AngelRing = false [ParameterName="Is AngelRing"; Group="30 - Shading Feature (pick one)"; SortPriority=4; Description="启用新天使环(鸣潮/异环式, T17): 材质函数 MF_ToonAngelRing 算出环的颜色和暗带, 主干只对主光求值(阴影下限、光色/固定色、暗带压暗漫反射). 只应勾选一个; 勾了多个时靠前的胜出. 旧的 Is HairHighlightMask 可用 Tools/AngelRing/migrate_hair_highlight_mask.py 迁移过来.\r\nThe new angel ring (T17): MF_ToonAngelRing paints the ring and its dark band; the trunk evaluates them on the main light only (shadow floor, light colour or fixed colour, the band darkening the diffuse)."];
 		StaticSwitchParameter Is_HairHighlightMask = false [ParameterName="Is HairHighlightMask"; Group="30 - Shading Feature (pick one)"; SortPriority=4; Description="启用 Hair Highlight Mask 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 		StaticSwitchParameter Is_Skin = false [ParameterName="Is Skin"; Group="30 - Shading Feature (pick one)"; SortPriority=5; Description="启用 Skin 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
 		StaticSwitchParameter Is_Stockings = false [ParameterName="Is Stockings"; Group="30 - Shading Feature (pick one)"; SortPriority=6; Description="启用 Stockings 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];
@@ -220,6 +260,18 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// so every other instance keeps a constant-zero WPO that the translator folds away.
 		ScalarParameter Coplanar_Depth_Bias = 0.05 [ParameterName="Coplanar Depth Bias"; Group="14 - Coplanar Layer"; SortPriority=1; Description="(配合 Use Coplanar Depth Bias) 这个材质的顶点沿指向相机的方向前移的距离, cm. 用于和皮肤完全共面的贴片层(额头印记/腮红/纹身)消除深度打架造成的闪烁. 0.02~0.1 足够, 太大会在侧视时看出贴片浮起.\r\n(With Use Coplanar Depth Bias) how far, in cm, this material's vertices move toward the camera. For decal-like layers that sit exactly on the skin (a forehead mark, blush, a tattoo), which otherwise z-fight with it and flicker."];
 		StaticSwitchParameter Use_Coplanar_Depth_Bias = false [ParameterName="Use Coplanar Depth Bias"; Group="14 - Coplanar Layer"; SortPriority=0; Description="把这个材质当作共面贴片层: 顶点朝相机前移 Coplanar Depth Bias, 消除和下面皮肤的深度打架(闪烁). 只给贴片层开, 不要给皮肤本体开.\r\nTreat this material as a coplanar layer: its vertices move toward the camera by Coplanar Depth Bias so it stops z-fighting (flickering) with the surface under it. Enable on the layer, never on the skin itself."];
+		StaticSwitchParameter Use_Sheer_Dither = false [ParameterName="Use Sheer Dither"; Group="21 - Translucency"; SortPriority=40; Description="薄纱镂空(鸣潮纱袖的做法): 材质仍是不透明 GBuffer, 每帧按屏幕位置丢掉一部分像素, 交给 TSR 时间累积成半透明. 覆盖率 = Opacity x Opacity Map(即原 OpacityMask), 1 = 不透. 只在 Blend Mode 覆盖为 Masked 的实例上生效; 阴影 pass 不抖动, 仍用 Shadow Opacity. 代价: 写满深度和速度, 快速运动/切镜会有噪点拖影.\r\nSheer screen-door (the Wuthering Waves sleeve technique): the surface stays an opaque GBuffer write, a per-frame screen-space pattern discards part of it, and TSR accumulates the holes into translucency. Coverage = Opacity x Opacity Map (the usual OpacityMask), 1 = solid. Needs the instance's Blend Mode overridden to Masked; the shadow pass is not dithered and keeps Shadow Opacity."];
+		StaticSwitchParameter Use_Hair_Tip_Translucency = false [ParameterName="Use Hair Tip Translucency"; Group="21 - Translucency|Hair Tip"; SortPriority=50; Description="发梢真半透明(终末地刘海的做法). 一张发梢遮罩(Hair Tip Mask), 两个实例: 头发本身的实例(Blend Mode 覆盖为 Masked)把发梢裁掉; 它的子实例 Blend Mode 覆盖为 Translucent, 设成该槽位的 Overlay Material(网格组件 Material Slots Overlay Material), 只画发梢、用底色贴图 alpha 混合, 眉眼从发梢透出来. 同一个开关, 角色由混合模式决定. 详见 MoonToon/Docs/HairTipTranslucency.md.\r\nHair-tip true translucency (the Arknights: Endfield fringe). One tip mask, two instances: the section's own instance (Blend Mode overridden to Masked) cuts the tips out; a child instance with Blend Mode overridden to Translucent, set as that slot's Overlay Material, draws only the tips, blended by the base colour alpha, so brows and eyes read through them. Same switch on both; the blend mode picks the role."];
+		ScalarParameter Hair_Tip_Root_Opacity = 1.0 [ParameterName="Hair Tip Root Opacity"; Group="21 - Translucency|Hair Tip"; SortPriority=54; Description="(半透明重画)发梢根部(遮罩值 = 阈值处)的不透明度, 再乘底色 alpha. 保持 1 与不透明部分无缝衔接.\r\n(Translucent redraw) opacity where the tip begins (mask = threshold), times the base colour alpha. Keep 1 for a seamless join with the opaque part."];
+		ScalarParameter Hair_Tip_End_Opacity = 1.0 [ParameterName="Hair Tip End Opacity"; Group="21 - Translucency|Hair Tip"; SortPriority=55; Description="(半透明重画)发梢末端(遮罩值 = 1 处)的不透明度, 再乘底色 alpha. 二值遮罩 + 底色 alpha(终末地)保持 1; 渐变遮罩可降到 0.6 左右(异环).\r\n(Translucent redraw) opacity at the very end (mask = 1), times the base colour alpha. 1 with a binary mask and an authored alpha (Endfield); about 0.6 with a gradient mask (NTE)."];
+		ScalarParameter Hair_Tip_Casts_Shadow = 1.0 [ParameterName="Hair Tip Casts Shadow"; Group="21 - Translucency|Hair Tip"; SortPriority=56; Description="(不透明裁剪)发梢是否仍投影: 1 = 阴影 pass 不裁发梢(额头上的发影保持完整), 0 = 阴影也裁掉.\r\n(Opaque cut) whether the cut tips still cast shadows: 1 = the shadow pass keeps them, 0 = cut there too."];
+		ScalarParameter Hair_Tip_Hidden_Push = 2.0 [ParameterName="Hair Tip Hidden Push"; Group="21 - Translucency|Hair Tip"; SortPriority=57; Description="(半透明重画)非发梢顶点沿视线往后推的距离, cm. 让重画的非发梢部分落到不透明头发后面: 不做前向着色, 也不被半透明预深度当成前景层. 远景描边/内线出问题时调大; 太大无害(屏幕位置不变).\r\n(Translucent redraw) how far, in cm, non-tip vertices move back along their camera ray, so the redraw's non-tip part sits behind the opaque section: no forward shading for it, and the translucent prepass does not take it for a front layer. Screen position is unchanged, so larger is harmless."];
+		ScalarParameter Sheer_Emissive_Opaque = 1.0 [ParameterName="Sheer Emissive Opaque"; Group="21 - Translucency"; SortPriority=41; Description="(配合 Use Sheer Dither) 自发光亮度抬高覆盖率的倍数: 覆盖率 = max(OpacityMask, 自发光亮度 x 此值). 让闪点/发光花纹在薄纱上保持实心不被打孔. 0 = 关.\r\n(With Use Sheer Dither) how much emissive luminance raises coverage, so glitter and glowing patterns stay solid on the gauze. 0 = off."];
+		// Effects (T09-T11, G05 / G06). One shared mask for every effect: which packed map and channel
+		// say where the effects live. 0 = the whole material. Each effect is its own static switch below,
+		// so an instance that ticks none compiles exactly what it compiled before.
+		ScalarParameter FX_Mask_Source = 0.0 [ParameterName="FX Mask Source"; Group="50 - FX"; SortPriority=0; Description="特效作用区域取自哪张打包遮罩图: 0 = 整个材质, 1/2/3 = Global Mask Map 1/2/3(通道由 FX Mask Channel 决定). 所有特效共用这一个遮罩.\r\nWhere the effects live: 0 = the whole material, 1/2/3 = Global Mask Map 1/2/3 through FX Mask Channel. Shared by every effect."];
+		ChannelMaskParameter FX_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [ParameterName="FX Mask Channel"; Group="50 - FX"; SortPriority=1; MaskChannel=Red];
 		StaticSwitchParameter Is_Modifier_OilFilm = false [ParameterName="Is Modifier Oil Film"; Group="43 - Modifier (pick one)"; SortPriority=1; Description="启用 Oil Film 修饰层. 修饰层叠加在着色特征之上, 与任意特征共存 —— 它不占 30 组的单选. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 无修饰层, 在面板和着色器里都不花代价."];
 	}
 
@@ -270,16 +322,16 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// One call, read many times: a VirtualFunction call with the same argument list is served
 		// from the graph builder's reuse cache, so MF_MoonToonBaseInput is one node in the generated
 		// asset however many of its outputs are read here.
-		float3 Surf_BaseColor              = MF_MoonToonBaseInput(Output="OutBaseColor");
+		float3 Surf_BaseColorAuthored      = MF_MoonToonBaseInput(Output="OutBaseColor");
 		float  Surf_Metallic               = MF_MoonToonBaseInput(Output="OutMetallic");
-		float  Surf_Specular               = MF_MoonToonBaseInput(Output="OutSpecular");
-		float  Surf_Roughness              = MF_MoonToonBaseInput(Output="OutRoughness");
+		float  Surf_SpecularAuthored       = MF_MoonToonBaseInput(Output="OutSpecular");
+		float  Surf_RoughnessAuthored      = MF_MoonToonBaseInput(Output="OutRoughness");
 		float3 Surf_Normal                 = MF_MoonToonBaseInput(Output="OutNormal");
-		float3 Surf_EmissiveColor          = MF_MoonToonBaseInput(Output="OutEmissiveColor");
+		float3 Surf_EmissiveColorAuthored  = MF_MoonToonBaseInput(Output="OutEmissiveColor");
 		float  Surf_Anisotropy             = MF_MoonToonBaseInput(Output="OutAnisotropy");
 		float3 Surf_Tangent                = MF_MoonToonBaseInput(Output="OutTangent");
 
-		float3 Surf_MainLightShadowColor   = MF_MoonToonBaseInput(Output="OutMainLightShadowColor");
+		float3 Surf_MainLightShadowColorAuthored = MF_MoonToonBaseInput(Output="OutMainLightShadowColor");
 		float  Surf_DiffuseColorRampIndex  = MF_MoonToonBaseInput(Output="OutDiffuseColorRampIndex");
 		float  Surf_DiffuseRampUVOffset    = MF_MoonToonBaseInput(Output="OutDiffuseRampUVOffset");
 		float3 Surf_SpecularColor          = MF_MoonToonBaseInput(Output="OutSpecularColor");
@@ -299,6 +351,152 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 Surf_GlobalMaskC            = MF_MoonToonBaseInput(Output="OutGlobalMaskC");
 		float  Surf_StockingsThickness     = MF_MoonToonBaseInput(Output="OutStockingsThickness");
 		float3 Surf_StockingsSkinColor     = MF_MoonToonBaseInput(Output="OutStockingsSkinColor");
+
+		#Region "FX (T09-T11)"
+		// Effects (G05 / G06), each behind its own static switch, all reading one shared mask. Every
+		// stage below passes the previous value through untouched when its switch is off -- a culled
+		// branch, not a multiply by one -- so an instance with no effect ticked compiles to exactly the
+		// graph it had before. Order: base colour (view hue -> wet -> hologram), emissive (each effect
+		// adds, flicker last), coverage (reveal / dissolve / hologram cut, applied at Opacity below).
+		float2 FX_UV = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=0);
+		float4 FX_MaskMap = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, FX_Mask_Source, FX_MaskMap);
+		float FX_Mask = FX_Mask_Channel(Input = FX_MaskMap);
+
+		float3 FX_Base_Hue = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=MF_ToonFX_ViewHueShift(Surf_BaseColorAuthored, float3(0.0, 0.0, 0.0), FX_UV, FX_Mask),
+				False=Surf_BaseColorAuthored,
+				ParameterName="Use FX View Hue Shift",
+				Group="50 - FX",
+				SortPriority=10,
+				Desc="镭射/视角色相旋转(鸣潮镭射): 按 N.V 旋转底色色相.\r\nView-dependent hue rotation of the base colour (foil)."
+			);
+		float3 FX_Base_Wet = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=MF_ToonFX_Wet(FX_Base_Hue, Surf_RoughnessAuthored, Surf_SpecularAuthored, float3(0.0, 0.0, 0.0), FX_Mask, Output="Result"),
+				False=FX_Base_Hue,
+				ParameterName="Use FX Wet",
+				Group="50 - FX",
+				SortPriority=20,
+				Desc="湿身(异环雨水): 底色变暗、粗糙度降低、高光增强、竖直面上流下雨痕.\r\nWet surface: darker, glossier, with rain streaks on vertical faces."
+			);
+		float  Surf_Roughness = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=MF_ToonFX_Wet(FX_Base_Hue, Surf_RoughnessAuthored, Surf_SpecularAuthored, float3(0.0, 0.0, 0.0), FX_Mask, Output="RoughnessOut"),
+				False=Surf_RoughnessAuthored,
+				ParameterName="Use FX Wet",
+				Group="50 - FX",
+				SortPriority=20
+			);
+		float  Surf_Specular = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=MF_ToonFX_Wet(FX_Base_Hue, Surf_RoughnessAuthored, Surf_SpecularAuthored, float3(0.0, 0.0, 0.0), FX_Mask, Output="SpecularOut"),
+				False=Surf_SpecularAuthored,
+				ParameterName="Use FX Wet",
+				Group="50 - FX",
+				SortPriority=20
+			);
+		float3 Surf_BaseColor = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=MF_ToonFX_Hologram(FX_Base_Wet, float3(0.0, 0.0, 0.0), FX_Mask, Output="BaseColorOut"),
+				False=FX_Base_Wet,
+				ParameterName="Use FX Hologram",
+				Group="50 - FX",
+				SortPriority=30,
+				Desc="全息(少前2): 扫描线 + 边缘发光 + 闪烁, 底色压暗, 扫描线之间降低覆盖率.\r\nHologram: scan lines, rim glow, flicker; darker base, lower coverage between the lines."
+			);
+
+		float3 FX_Emissive_Glitter = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=(Surf_EmissiveColorAuthored + MF_ToonFX_Glitter(FX_UV, Surf_BaseColor, FX_Mask, 1.0, Output="Result")),
+				False=Surf_EmissiveColorAuthored,
+				ParameterName="Use FX Glitter",
+				Group="50 - FX",
+				SortPriority=40,
+				Desc="闪点(鸣潮纱袍): 两层点阵 + 视差 + 时间滚动, 视角一动就闪.\r\nGlitter: two dot layers with view parallax; sparkles when the view moves."
+			);
+		float3 FX_Emissive_Flow = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=(FX_Emissive_Glitter + MF_ToonFX_FlowLight(FX_UV, FX_Mask)),
+				False=FX_Emissive_Glitter,
+				ParameterName="Use FX Flow Light",
+				Group="50 - FX",
+				SortPriority=50,
+				Desc="流光(鸣潮): 焦散纹理按时间滚动、自扭曲, 进自发光.\r\nFlow light: a scrolling, self-distorted caustic in the emissive."
+			);
+		float3 FX_Emissive_Reveal = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=(FX_Emissive_Flow + MF_ToonFX_Reveal(FX_UV, FX_Mask, Output="Result")),
+				False=FX_Emissive_Flow,
+				ParameterName="Use FX Reveal",
+				Group="50 - FX",
+				SortPriority=60,
+				Desc="显现(鸣潮额饰): 按顺序图和进度显现, 边缘带噪声发光.\r\nReveal: appears along an order map by Progress, with a noisy glowing edge."
+			);
+		float3 FX_Emissive_Pulse = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=(FX_Emissive_Reveal + MF_ToonFX_Pulse(Surf_BaseColor, FX_Mask)),
+				False=FX_Emissive_Reveal,
+				ParameterName="Use FX Pulse",
+				Group="50 - FX",
+				SortPriority=70,
+				Desc="脉冲(鸣潮宝石): 底色 x 颜色的自发光随时间呼吸.\r\nPulse: base colour x colour emissive breathing over time."
+			);
+		float3 FX_Emissive_Dissolve = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=(FX_Emissive_Pulse + MF_ToonFX_Dissolve(FX_UV, FX_Mask, Output="Result")),
+				False=FX_Emissive_Pulse,
+				ParameterName="Use FX Dissolve",
+				Group="50 - FX",
+				SortPriority=80,
+				Desc="溶解(异环): 噪声/高度溶解, 边缘发光, 溶掉的地方裁掉.\r\nDissolve: noise / height dissolve with a glowing edge; the dissolved part is cut."
+			);
+		float3 FX_Emissive_Hologram = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=(FX_Emissive_Dissolve + MF_ToonFX_Hologram(FX_Base_Wet, float3(0.0, 0.0, 0.0), FX_Mask, Output="Result")),
+				False=FX_Emissive_Dissolve,
+				ParameterName="Use FX Hologram",
+				Group="50 - FX",
+				SortPriority=30
+			);
+		float3 Surf_EmissiveColor = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=MF_ToonFX_Flicker(FX_Emissive_Hologram, FX_UV, FX_Mask),
+				False=FX_Emissive_Hologram,
+				ParameterName="Use FX Flicker",
+				Group="50 - FX",
+				SortPriority=90,
+				Desc="闪烁: 自发光随机明灭, 可加随机亮点(鸣潮顶点闪烁).\r\nFlicker: the emissive blinks; optional random sparkles."
+			);
+		#EndRegion
+
+		// Shadow colour LUT (T08 / G22): the shadow side's colour looked up from the albedo in a 32^3
+		// LUT instead of one colour (Endfield's skin). Off by default; the culled branch leaves the
+		// shadow colour exactly what the base input authored. Every leaf below reads this one local.
+		float3 Surf_MainLightShadowColor =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=MF_ToonShadowColorLUT(Surf_BaseColor, Surf_MainLightShadowColorAuthored),
+				False=Surf_MainLightShadowColorAuthored,
+				ParameterName="Use Shadow Color LUT",
+				Group="10 - Diffuse|Shadow Color LUT",
+				SortPriority=0,
+				Desc="暗部颜色改为按底色查 3D LUT(终末地皮肤的做法): 色相、饱和度随底色变化, 比单色相乘更自然. 关 = 原来的 Shadow Color.\r\nLook the shadow-side colour up from the albedo in a 32^3 LUT (Endfield's skin). Off = the authored Shadow Color."
+			);
 		#EndRegion
 
 		#Region "Modifier"
@@ -539,6 +737,55 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Modifier_Payload        = ModifierPayload,
 			Modifier_Id             = ModifierId);
 
+		// 3b THE SAME FACE, FULL-ANGLE SDF (G26, R2 / T18). MF_ToonFullAngleSDF evaluates the baked
+		// theta x phi atlas for the character's key light (MF_MoonToonKeyLight: the rig's face direction,
+		// the scene main light without one) and the node is told the result is final
+		// (bFacialShadowSdfPreEvaluated), so the trunk thresholds it at 0.5 for the main light instead of
+		// splitting by azimuth. Head forward: the rig's head frame when the character has one, else the
+		// baked face-forward the classic leaf uses (the Tangent pin).
+		float3 SDF360_FaceDirection = MF_MoonToonKeyLight(Output="FaceDirection");
+		float3 SDF360_HeadForward   = MF_MoonToonKeyLight(Output="HeadForward");
+		float3 SDF360_HeadUp        = MF_MoonToonKeyLight(Output="HeadUp");
+		float3 SDF360_Forward = lerp(Surf_Tangent, SDF360_HeadForward, step(0.5, dot(SDF360_HeadForward, SDF360_HeadForward)));
+		float2 SDF360_UV = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=0);
+		float Surf_FacialShadowSdf360 = MF_ToonFullAngleSDF(SDF360_UV, SDF360_FaceDirection, SDF360_Forward, SDF360_HeadUp);
+		Substrate Leaf_DFFacialShadow360 = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Skin",
+			bFacialShadowSdfPreEvaluated = true,
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Facial_Shadow_SDF_Left  = Surf_FacialShadowSdf360,
+			Facial_Shadow_SDF_Right = Surf_FacialShadowSdf360,
+			ScatterStrength         = MF_ToonFeature_DFFacialShadow(Output="ScatterStrength"),
+			TransmissionStrength    = MF_ToonFeature_DFFacialShadow(Output="TransmissionStrength"),
+			TransmissionPower       = MF_ToonFeature_DFFacialShadow(Output="TransmissionPower"),
+			PrimaryRoughnessScale   = MF_ToonFeature_DFFacialShadow(Output="PrimaryRoughnessScale"),
+			SecondaryRoughnessScale = MF_ToonFeature_DFFacialShadow(Output="SecondaryRoughnessScale"),
+			SecondaryRampOffset     = MF_ToonFeature_DFFacialShadow(Output="SecondaryRampOffset"),
+			OverallSpecIntensity    = MF_ToonFeature_DFFacialShadow(Output="OverallSpecIntensity"),
+			PrimaryLobeIntensity    = MF_ToonFeature_DFFacialShadow(Output="PrimaryLobeIntensity"),
+			SecondaryLobeIntensity  = MF_ToonFeature_DFFacialShadow(Output="SecondaryLobeIntensity"),
+			SpecShadowStrength      = MF_ToonFeature_DFFacialShadow(Output="SpecShadowStrength"),
+			WarmTintStrength        = MF_ToonFeature_DFFacialShadow(Output="WarmTintStrength"),
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
 		// 4 HAIR_HIGHLIGHT_MASK -- Kind Default + term Hair Highlight Mask.
 		Substrate Base_HairHighlightMask = UE.Expression(
 			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
@@ -571,6 +818,45 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Intensity       = MF_ToonFeature_HairHighlightMask(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Output="Intensity"),
 			ShadowIntensity = MF_ToonFeature_HairHighlightMask(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Output="ShadowIntensity"),
 			ViewAnchorBlend = MF_ToonFeature_HairHighlightMask(Surf_GlobalMaskA, Surf_GlobalMaskB, Surf_GlobalMaskC, Output="ViewAnchorBlend"));
+
+		// 4b ANGEL RING (G08, R2 / T17) -- Kind Default + term Angel Ring, i.e. the hair-mask term with
+		// the angel-ring variant bit. MF_ToonAngelRing is evaluated once (the graph builder reuses the
+		// call); every one of the five slots is wired, because the Feature node does not write an
+		// unconnected term pin and ShadowFloor would otherwise inherit the Kind's ScalarC.
+		float2 AngelRing_UV0 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=0);
+		float2 AngelRing_UV1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
+		Substrate Base_AngelRing = UE.Expression(
+			Class = "SubstrateMoonToonBSDF", OutputType = "Substrate",
+			Kind = "Default",
+			BaseColor               = Surf_BaseColor,
+			Metallic                = Surf_Metallic,
+			Specular                = Surf_Specular,
+			Roughness               = Surf_Roughness,
+			Normal                  = Surf_Normal,
+			Emissive_Color          = Surf_EmissiveColor,
+			Anisotropy              = Surf_Anisotropy,
+			Tangent                 = Surf_Tangent,
+			Main_Light_Shadow_Color = Surf_MainLightShadowColor,
+			Diffuse_Ramp_Index      = Surf_DiffuseColorRampIndex,
+			Diffuse_Ramp_UV_Offset  = Surf_DiffuseRampUVOffset,
+			Toon_Specular_Color     = Surf_SpecularColor,
+			Specular_Ramp_Index     = Surf_SpecularColorRampIndex,
+			Specular_Ramp_UV_Offset = Surf_SpecularRampUVOffset,
+			Reflection_Intensity    = Surf_ReflectionIntensity,
+			Stencil                 = Surf_Stencil,
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Modifier_Payload        = ModifierPayload,
+			Modifier_Id             = ModifierId);
+
+		Substrate Leaf_AngelRing = UE.Expression(
+			Class = "MoonToonFeature", OutputType = "Substrate",
+			Term = "AngelRing",
+			MoonToonMaterial = Base_AngelRing,
+			DarkBand    = MF_ToonAngelRing(float3(0.0, 0.0, 0.0), AngelRing_UV0, AngelRing_UV1, 1.0, float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), Output="DarkBand"),
+			Intensity   = MF_ToonAngelRing(float3(0.0, 0.0, 0.0), AngelRing_UV0, AngelRing_UV1, 1.0, float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), Output="IntensityEncoded"),
+			ShadowFloor = MF_ToonAngelRing(float3(0.0, 0.0, 0.0), AngelRing_UV0, AngelRing_UV1, 1.0, float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), Output="ShadowFloor"),
+			ColorMode   = MF_ToonAngelRing(float3(0.0, 0.0, 0.0), AngelRing_UV0, AngelRing_UV1, 1.0, float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), Output="ColorMode"),
+			RingColor   = MF_ToonAngelRing(float3(0.0, 0.0, 0.0), AngelRing_UV0, AngelRing_UV1, 1.0, float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), float3(0.0, 0.0, 0.0), Output="RingColor"));
 
 		// 6 SKIN -- the same Kind as the SDF face, without the pair wired.
 		Substrate Leaf_Skin = UE.Expression(
@@ -843,8 +1129,10 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 				False = Is_ToonKajiyaHair(
 					True = Leaf_ToonKajiyaHair,
 					False = Is_DFFacialShadow(
-						True = Leaf_DFFacialShadow,
-						False = Is_HairHighlightMask(
+						True = Use_Full_Angle_SDF(True = Leaf_DFFacialShadow360, False = Leaf_DFFacialShadow),
+						False = Is_AngelRing(
+							True = Leaf_AngelRing,
+							False = Is_HairHighlightMask(
 							True = Leaf_HairHighlightMask,
 							False = Is_Skin(
 								True = Leaf_Skin,
@@ -860,7 +1148,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 													True = Leaf_ToonMetal,
 													False = Is_EmissiveInk(
 														True = Leaf_EmissiveInk,
-														False = Leaf_Default))))))))))));
+														False = Leaf_Default)))))))))))));
 		#EndRegion
 
 		#Region "Root pins and custom outputs"
@@ -875,8 +1163,116 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		// MF_MoonToonBaseInput writes both channels: OutOpacity for the translucent blend and
 		// OutOpacityMask (the sampled alpha, with "Shadow Opacity" x "Apply Opacity to Shadow"
 		// substituted in the shadow pass) for the masked cutout.
-		Opacity          = MF_MoonToonBaseInput(Output="OutOpacity");
-		OpacityMask      = MF_MoonToonBaseInput(Output="OutOpacityMask");
+		// FX coverage (reveal / dissolve / hologram), chained like the FX region: each stage passes the
+		// previous value through untouched when its switch is off.
+		float Surf_OpacityAuthored     = MF_MoonToonBaseInput(Output="OutOpacity");
+		float Surf_OpacityMaskAuthored = MF_MoonToonBaseInput(Output="OutOpacityMask");
+		float FX_Opacity_Reveal = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(Surf_OpacityAuthored * MF_ToonFX_Reveal(FX_UV, FX_Mask, Output="Coverage")),
+				False=Surf_OpacityAuthored,
+				ParameterName="Use FX Reveal",
+				Group="50 - FX",
+				SortPriority=60
+			);
+		float FX_OpacityMask_Reveal = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(Surf_OpacityMaskAuthored * MF_ToonFX_Reveal(FX_UV, FX_Mask, Output="Coverage")),
+				False=Surf_OpacityMaskAuthored,
+				ParameterName="Use FX Reveal",
+				Group="50 - FX",
+				SortPriority=60
+			);
+		float FX_Opacity_Dissolve = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(FX_Opacity_Reveal * MF_ToonFX_Dissolve(FX_UV, FX_Mask, Output="Coverage")),
+				False=FX_Opacity_Reveal,
+				ParameterName="Use FX Dissolve",
+				Group="50 - FX",
+				SortPriority=80
+			);
+		float FX_OpacityMask_Dissolve = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(FX_OpacityMask_Reveal * MF_ToonFX_Dissolve(FX_UV, FX_Mask, Output="Coverage")),
+				False=FX_OpacityMask_Reveal,
+				ParameterName="Use FX Dissolve",
+				Group="50 - FX",
+				SortPriority=80
+			);
+		float FX_Opacity_Hologram = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(FX_Opacity_Dissolve * MF_ToonFX_Hologram(FX_Base_Wet, float3(0.0, 0.0, 0.0), FX_Mask, Output="Coverage")),
+				False=FX_Opacity_Dissolve,
+				ParameterName="Use FX Hologram",
+				Group="50 - FX",
+				SortPriority=30
+			);
+		float FX_OpacityMask_Hologram = UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(FX_OpacityMask_Dissolve * MF_ToonFX_Hologram(FX_Base_Wet, float3(0.0, 0.0, 0.0), FX_Mask, Output="Coverage")),
+				False=FX_OpacityMask_Dissolve,
+				ParameterName="Use FX Hologram",
+				Group="50 - FX",
+				SortPriority=30
+			);
+
+		// Hair-tip translucency (T12, "Use Hair Tip Translucency"; the role functions at the top of this
+		// file say which half runs). Off: both pins are exactly the FX chain's result.
+		float HairTip_Tip      = MF_ToonHairTip(FX_UV, Output="Tip");
+		float HairTip_Gradient = MF_ToonHairTip(FX_UV, Output="Gradient");
+		float HairTip_Keep     = MF_ToonHairTip(FX_UV, Output="Keep");
+		Opacity = Use_Hair_Tip_Translucency(
+			True = MoonToonHairTipOpacity(FX_Opacity_Hologram, HairTip_Tip, lerp(Hair_Tip_Root_Opacity, Hair_Tip_End_Opacity, HairTip_Gradient)),
+			False = FX_Opacity_Hologram);
+		// The cut keeps the tips in the shadow pass unless Hair Tip Casts Shadow is 0, so the fringe's
+		// shadow on the forehead does not lose its ends.
+		float HairTip_CutMask = MoonToonHairTipCut(FX_OpacityMask_Hologram, HairTip_Tip);
+		float HairTip_OpacityMask =
+			UE.Expression(
+				Class="ShadowReplace",
+				OutputType="float",
+				Default=HairTip_CutMask,
+				Shadow=lerp(HairTip_CutMask, FX_OpacityMask_Hologram, Hair_Tip_Casts_Shadow)
+			);
+		float Surf_OpacityMask = Use_Hair_Tip_Translucency(
+			True = HairTip_OpacityMask,
+			False = FX_OpacityMask_Hologram);
+
+		// Sheer dither (opt-in, "Use Sheer Dither"). A narrower revival of the retired scheme above,
+		// for one job only: thin cloth over a body, where writing full depth/velocity is harmless.
+		// Ported from Wuthering Waves' gauze sleeves (RenderDoc 2026-10-30, Toon/WUWA_CHARACTER_
+		// RENDERING_ANALYSIS.md 10.5): keep the pixel when ((2y+x+3f)%5 + n)/5 >= 1 - coverage, with
+		// n a static per-pixel noise and f the frame. Five interleaved phases rotate through the
+		// frames, so TSR averages each pixel to ~coverage; the static n spreads the threshold within
+		// a phase. Wuwa maps coverage 0.8333 to solid and uses the TAA jitter index for f; here 1 is
+		// solid and f is StateFrameIndex, which cycles the five phases evenly whatever the jitter
+		// sequence length. Emissive luminance lifts coverage the way Wuwa's specular/glitter does.
+		// The binary 0/1 result clips correctly against any clip value in (0,1). The shadow pass gets
+		// the undithered mask, so "Shadow Opacity" keeps meaning what it says.
+		float Sheer_Keep =
+			UE.Expression(
+				Class="Custom",
+				OutputType="float",
+				Code="float Coverage = saturate(max(Mask, dot(Emissive, float3(0.3f, 0.59f, 0.11f)) * EmissiveOpaque));\r\nfloat2 Pixel = floor(Parameters.SvPosition.xy - ResolvedView.ViewRectMin.xy);\r\nfloat Frame = (float)(View.StateFrameIndex % 5u);\r\nfloat Phase = fmod(2.0f * (Pixel.y + Frame) + (Pixel.x + Frame), 5.0f);\r\nfloat Noise = frac(52.9829189f * frac(dot(Pixel, float2(0.06711056f, 0.00583715f))));\r\nreturn ((Phase + Noise) * 0.2f >= 1.0f - Coverage) ? 1.0f : 0.0f;",
+				Description="Sheer screen-door dither (Wuthering Waves style)",
+				Mask=Surf_OpacityMask,
+				Emissive=Surf_EmissiveColor,
+				EmissiveOpaque=Sheer_Emissive_Opaque
+			);
+		float Sheer_OpacityMask =
+			UE.Expression(
+				Class="ShadowReplace",
+				OutputType="float",
+				Default=Sheer_Keep,
+				Shadow=Surf_OpacityMask
+			);
+		OpacityMask = Use_Sheer_Dither(True = Sheer_OpacityMask, False = Surf_OpacityMask);
 		// Coverage: the opacity for translucent blends, 1 for opaque and masked -- see
 		// MoonToonCoverageWeight at the top of this file for why that has to be decided in HLSL.
 		ToonSurface = Substrate.Weight(A = ToonClosure, Weight = MoonToonCoverageWeight(Opacity));
@@ -898,9 +1294,13 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float3 CoplanarBias_CameraPos = UE.Expression(Class="CameraPositionWS", OutputType="float3");
 		float3 CoplanarBias_WorldPos  = UE.Expression(Class="WorldPosition", OutputType="float3");
 		float3 CoplanarBias_ToCamera  = normalize(CoplanarBias_CameraPos - CoplanarBias_WorldPos);
-		WorldPositionOffset = Use_Coplanar_Depth_Bias(
+		float3 CoplanarBias_Offset = Use_Coplanar_Depth_Bias(
 			True = (CoplanarBias_ToCamera * Coplanar_Depth_Bias),
 			False = float3(0.0, 0.0, 0.0));
+		// Hair-tip redraw: non-tip vertices step back along their camera ray (zero in the opaque cut).
+		WorldPositionOffset = Use_Hair_Tip_Translucency(
+			True = (CoplanarBias_Offset + MoonToonHairTipPush(-CoplanarBias_ToCamera, HairTip_Keep, Hair_Tip_Hidden_Push)),
+			False = CoplanarBias_Offset);
 		#EndRegion
 	}
 }

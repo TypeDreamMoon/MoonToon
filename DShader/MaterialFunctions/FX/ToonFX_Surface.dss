@@ -1,0 +1,194 @@
+// MoonToon effect functions, batch 3 (task T11, gap G06): dissolve, wet, hologram, flicker.
+// Each `export` builds its own function asset in this folder. Conventions: Shared/ToonFXCommon.dsh.
+//
+// Sources: Neverness to Everness (noise dissolve, the rain-wet set: streaks / ripples / occlusion
+// box, all present in code with the global switch off -- Toon/NTE_CHARACTER_RENDERING_ANALYSIS.md
+// section 10), Girls' Frontline 2 (variant 7149: dither / hologram / dissolve, and the optional flicker
+// colour lerp -- Toon/GF2_CHARACTER_RENDERING_ANALYSIS.md section 4), Wuthering Waves (the vertex
+// flicker hash(uv, time)^16, off in the captured frame).
+
+#include "Shared/ToonFXCommon.dsh"
+
+// --------------------------------------------------------------------------------------- dissolve
+
+/// @name FX Dissolve Noise   @group 55 - FX: Dissolve   @sort 0   @sampler LinearColor
+/// @default /MoonToon/Textures/FX/T_ToonFX_Noise
+uniform Texture2D FX_Dissolve_Noise;
+
+/// @name FX Dissolve Progress   @group 55 - FX: Dissolve   @sort 1   @slider 0 1
+/// @desc 溶解进度: 0 = 完整, 1 = 全部溶掉. 0 = intact, 1 = gone.
+uniform float FX_Dissolve_Progress = 0.0;
+
+/// @name FX Dissolve Noise Tiling   @group 55 - FX: Dissolve   @sort 2   @slider 0.1 16
+uniform float FX_Dissolve_Noise_Tiling = 2.0;
+
+/// @name FX Dissolve Height Weight   @group 55 - FX: Dissolve   @sort 3   @slider 0 1
+/// @desc 0 = 纯噪声溶解, 1 = 从下往上按高度溶解(噪声只扰动边缘). 0 noise only, 1 a bottom-up sweep.
+uniform float FX_Dissolve_Height_Weight = 0.0;
+
+/// @name FX Dissolve Height   @group 55 - FX: Dissolve   @sort 4   @slider 10 400
+/// @desc 高度溶解覆盖的高度, cm(从物体原点向上). Height the sweep covers above the object origin, cm.
+uniform float FX_Dissolve_Height = 180.0;
+
+/// @name FX Dissolve Edge Width   @group 55 - FX: Dissolve   @sort 5   @slider 0 0.5
+uniform float FX_Dissolve_Edge_Width = 0.05;
+
+/// @name FX Dissolve Edge Color   @group 55 - FX: Dissolve   @sort 6
+uniform float4 FX_Dissolve_Edge_Color = float4(0.4, 0.8, 1.0, 1.0);
+
+/// @name FX Dissolve Edge Intensity   @group 55 - FX: Dissolve   @sort 7   @slider 0 50
+uniform float FX_Dissolve_Edge_Intensity = 6.0;
+
+/// @library MoonToon|FX
+/// @param UV    Mesh UV for the noise.
+/// @param Mask  Where it dissolves; outside the mask the surface stays.
+export float3 MF_ToonFX_Dissolve(float2 UV, float Mask = 1.0, out float Coverage)
+{
+    float Noise = FX_Dissolve_Noise.Sample(UV * FX_Dissolve_Noise_Tiling).r;
+    float Height = saturate((UE.WorldPosition().Z - UE.ObjectPositionWS().z) / max(FX_Dissolve_Height, 1.0));
+    float Order = lerp(Noise, Height + (Noise - 0.5) * 0.2, FX_Dissolve_Height_Weight);
+    float P = FX_Dissolve_Progress * (1.0 + FX_Dissolve_Edge_Width * 2.0) - FX_Dissolve_Edge_Width;
+    float Kept = step(P, Order);
+    float Edge = saturate(1.0 - (Order - P) / max(FX_Dissolve_Edge_Width, 0.0001)) * Kept;
+    Coverage = lerp(1.0, Kept, Mask);
+    return FX_Dissolve_Edge_Color.rgb * (Edge * Mask * FX_Dissolve_Edge_Intensity * step(0.0001, FX_Dissolve_Progress));
+}
+
+// -------------------------------------------------------------------------------------------- wet
+
+/// @name FX Wetness   @group 56 - FX: Wet   @sort 0   @slider 0 1
+/// @desc 湿润程度. 0 = 干. Wetness, 0 = dry.
+uniform float FX_Wetness = 0.0;
+
+/// @name FX Wet Darken   @group 56 - FX: Wet   @sort 1   @slider 0 1
+/// @desc 全湿时底色变暗多少. How much a fully wet surface darkens.
+uniform float FX_Wet_Darken = 0.35;
+
+/// @name FX Wet Roughness Scale   @group 56 - FX: Wet   @sort 2   @slider 0 1
+/// @desc 全湿时粗糙度乘多少(越小越亮滑). Roughness multiplier when fully wet.
+uniform float FX_Wet_Roughness_Scale = 0.35;
+
+/// @name FX Wet Specular Boost   @group 56 - FX: Wet   @sort 3   @slider 1 4
+uniform float FX_Wet_Specular_Boost = 1.6;
+
+/// @name FX Wet Streaks   @group 56 - FX: Wet   @sort 4   @sampler LinearColor
+/// @default /MoonToon/Textures/FX/T_ToonFX_RainStreaks
+/// @desc 雨痕(R 流痕, G 水珠头). Rain streaks (R) and droplet heads (G).
+uniform Texture2D FX_Wet_Streaks;
+
+/// @name FX Wet Streak Tiling   @group 56 - FX: Wet   @sort 5   @slider 1 200
+/// @desc 世界空间雨痕尺度, cm/每张. World size of one streak tile, cm.
+uniform float FX_Wet_Streak_Tiling = 40.0;
+
+/// @name FX Wet Streak Speed   @group 56 - FX: Wet   @sort 6   @slider 0 2
+/// @desc 雨痕下流速度(张/秒). Streak flow speed, tiles per second.
+uniform float FX_Wet_Streak_Speed = 0.25;
+
+/// @name FX Wet Streak Strength   @group 56 - FX: Wet   @sort 7   @slider 0 1
+uniform float FX_Wet_Streak_Strength = 0.6;
+
+/// @library MoonToon|FX
+/// @param BaseColor  The surface's base colour.
+/// @param Roughness  The surface's roughness.
+/// @param Specular   The surface's specular.
+/// @param NormalWS   World normal; zero = the vertex normal.
+/// @param Mask       Where it can get wet (0..1).
+export float3 MF_ToonFX_Wet(float3 BaseColor, float Roughness, float Specular, float3 NormalWS, float Mask = 1.0,
+    out float RoughnessOut, out float SpecularOut)
+{
+    float3 N = length(NormalWS) > 0.0001 ? normalize(NormalWS) : UE.VertexNormalWS();
+    float3 P = UE.WorldPosition();
+    // Streaks run down vertical surfaces: project on the plane facing the normal's dominant horizontal axis.
+    float U = abs(N.x) > abs(N.y) ? P.y : P.x;
+    float2 SUV = float2(U, -P.z) / max(FX_Wet_Streak_Tiling, 1.0) + float2(0.0, ToonFXTime() * FX_Wet_Streak_Speed);
+    float4 S = FX_Wet_Streaks.Sample(SUV);
+    float Vertical = 1.0 - saturate(abs(N.z));
+    float Streak = saturate(S.r + S.g) * FX_Wet_Streak_Strength * Vertical;
+    float W = saturate(FX_Wetness * Mask * (1.0 - FX_Wet_Streak_Strength * 0.5 + Streak));
+
+    RoughnessOut = Roughness * lerp(1.0, FX_Wet_Roughness_Scale, W);
+    SpecularOut = saturate(Specular * lerp(1.0, FX_Wet_Specular_Boost, W));
+    return BaseColor * lerp(1.0, 1.0 - FX_Wet_Darken, W);
+}
+
+// --------------------------------------------------------------------------------------- hologram
+
+/// @name FX Hologram Color   @group 57 - FX: Hologram   @sort 0
+uniform float4 FX_Hologram_Color = float4(0.3, 0.8, 1.0, 1.0);
+
+/// @name FX Hologram Intensity   @group 57 - FX: Hologram   @sort 1   @slider 0 20
+uniform float FX_Hologram_Intensity = 2.0;
+
+/// @name FX Hologram Line Density   @group 57 - FX: Hologram   @sort 2   @slider 0.1 20
+/// @desc 扫描线密度, 条/厘米(世界 Z). Scan lines per cm along world Z.
+uniform float FX_Hologram_Line_Density = 1.5;
+
+/// @name FX Hologram Line Speed   @group 57 - FX: Hologram   @sort 3   @slider -10 10
+uniform float FX_Hologram_Line_Speed = 2.0;
+
+/// @name FX Hologram Rim Power   @group 57 - FX: Hologram   @sort 4   @slider 0.5 8
+uniform float FX_Hologram_Rim_Power = 2.5;
+
+/// @name FX Hologram Flicker   @group 57 - FX: Hologram   @sort 5   @slider 0 1
+/// @desc 整体闪烁幅度. Overall flicker amount.
+uniform float FX_Hologram_Flicker = 0.15;
+
+/// @name FX Hologram Base Darken   @group 57 - FX: Hologram   @sort 6   @slider 0 1
+/// @desc 底色压暗多少(只剩全息的光). How much the base colour is pressed down.
+uniform float FX_Hologram_Base_Darken = 0.7;
+
+/// @name FX Hologram Coverage   @group 57 - FX: Hologram   @sort 7   @slider 0 1
+/// @desc 扫描线之间的覆盖率(配合薄纱镂空 / 半透明). Coverage between the lines (for sheer dither / translucency).
+uniform float FX_Hologram_Coverage = 0.6;
+
+/// @library MoonToon|FX
+/// @param BaseColor  The surface's base colour.
+/// @param NormalWS   World normal; zero = the vertex normal.
+/// @param Mask       Where it is a hologram (0..1).
+export float3 MF_ToonFX_Hologram(float3 BaseColor, float3 NormalWS, float Mask = 1.0, out float3 BaseColorOut, out float Coverage)
+{
+    float3 N = length(NormalWS) > 0.0001 ? normalize(NormalWS) : UE.VertexNormalWS();
+    float NoV = saturate(dot(N, normalize(UE.CameraVectorWS())));
+    float T = ToonFXTime();
+    float Lines = 0.5 + 0.5 * sin((UE.WorldPosition().Z * FX_Hologram_Line_Density + T * FX_Hologram_Line_Speed) * 6.2831853);
+    float Rim = pow(1.0 - NoV, FX_Hologram_Rim_Power);
+    float Flicker = 1.0 - FX_Hologram_Flicker * ToonFXHash21(float2(floor(T * 24.0), 7.0));
+
+    BaseColorOut = lerp(BaseColor, BaseColor * (1.0 - FX_Hologram_Base_Darken), Mask);
+    Coverage = lerp(1.0, saturate(lerp(FX_Hologram_Coverage, 1.0, Lines * Lines)), Mask);
+    return FX_Hologram_Color.rgb * ((Rim + Lines * 0.35) * Flicker * Mask * FX_Hologram_Intensity);
+}
+
+// ---------------------------------------------------------------------------------------- flicker
+
+/// @name FX Flicker Speed   @group 58 - FX: Flicker   @sort 0   @slider 0 60
+/// @desc 闪烁频率(次/秒). Flicker rate per second.
+uniform float FX_Flicker_Speed = 10.0;
+
+/// @name FX Flicker Depth   @group 58 - FX: Flicker   @sort 1   @slider 0 1
+/// @desc 自发光最暗时剩多少的反面: 1 = 会完全灭. How deep the emissive dips (1 = goes fully dark).
+uniform float FX_Flicker_Depth = 0.5;
+
+/// @name FX Sparkle Cells   @group 58 - FX: Flicker   @sort 2   @slider 1 256
+/// @desc 随机亮点的 UV 网格密度(鸣潮顶点闪烁). Random sparkle cells across UV.
+uniform float FX_Sparkle_Cells = 64.0;
+
+/// @name FX Sparkle Power   @group 58 - FX: Flicker   @sort 3   @slider 1 64
+/// @desc 亮点稀疏度(鸣潮 16). Sparkle sparseness exponent.
+uniform float FX_Sparkle_Power = 16.0;
+
+/// @name FX Sparkle Color   @group 58 - FX: Flicker   @sort 4
+uniform float4 FX_Sparkle_Color = float4(0.0, 0.0, 0.0, 1.0);
+
+/// @library MoonToon|FX
+/// @param Emissive  The material's emissive, flickered.
+/// @param UV        Mesh UV (sparkle cells).
+/// @param Mask      Where it flickers (0..1).
+export float3 MF_ToonFX_Flicker(float3 Emissive, float2 UV, float Mask = 1.0)
+{
+    float T = ToonFXTime();
+    float Blink = ToonFXHash21(float2(floor(T * FX_Flicker_Speed), 3.0));
+    float Scale = lerp(1.0, 1.0 - FX_Flicker_Depth * Blink, Mask);
+    float Sparkle = pow(ToonFXHash21(floor(UV * FX_Sparkle_Cells) + floor(T * FX_Flicker_Speed)), FX_Sparkle_Power);
+    return Emissive * Scale + FX_Sparkle_Color.rgb * (Sparkle * Mask);
+}

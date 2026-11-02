@@ -1,0 +1,42 @@
+// MF_ToonShadowColorLUT -- the main light's shadow colour looked up from the albedo in a 3D colour LUT
+// (task T08, gap G22; Arknights: Endfield's skin does this with a 32^3 LUT). Compared with one shadow
+// colour times the albedo, the LUT lets hue and saturation move with the albedo: the darker, redder
+// parts of skin go warmer, pale parts stay soft.
+//
+// The result is the ABSOLUTE shadow-side colour (what the trunk lerps the albedo to where the main
+// light's ramp mask is dark), i.e. it replaces Main Light Shadow Color. Strength 0 returns ShadowColorIn
+// unchanged, so wiring this in costs nothing until it is turned up.
+//
+// LUT layout (Tools/ShadowColorLUT/make_shadow_color_lut.py): 32^3 unwrapped into a 1024x32 strip,
+// texel (x, y) = (r + 32 b, g), each axis value = index / 31. Linear (sRGB off).
+
+/// @name Shadow Color LUT   @group 10 - Diffuse|Shadow Color LUT   @sort 0   @sampler LinearColor
+/// @default /MoonToon/Textures/ShadowColorLUT/T_ShadowColorLUT_Skin
+/// @desc 阴影色 LUT(32x32x32 展开成 1024x32): 按底色查暗部颜色. 1024x32 strip, albedo -> shadow colour.
+uniform Texture2D Shadow_Color_LUT;
+
+/// @name Shadow Color LUT Strength   @group 10 - Diffuse|Shadow Color LUT   @sort 1   @slider 0 1
+/// @desc 0 = 用原来的阴影色, 1 = 完全用 LUT 的结果. 0 = the authored shadow colour, 1 = the LUT.
+uniform float Shadow_Color_LUT_Strength = 1.0;
+
+/// @name Shadow Color LUT Tint   @group 10 - Diffuse|Shadow Color LUT   @sort 2
+/// @desc LUT 结果再乘的颜色(线性). Multiplies the LUT result (linear).
+uniform float4 Shadow_Color_LUT_Tint = float4(1.0, 1.0, 1.0, 1.0);
+
+/// @library MoonToon|Shared
+/// @param BaseColor      The albedo to look up (linear, 0..1).
+/// @param ShadowColorIn  The shadow colour the material had without the LUT.
+export float3 MF_ToonShadowColorLUT(float3 BaseColor, float3 ShadowColorIn)
+{
+    float3 C = saturate(BaseColor);
+    float B = C.b * 31.0;
+    float B0 = floor(B);
+    float B1 = min(B0 + 1.0, 31.0);
+    float T = B - B0;
+    float U = C.r * 31.0 + 0.5;
+    float V = (C.g * 31.0 + 0.5) / 32.0;
+    float3 S0 = Shadow_Color_LUT.SampleLevel(float2((U + B0 * 32.0) / 1024.0, V), 0.0).rgb;
+    float3 S1 = Shadow_Color_LUT.SampleLevel(float2((U + B1 * 32.0) / 1024.0, V), 0.0).rgb;
+    float3 Looked = lerp(S0, S1, T) * Shadow_Color_LUT_Tint.rgb;
+    return lerp(ShadowColorIn, Looked, saturate(Shadow_Color_LUT_Strength));
+}
