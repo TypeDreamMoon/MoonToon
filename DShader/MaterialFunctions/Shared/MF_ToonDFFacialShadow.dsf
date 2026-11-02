@@ -58,7 +58,21 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 			);
 		#EndRegion
 
-		float SampledFacialShadowSdfRight = Distance_Field_Facial_Shadow_Map_Channel(Input = Distance_Field_Facial_Shadow_Map.rgba);
+		// R+G Average (T24): an Endfield-style split map, the threshold spread over two 8-bit channels and
+		// read back as (R + G) / 2 -- 511 levels, about 9 bits, from an uncompressed RGBA8 texture
+		// (VectorDisplacementmap; any block compression mixes R and G and loses the extra bit). Tools/FaceSDF
+		// writes it. Off = the channel mask, exactly as before.
+		float SampledFacialShadowSdfRight =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(Distance_Field_Facial_Shadow_Map.r + Distance_Field_Facial_Shadow_Map.g) * 0.5,
+				False=Distance_Field_Facial_Shadow_Map_Channel(Input = Distance_Field_Facial_Shadow_Map.rgba),
+				Group="02 - Distance Field Facial Shadow",
+				SortPriority=33,
+				Desc="距离场面影贴图按终末地式 R+G 分半格式读: 阈值 = (R + G) / 2, 约 9 位精度(Tools/FaceSDF 可输出). 关 = 按上面的通道读, 和以前一样.\r\nRead the map as an Endfield-style R+G split: threshold = (R + G) / 2, about 9 bits (Tools/FaceSDF writes it). Off = the channel above, as before.",
+				ParameterName="Distance Field Facial Shadow Map R+G Average"
+			);
 		float2 MaterialExpressionTextureCoordinate_2_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
 		#Region "Texture Sample"
 		float4 Distance_Field_Facial_Shadow_Map_1 =
@@ -78,7 +92,16 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 			);
 		#EndRegion
 
-		float SampledFacialShadowSdfLeft = Distance_Field_Facial_Shadow_Map_Channel_1(Input = Distance_Field_Facial_Shadow_Map_1.rgba);
+		float SampledFacialShadowSdfLeft =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=(Distance_Field_Facial_Shadow_Map_1.r + Distance_Field_Facial_Shadow_Map_1.g) * 0.5,
+				False=Distance_Field_Facial_Shadow_Map_Channel_1(Input = Distance_Field_Facial_Shadow_Map_1.rgba),
+				Group="02 - Distance Field Facial Shadow",
+				SortPriority=33,
+				ParameterName="Distance Field Facial Shadow Map R+G Average"
+			);
 
 		#Region "Distance Field Facial Shadow"
 		SdfLeft =
