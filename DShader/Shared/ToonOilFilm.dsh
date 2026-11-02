@@ -1,0 +1,12 @@
+// The oil-film material function (T30), which only M_MoonToon calls. Kept out of ToonFunctions.dsh on
+// purpose: every function that imports that header is regenerated when it changes.
+
+VirtualFunction(Name="MF_ToonOilFilm")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonOilFilm");
+		Description = "Oil film as a specular ramp plus a view-driven ramp offset (T30), optionally tinted by UE thin-film interference.";
+	}
+	Inputs = { float3 NormalTS; }
+	Outputs = { float RampIndex; float RampOffsetDelta; float3 SpecularTint; }
+}
