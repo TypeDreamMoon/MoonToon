@@ -54,6 +54,9 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		// MoonToonActorComponent (Face Overlay Mode): 0 = auto (eyebrow-tagged = brow, else eye),
 		// 1 = brow, 2 = eye. Appended last so every existing output index stays put.
 		float FaceOverlayPart;
+		// Hair-thickness falloff in cm for this material (0 = the engine default
+		// r.MoonToon.FaceOverlay.Thickness, negative = none). Appended last, like Part.
+		float FaceOverlayThickness;
 	}
 
 	Properties = {
@@ -81,13 +84,13 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			SortPriority=31;
 			Description="Opacity feathers to zero over the last N cm before the threshold. Only used when Depth Threshold > 0; 0 with an overridden threshold = hard cutoff.";
 		];
-		ScalarParameter Through_Hair_View_Fade_Start = 0.12 [
+		ScalarParameter Through_Hair_View_Fade_Start = 0.02 [
 			ParameterName="Through Hair View Fade Start";
 			Group="24 - See Through Overlay";
 			SortPriority=32;
-			Description="N dot V below which the re-blend is fully gone (profile views). Start < End required; equal values fall back to the engine curve 0.12-0.40.";
+			Description="N dot V below which the re-blend is fully gone. Only meant to remove near edge-on slivers (a lash card seen side-on): profile views are faded by Through Hair Thickness instead, by how much hair is in the way. Start < End required; equal values fall back to the engine curve 0.02-0.15. (Was 0.12 / 0.40, which hid every part past roughly 70 degrees.)";
 		];
-		ScalarParameter Through_Hair_View_Fade_End = 0.40 [
+		ScalarParameter Through_Hair_View_Fade_End = 0.15 [
 			ParameterName="Through Hair View Fade End";
 			Group="24 - See Through Overlay";
 			SortPriority=33;
@@ -157,6 +160,24 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			Group="24 - See Through Overlay";
 			SortPriority=8;
 			Description="这个材质在角色'眉眼透视档位'(MoonToonActorComponent 的 Face Overlay Mode: 不透/仅透眉/半透/全透)里算眉还是算眼: 0 = 自动(标了眉毛特性的算眉, 其余算眼), 1 = 眉, 2 = 眼(瞳孔/睫毛/眼白/高光). 睫毛卡片用普通 toon 着色时请手动设 2.\r\nWhich see-through group the per-character tier (Face Overlay Mode on MoonToonActorComponent: none / brows only / half / full) treats this material as: 0 = auto (eyebrow-tagged is a brow, everything else an eye), 1 = brow, 2 = eye (iris, lashes, eye white, highlights).";
+		];
+		ScalarParameter Through_Hair_Thickness = 0.0 [
+			ParameterName="Through Hair Thickness";
+			Group="24 - See Through Overlay";
+			SortPriority=34;
+			Description="头发厚度感: 头发离这个部件每远 N cm, 透出强度减半. 刘海贴着眉毛时透得明显, 侧面隔着厚厚的侧发只剩淡淡的影子, 两侧被不同发片盖住时强度也自然不同. 0 = 用引擎默认值 r.MoonToon.FaceOverlay.Thickness(6 cm), 负数 = 不衰减. 想让侧面也透得更清楚就调大, 想让只有贴得很近的刘海才透就调小.\r\nHair-thickness falloff: the re-blend halves for every N cm between the hair in front and this part. 0 = the engine default (r.MoonToon.FaceOverlay.Thickness, 6 cm), negative = no falloff.";
+		];
+		ScalarParameter Through_Hair_Top_View_Fade_Start = 35.0 [
+			ParameterName="Through Hair Top View Fade Start";
+			Group="24 - See Through Overlay";
+			SortPriority=35;
+			Description="俯视淡出起点(度): 视线高出头部水平面这么多度时开始变淡. 从上往下看时刘海是顺着视线盖在眉眼上的, 透出来像五官浮在头发上面. 按头部坐标算(有脸朝前方向时去掉它的分量), 低头也算俯视, 左右转头/侧面不受影响; 没有朝向来源时用世界上方向. 设成 90 或以上 = 关闭.\r\nTop-down fade start, degrees of camera elevation above the head's horizontal plane. Seen from above, the fringe lies over the brows / eyes along the view and a re-blend reads as features floating on the hair. Head-relative when a head-forward source exists (a nodding head counts too; yaw / profiles never do), world up otherwise. 90 or more turns it off.";
+		];
+		ScalarParameter Through_Hair_Top_View_Fade_End = 55.0 [
+			ParameterName="Through Hair Top View Fade End";
+			Group="24 - See Through Overlay";
+			SortPriority=36;
+			Description="俯视淡出终点(度): 高于这个仰角完全不透. 要大于起点.\r\nTop-down fade end, degrees: above this elevation the part no longer reads through. Must be greater than Start.";
 		];
 		ScalarParameter Through_Hair_Mask_Source = 0.0 [
 			ParameterName="Through Hair Mask Source";
@@ -237,6 +258,23 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			step(0.001, FrontHair_HeadLen));
 
 		float FrontHair_Mask = FrontHair_IsHair * FrontHair_InFront * FrontHair_ViewMask;
+
+		// Top-down fade. Independent of the gate above (always on unless Start >= 90). The head's up is
+		// world Z with the head-forward component removed, so a head tipped forward under a level camera
+		// counts as seen from above while turning the head (profiles) never does; with no head-forward
+		// source the forward is zero and this is plain world Z. Pre-tier (folded into the alpha), so it
+		// also drops enrollment once the elevation passes End.
+		float3 TopView_WorldUp = float3(0.0, 0.0, 1.0);
+		float3 TopView_HeadF = FrontHair_HeadSource / max(FrontHair_HeadLen, 0.001);
+		float3 TopView_UpRaw = TopView_WorldUp - TopView_HeadF * dot(TopView_WorldUp, TopView_HeadF);
+		float TopView_UpLen = length(TopView_UpRaw);
+		float3 TopView_Up = lerp(TopView_WorldUp, TopView_UpRaw / max(TopView_UpLen, 0.001),
+			step(0.001, FrontHair_HeadLen) * step(0.1, TopView_UpLen));
+		float TopView_ElevationDeg = asin(clamp(dot(FrontHair_ViewDir, TopView_Up), -1.0, 1.0)) * 57.29578;
+		float TopView_Fade = lerp(
+			1.0 - smoothstep(Through_Hair_Top_View_Fade_Start, Through_Hair_Top_View_Fade_End, TopView_ElevationDeg),
+			1.0,
+			step(90.0, Through_Hair_Top_View_Fade_Start));
 		float FrontHair_Gate = UE.Expression(
 			Class="StaticSwitchParameter",
 			OutputType="float",
@@ -255,7 +293,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=float4(Multiply_Overlay, (Through_Hair_Opacity * Through_Hair_Mask_Value * FrontHair_Gate)),
+				True=float4(Multiply_Overlay, (Through_Hair_Opacity * Through_Hair_Mask_Value * FrontHair_Gate * TopView_Fade)),
 				False=float4(0.0, 0.0, 0.0, 0.0),
 				Group="24 - See Through Overlay",
 				SortPriority=5,
@@ -274,5 +312,6 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 				ParameterName="Is Face Overlay Occluder"
 			);
 		FaceOverlayPart = Through_Hair_Part;
+		FaceOverlayThickness = Through_Hair_Thickness;
 	}
 }

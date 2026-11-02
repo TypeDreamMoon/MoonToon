@@ -12,7 +12,8 @@
 //   MoonToonFaceOverlay.Pin[0..4] <- the see-through-bangs re-blend, the per-MI depth threshold /
 //                         fade tuning, the extra accepted occluder classes, this material's own
 //                         occluder class (engine #10: the overlay's occluder layer, not CustomStencil),
-//                         and its see-through group (brow / eye) for the per-character tier.
+//                         its see-through group (brow / eye) for the per-character tier, and its
+//                         hair-thickness falloff (Pin[5]).
 //
 // MoonToonFaceOverlay is a UMaterialExpressionCustomOutput: it has no output pins, so it can only be
 // reached through an Outputs expression binding, never from the Graph body. It stays a custom output
@@ -99,6 +100,7 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float3 OutStockingsSkinColor;
 		float  FaceOverlayOccluderClass;
 		float  FaceOverlayPart;
+		float  FaceOverlayThickness;
 	}
 }
 
@@ -236,6 +238,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float4 FaceOverlayStencils;
 		float  FaceOverlayOccluder;
 		float  FaceOverlayPart;
+		float  FaceOverlayThickness;
 		float3 WorldPositionOffset;
 
 		// The one shading wire. Everything the renderer needs to shade this pixel is inside it.
@@ -259,6 +262,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		Expression(Class="MoonToonFaceOverlay").Pin[2] = FaceOverlayStencils;
 		Expression(Class="MoonToonFaceOverlay").Pin[3] = FaceOverlayOccluder;
 		Expression(Class="MoonToonFaceOverlay").Pin[4] = FaceOverlayPart;
+		Expression(Class="MoonToonFaceOverlay").Pin[5] = FaceOverlayThickness;
 	}
 
 	Graph = {
@@ -887,6 +891,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		FaceOverlayStencils = MF_MoonToonBaseInput(Output="FaceOverlayStencilIDs");
 		FaceOverlayOccluder = MF_MoonToonBaseInput(Output="FaceOverlayOccluderClass");
 		FaceOverlayPart     = MF_MoonToonBaseInput(Output="FaceOverlayPart");
+		FaceOverlayThickness = MF_MoonToonBaseInput(Output="FaceOverlayThickness");
 
 		// Coplanar layer bias (see the property). Toward the camera rather than along the normal, so
 		// the layer's silhouette does not grow; constant zero while the switch is off.

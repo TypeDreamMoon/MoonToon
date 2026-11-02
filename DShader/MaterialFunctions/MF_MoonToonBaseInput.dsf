@@ -544,6 +544,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// The see-through group (0 auto, 1 brow, 2 eye) for the per-character Face Overlay Mode.
 		// Appended last for the same reason as the occluder class above.
 		float  FaceOverlayPart;
+		// The hair-thickness falloff (cm, 0 = engine default). Appended last.
+		float  FaceOverlayThickness;
 	}
 
 	Graph = {
@@ -1599,6 +1601,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float4 Face_Overlay_Stencil_IDs = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=2);
 		float Face_Overlay_Occluder_Class = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=3);
 		float Face_Overlay_Part = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=4);
+		float Face_Overlay_Thickness = MF_ToonSeeThroughOverlay(Base_Color_1, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, OutputIndex=5);
 		#EndRegion
 
 		Output = Attributes;
@@ -1653,6 +1656,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		OutStockingsSkinColor = BodyBaseColor.rgb;
 		FaceOverlayOccluderClass = Face_Overlay_Occluder_Class;
 		FaceOverlayPart = Face_Overlay_Part;
+		FaceOverlayThickness = Face_Overlay_Thickness;
 		#EndRegion
 	}
 }
