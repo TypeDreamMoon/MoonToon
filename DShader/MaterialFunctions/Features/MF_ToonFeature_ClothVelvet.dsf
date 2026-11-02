@@ -12,6 +12,8 @@
 //     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
 //     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_ClothVelvet(
 	in float WrapStrength,
 	in float SheenPower,
@@ -88,15 +90,33 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ClothVelvet", Roo
 	}
 
 	Graph = {
-		float Slot_WrapStrength = In_ClothVelvet_DiffuseWrapStrength;
-		float Slot_SheenPower = In_ClothVelvet_SheenPower;
-		float Slot_SheenShadowStrength = In_ClothVelvet_SheenShadowStrength;
-		float Slot_RoughnessScale = In_ClothVelvet_RoughnessScale;
-		float Slot_SheenIntensity = In_ClothVelvet_SheenIntensity;
-		float Slot_RetroDiffuseStrength = In_ClothVelvet_RetroDiffuseStrength;
-		float Slot_GrazingDarkenStrength = In_ClothVelvet_GrazingDarkenStrength;
-		float3 Slot_SheenTint = In_ClothVelvet_SheenTintRGB.rgb;
-		float Slot_RimBias = In_ClothVelvet_RimBias;
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C4 = MF_ToonSubMaterial(SubMat_ID, Output="C4");
+		float4 SubMat_W4 = MF_ToonSubMaterial(SubMat_ID, Output="W4");
+		float4 SubMat_C5 = MF_ToonSubMaterial(SubMat_ID, Output="C5");
+		float4 SubMat_W5 = MF_ToonSubMaterial(SubMat_ID, Output="W5");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
+		float Slot_WrapStrength_Authored = In_ClothVelvet_DiffuseWrapStrength;
+		float Slot_WrapStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_WrapStrength_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_WrapStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SheenPower_Authored = In_ClothVelvet_SheenPower;
+		float Slot_SheenPower = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenPower_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_SheenPower_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SheenShadowStrength_Authored = In_ClothVelvet_SheenShadowStrength;
+		float Slot_SheenShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenShadowStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_SheenShadowStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RoughnessScale_Authored = In_ClothVelvet_RoughnessScale;
+		float Slot_RoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_RoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SheenIntensity_Authored = In_ClothVelvet_SheenIntensity;
+		float Slot_SheenIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SheenIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RetroDiffuseStrength_Authored = In_ClothVelvet_RetroDiffuseStrength;
+		float Slot_RetroDiffuseStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RetroDiffuseStrength_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_RetroDiffuseStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_GrazingDarkenStrength_Authored = In_ClothVelvet_GrazingDarkenStrength;
+		float Slot_GrazingDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_GrazingDarkenStrength_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_GrazingDarkenStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_SheenTint_Authored = In_ClothVelvet_SheenTintRGB.rgb;
+		float3 Slot_SheenTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_SheenTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_SheenTint_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RimBias_Authored = In_ClothVelvet_RimBias;
+		float Slot_RimBias = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RimBias_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_RimBias_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_ClothVelvet(
 			Slot_WrapStrength,

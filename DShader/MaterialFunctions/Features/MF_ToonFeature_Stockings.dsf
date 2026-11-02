@@ -94,6 +94,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 	}
 
 	Graph = {
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C4 = MF_ToonSubMaterial(SubMat_ID, Output="C4");
+		float4 SubMat_W4 = MF_ToonSubMaterial(SubMat_ID, Output="W4");
+		float4 SubMat_C5 = MF_ToonSubMaterial(SubMat_ID, Output="C5");
+		float4 SubMat_W5 = MF_ToonSubMaterial(SubMat_ID, Output="W5");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
 		// Denier -> opacity, half-life form. Denier is grams per 9000m of filament, i.e. how much
 		// fibre is in the way, so occlusion is Beer-Lambert in it: every extra 35D halves what
 		// still gets through. Written as pow(0.5, D/35) rather than exp(-D/50) because the
@@ -103,15 +112,24 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Stockings", Root=
 		// many filaments here, which is what a stretched knee actually is.
 		float StockingsOpacity = 1.0 - pow(0.5, max(InThickness * In_Stockings_Denier, 0.0) / 35.0);
 
-		float Slot_Density = StockingsOpacity;
-		float Slot_FresnelPower = In_Stockings_FresnelPower;
-		float Slot_TransmissionStrength = In_Stockings_TransStrength;
-		float Slot_TransmissionDistortion = In_Stockings_TransDistortion;
-		float Slot_SpecularIntensity = MF_ToonStockingsSheenMask(GlobalMaskA, GlobalMaskB, GlobalMaskC) * In_Stockings_SpecIntensity;
-		float Slot_ShadowStrength = In_Stockings_ShadowStrength;
-		float Slot_GrazingDarkenStrength = In_Stockings_GrazingDarken;
-		float3 Slot_SkinColor = InSkinColor + In_Stockings_SkinColorRGB.rgb;
-		float Slot_GrazingSpecBoost = In_Stockings_GrazingSpecBoost;
+		float Slot_Density_Authored = StockingsOpacity;
+		float Slot_Density = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_Density_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_Density_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_FresnelPower_Authored = In_Stockings_FresnelPower;
+		float Slot_FresnelPower = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_FresnelPower_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_FresnelPower_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_TransmissionStrength_Authored = In_Stockings_TransStrength;
+		float Slot_TransmissionStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_TransmissionStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_TransmissionStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_TransmissionDistortion_Authored = In_Stockings_TransDistortion;
+		float Slot_TransmissionDistortion = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_TransmissionDistortion_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_TransmissionDistortion_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularIntensity_Authored = MF_ToonStockingsSheenMask(GlobalMaskA, GlobalMaskB, GlobalMaskC) * In_Stockings_SpecIntensity;
+		float Slot_SpecularIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SpecularIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_ShadowStrength_Authored = In_Stockings_ShadowStrength;
+		float Slot_ShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_ShadowStrength_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_ShadowStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_GrazingDarkenStrength_Authored = In_Stockings_GrazingDarken;
+		float Slot_GrazingDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_GrazingDarkenStrength_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_GrazingDarkenStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_SkinColor_Authored = InSkinColor + In_Stockings_SkinColorRGB.rgb;
+		float3 Slot_SkinColor = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_SkinColor_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_SkinColor_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_GrazingSpecBoost_Authored = In_Stockings_GrazingSpecBoost;
+		float Slot_GrazingSpecBoost = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_GrazingSpecBoost_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_GrazingSpecBoost_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_Stockings(
 			Slot_Density,

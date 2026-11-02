@@ -12,6 +12,8 @@
 //     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
 //     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_Eye(
 	in float DiffuseWrapStrength,
 	in float LimbalDarkenStrength,
@@ -88,15 +90,33 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 	}
 
 	Graph = {
-		float Slot_DiffuseWrapStrength = In_Eye_DiffuseWrapStrength;
-		float Slot_LimbalDarkenStrength = In_Eye_LimbalDarkenStrength;
-		float Slot_SpecularShadowStrength = In_Eye_SpecularShadowStrength;
-		float Slot_PrimaryRoughnessScale = In_Eye_PrimaryRoughnessScale;
-		float Slot_SecondaryRoughnessScale = In_Eye_SecondaryRoughnessScale;
-		float Slot_PrimaryIntensity = In_Eye_PrimaryIntensity;
-		float Slot_SecondaryIntensity = In_Eye_SecondaryIntensity;
-		float3 Slot_EyeTint = In_Eye_EyeTintRGB.rgb;
-		float Slot_SecondaryRampOffset = In_Eye_SecondaryRampOffset;
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C4 = MF_ToonSubMaterial(SubMat_ID, Output="C4");
+		float4 SubMat_W4 = MF_ToonSubMaterial(SubMat_ID, Output="W4");
+		float4 SubMat_C5 = MF_ToonSubMaterial(SubMat_ID, Output="C5");
+		float4 SubMat_W5 = MF_ToonSubMaterial(SubMat_ID, Output="W5");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
+		float Slot_DiffuseWrapStrength_Authored = In_Eye_DiffuseWrapStrength;
+		float Slot_DiffuseWrapStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_DiffuseWrapStrength_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_DiffuseWrapStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_LimbalDarkenStrength_Authored = In_Eye_LimbalDarkenStrength;
+		float Slot_LimbalDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_LimbalDarkenStrength_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_LimbalDarkenStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularShadowStrength_Authored = In_Eye_SpecularShadowStrength;
+		float Slot_SpecularShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularShadowStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_SpecularShadowStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_PrimaryRoughnessScale_Authored = In_Eye_PrimaryRoughnessScale;
+		float Slot_PrimaryRoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryRoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_PrimaryRoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryRoughnessScale_Authored = In_Eye_SecondaryRoughnessScale;
+		float Slot_SecondaryRoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryRoughnessScale_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SecondaryRoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_PrimaryIntensity_Authored = In_Eye_PrimaryIntensity;
+		float Slot_PrimaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryIntensity_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_PrimaryIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryIntensity_Authored = In_Eye_SecondaryIntensity;
+		float Slot_SecondaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryIntensity_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_SecondaryIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_EyeTint_Authored = In_Eye_EyeTintRGB.rgb;
+		float3 Slot_EyeTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_EyeTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_EyeTint_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryRampOffset_Authored = In_Eye_SecondaryRampOffset;
+		float Slot_SecondaryRampOffset = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryRampOffset_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_SecondaryRampOffset_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_Eye(
 			Slot_DiffuseWrapStrength,

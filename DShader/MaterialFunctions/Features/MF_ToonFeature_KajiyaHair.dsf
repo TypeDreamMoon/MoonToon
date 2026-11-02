@@ -12,6 +12,8 @@
 //     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
 //     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_KajiyaHair(
 	in float TangentRotate,
 	in float SecondaryShift,
@@ -96,17 +98,37 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_KajiyaHair", Root
 	}
 
 	Graph = {
-		float Slot_TangentRotate = In_Hair_TangentRotate;
-		float Slot_SecondaryShift = In_Hair_SecondaryShift;
-		float Slot_SecondaryMask = In_Hair_SecondaryMask;
-		float Slot_PrimaryShift = In_Hair_PrimaryShift;
-		float Slot_PrimaryExpScale = In_Hair_PrimaryExpScale;
-		float Slot_SecondaryExpScale = In_Hair_SecondaryExpScale;
-		float Slot_OverallIntensity = In_Hair_OverallSpecIntensity;
-		float Slot_PrimaryIntensity = In_Hair_PrimaryIntensity;
-		float Slot_SecondaryIntensity = In_Hair_SecondaryIntensity;
-		float Slot_SecondaryShiftScale = In_Hair_SecondaryShiftScale;
-		float Slot_ShadowStrength = In_Hair_ShadowStrength;
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C4 = MF_ToonSubMaterial(SubMat_ID, Output="C4");
+		float4 SubMat_W4 = MF_ToonSubMaterial(SubMat_ID, Output="W4");
+		float4 SubMat_C5 = MF_ToonSubMaterial(SubMat_ID, Output="C5");
+		float4 SubMat_W5 = MF_ToonSubMaterial(SubMat_ID, Output="W5");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
+		float Slot_TangentRotate_Authored = In_Hair_TangentRotate;
+		float Slot_TangentRotate = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_TangentRotate_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_TangentRotate_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryShift_Authored = In_Hair_SecondaryShift;
+		float Slot_SecondaryShift = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryShift_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_SecondaryShift_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryMask_Authored = In_Hair_SecondaryMask;
+		float Slot_SecondaryMask = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryMask_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_SecondaryMask_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_PrimaryShift_Authored = In_Hair_PrimaryShift;
+		float Slot_PrimaryShift = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryShift_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_PrimaryShift_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_PrimaryExpScale_Authored = In_Hair_PrimaryExpScale;
+		float Slot_PrimaryExpScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryExpScale_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_PrimaryExpScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryExpScale_Authored = In_Hair_SecondaryExpScale;
+		float Slot_SecondaryExpScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryExpScale_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_SecondaryExpScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_OverallIntensity_Authored = In_Hair_OverallSpecIntensity;
+		float Slot_OverallIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_OverallIntensity_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_OverallIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_PrimaryIntensity_Authored = In_Hair_PrimaryIntensity;
+		float Slot_PrimaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryIntensity_Authored, SubMat_C6.x, SubMat_W6.x), False=Slot_PrimaryIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryIntensity_Authored = In_Hair_SecondaryIntensity;
+		float Slot_SecondaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryIntensity_Authored, SubMat_C6.y, SubMat_W6.y), False=Slot_SecondaryIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryShiftScale_Authored = In_Hair_SecondaryShiftScale;
+		float Slot_SecondaryShiftScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryShiftScale_Authored, SubMat_C6.z, SubMat_W6.z), False=Slot_SecondaryShiftScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_ShadowStrength_Authored = In_Hair_ShadowStrength;
+		float Slot_ShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_ShadowStrength_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_ShadowStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_KajiyaHair(
 			Slot_TangentRotate,

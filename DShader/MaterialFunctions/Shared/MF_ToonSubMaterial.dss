@@ -1,0 +1,149 @@
+// MF_ToonSubMaterial -- one material, up to 16 sub-materials (task T22, gap G01; Wuthering Waves keeps
+// five per material). A sub-material ID per pixel picks a row of a small table texture; each row
+// overrides some of the material's parameters. The table is baked from a UMoonToonSubMaterialTable
+// asset (or by Tools/SubMaterial) into an 8 x 16 float texture (RGBA16F is enough), no mips, nearest:
+//
+//   column 0  Shadow Color.rgb            | override mask bits 0-7   (an integer 0..255)
+//   column 1  Metallic | Specular | Roughness | Reflection
+//   column 2  Anisotropy | Diffuse Ramp UV Offset | Base Color Tint strength | Emissive Scale
+//   column 3  Base Color Tint.rgb         | override mask bits 8-15
+//   column 4  feature channel ScalarA | B | C | D
+//   column 5  feature channel ScalarE | F | G | override mask bits 16-23
+//   column 6  feature channel Vector.xyzw
+//   column 7  Outline Width Scale | Outline Colour Scale.rgb
+//
+//   mask bits  0 Shadow Color  1 Metallic  2 Specular  3 Roughness  4 Reflection  5 Anisotropy
+//              6 Ramp UV Offset  7 Base Color Tint  8 Emissive Scale  9-12 ScalarA-D  13-15 ScalarE-G
+//              16-19 Vector.x-w  20 Outline Width  21 Outline Colour
+//
+// The feature channels are GENERIC (Shared/MoonToonFeatureSlots.h: every feature has up to seven
+// scalars and a float4); a row's values land on whatever feature the material shades with.
+//
+// The mask is split into bytes so a half-float table stores it exactly.
+//
+// Outputs C0..C7 are the row; W0..W7 the per-component override weights (0 or 1), so a consumer only
+// has to write lerp(parameter, C, W) -- behind the static switch "Use SubMaterial Table", whose off
+// branch is the parameter alone, so a material that does not use a table compiles what it did before.
+//
+// The ID (SubMaterial ID Source):
+//   0 texture  SubMaterial ID Map, channel SubMaterial ID Channel, UV SubMaterial ID UV Channel.
+//              An 8-bit value v holds ID * 16 / 255 (16 levels). SubMaterial ID Split = 1 reads it as
+//              4 + 4 bits instead: the high nibble is the ID, the low one a pattern ID (Wuthering
+//              Waves' line-art / pattern ID), returned as PatternID for later use.
+//              The ID map must be point sampled: Nearest, no mips (Tools/SubMaterial bakes it so).
+//   1 vertex colour, same channel and encoding
+//   2 UV range: the ID is which sixteenth of [0, 1) the U of the chosen UV channel falls in
+//   3 constant SubMaterial ID Constant
+
+/// @name SubMaterial Table   @group 15 - SubMaterial   @sort 1   @sampler LinearColor
+/// @default /MoonToon/Textures/T_Black_Linear
+/// @desc 子材质表纹理(8x16 浮点, 由子材质表资产或 Tools/SubMaterial 烘焙). The baked sub-material table (8 x 16 float).
+uniform Texture2D SubMaterial_Table;
+
+/// @name SubMaterial ID Source   @group 15 - SubMaterial   @sort 2   @slider 0 3
+/// @desc 子材质 ID 从哪来: 0 ID 贴图, 1 顶点色, 2 UV 范围, 3 常量. Where the ID comes from: 0 ID map, 1 vertex colour, 2 UV range, 3 constant.
+uniform float SubMaterial_ID_Source = 0.0;
+
+/// @name SubMaterial ID Map   @group 15 - SubMaterial   @sort 3   @sampler LinearColor
+/// @default /MoonToon/Textures/T_Black_Linear
+/// @desc 子材质 ID 贴图(关 sRGB, Nearest, 无 mip). 8 位值 = ID x 16 / 255. Sub-material ID map (sRGB off, nearest, no mips); 8-bit value = ID x 16 / 255.
+uniform Texture2D SubMaterial_ID_Map;
+
+/// @name SubMaterial ID Channel   @group 15 - SubMaterial   @sort 4   @slider 0 3
+/// @desc ID 在哪个通道(贴图或顶点色): 0 R, 1 G, 2 B, 3 A. Channel of the ID map / vertex colour.
+uniform float SubMaterial_ID_Channel = 0.0;
+
+/// @name SubMaterial ID UV Channel   @group 15 - SubMaterial   @sort 5   @slider 0 1
+/// @desc ID 贴图 / UV 范围用哪套 UV: 0 = UV0, 1 = UV1. UV set of the ID map and the UV-range source.
+uniform float SubMaterial_ID_UV_Channel = 0.0;
+
+/// @name SubMaterial ID Constant   @group 15 - SubMaterial   @sort 6   @slider 0 15
+/// @desc 常量来源时的 ID. The ID when the source is the constant.
+uniform float SubMaterial_ID_Constant = 0.0;
+
+/// @name SubMaterial ID Split   @group 15 - SubMaterial   @sort 7   @slider 0 1
+/// @desc 1 = 8 位按 4+4 拆: 高 4 位是 ID, 低 4 位是花纹 ID. 1 = split the byte 4 + 4: high nibble ID, low nibble pattern ID.
+uniform float SubMaterial_ID_Split = 0.0;
+
+/// @custom
+float4 MoonToonSubMaterialLoad(Texture2D Table, float Row, float Column)
+{
+	return Table.Load(int3((int)Column, (int)Row, 0));
+}
+
+/// @custom
+float4 MoonToonSubMaterialWeights(float Mask, float Column)
+{
+	// The whole mask (22 bits used), reassembled by MF_ToonSubMaterial from three bytes. Bits per
+	// component, column by column; -1 = no field there.
+	const uint M = (uint)max(Mask + 0.5f, 0.0f);
+	const int C = (int)Column;
+	int4 Bits = int4(-1, -1, -1, -1);
+	if (C == 0) Bits = int4(0, 0, 0, -1);
+	else if (C == 1) Bits = int4(1, 2, 3, 4);
+	else if (C == 2) Bits = int4(5, 6, 7, 8);
+	else if (C == 3) Bits = int4(7, 7, 7, -1);
+	else if (C == 4) Bits = int4(9, 10, 11, 12);
+	else if (C == 5) Bits = int4(13, 14, 15, -1);
+	else if (C == 6) Bits = int4(16, 17, 18, 19);
+	else if (C == 7) Bits = int4(20, 21, 21, 21);
+	float4 W;
+	W.x = Bits.x >= 0 ? (float)((M >> (uint)Bits.x) & 1u) : 0.0f;
+	W.y = Bits.y >= 0 ? (float)((M >> (uint)Bits.y) & 1u) : 0.0f;
+	W.z = Bits.z >= 0 ? (float)((M >> (uint)Bits.z) & 1u) : 0.0f;
+	W.w = Bits.w >= 0 ? (float)((M >> (uint)Bits.w) & 1u) : 0.0f;
+	return W;
+}
+
+/// @library MoonToon|Shared
+/// @return The sub-material ID (0..15). PatternID is the low nibble when SubMaterial ID Split is on.
+export float MF_ToonSubMaterialID(out float PatternID)
+{
+	float2 UV0 = UE.TexCoord(Index = 0);
+	float2 UV1 = UE.TexCoord(Index = 1);
+	float2 UV = lerp(UV0, UV1, step(0.5, SubMaterial_ID_UV_Channel));
+	float C = SubMaterial_ID_Channel;
+	float4 Pick = float4(1.0 - step(0.5, C), step(0.5, C) - step(1.5, C), step(1.5, C) - step(2.5, C), step(2.5, C));
+	float TexValue = dot(SubMaterial_ID_Map.Sample(UV), Pick);
+	float VcValue = dot(UE.VertexColor(), Pick);
+	float S = SubMaterial_ID_Source;
+	float Value = lerp(TexValue, VcValue, step(0.5, S));
+	float Byte = floor(saturate(Value) * 255.0 + 0.5);
+	float High = floor(Byte / 16.0);
+	// Whole byte: ID * 16 rounds to the nearest level; split: the high nibble exactly.
+	float FromValue = lerp(floor(Byte / 16.0 + 0.5), High, step(0.5, SubMaterial_ID_Split));
+	PatternID = (Byte - High * 16.0) * step(0.5, SubMaterial_ID_Split);
+	float FromUV = floor(saturate(UV.x) * 16.0);
+	float FromConstant = floor(SubMaterial_ID_Constant + 0.5);
+	float Id = lerp(FromValue, FromUV, step(1.5, S));
+	Id = lerp(Id, FromConstant, step(2.5, S));
+	return clamp(Id, 0.0, 15.0);
+}
+
+/// @library MoonToon|Shared
+/// @param  ID  The sub-material ID (MF_ToonSubMaterialID).
+/// @return The override mask. C0..C7 are the table row, W0..W7 the per-component override weights.
+export float MF_ToonSubMaterial(float ID, out float4 C0, out float4 C1, out float4 C2, out float4 C3,
+	out float4 C4, out float4 C5, out float4 C6, out float4 C7,
+	out float4 W0, out float4 W1, out float4 W2, out float4 W3,
+	out float4 W4, out float4 W5, out float4 W6, out float4 W7)
+{
+	C0 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 0.0);
+	C1 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 1.0);
+	C2 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 2.0);
+	C3 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 3.0);
+	C4 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 4.0);
+	C5 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 5.0);
+	C6 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 6.0);
+	C7 = MoonToonSubMaterialLoad(SubMaterial_Table, ID, 7.0);
+	float Mask = floor(C0.w + 0.5) + floor(C3.w + 0.5) * 256.0 + floor(C5.w + 0.5) * 65536.0;
+	W0 = MoonToonSubMaterialWeights(Mask, 0.0);
+	W1 = MoonToonSubMaterialWeights(Mask, 1.0);
+	W2 = MoonToonSubMaterialWeights(Mask, 2.0);
+	W3 = MoonToonSubMaterialWeights(Mask, 3.0);
+	W4 = MoonToonSubMaterialWeights(Mask, 4.0);
+	W5 = MoonToonSubMaterialWeights(Mask, 5.0);
+	W6 = MoonToonSubMaterialWeights(Mask, 6.0);
+	W7 = MoonToonSubMaterialWeights(Mask, 7.0);
+	return Mask;
+}

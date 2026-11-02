@@ -12,6 +12,8 @@
 //     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
 //     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_ToonMetal(
 	in float DiffuseIntensity,
 	in float ShadowSpecularFloor,
@@ -84,14 +86,31 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonMetal", Root=
 	}
 
 	Graph = {
-		float Slot_DiffuseIntensity = In_ToonMetal_DiffuseIntensity;
-		float Slot_ShadowSpecularFloor = In_ToonMetal_ShadowSpecularFloor;
-		float Slot_RampOffset = In_ToonMetal_RampOffset;
-		float Slot_RoughnessScale = In_ToonMetal_RoughnessScale;
-		float Slot_SpecularIntensity = In_ToonMetal_SpecularIntensity;
-		float Slot_EdgeBoost = In_ToonMetal_EdgeBoost;
-		float Slot_SpecularContrast = In_ToonMetal_SpecularContrast;
-		float3 Slot_MetalTint = In_ToonMetal_MetalTintRGB.rgb;
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C4 = MF_ToonSubMaterial(SubMat_ID, Output="C4");
+		float4 SubMat_W4 = MF_ToonSubMaterial(SubMat_ID, Output="W4");
+		float4 SubMat_C5 = MF_ToonSubMaterial(SubMat_ID, Output="C5");
+		float4 SubMat_W5 = MF_ToonSubMaterial(SubMat_ID, Output="W5");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
+		float Slot_DiffuseIntensity_Authored = In_ToonMetal_DiffuseIntensity;
+		float Slot_DiffuseIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_DiffuseIntensity_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_DiffuseIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_ShadowSpecularFloor_Authored = In_ToonMetal_ShadowSpecularFloor;
+		float Slot_ShadowSpecularFloor = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_ShadowSpecularFloor_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_ShadowSpecularFloor_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RampOffset_Authored = In_ToonMetal_RampOffset;
+		float Slot_RampOffset = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RampOffset_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_RampOffset_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RoughnessScale_Authored = In_ToonMetal_RoughnessScale;
+		float Slot_RoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_RoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularIntensity_Authored = In_ToonMetal_SpecularIntensity;
+		float Slot_SpecularIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SpecularIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_EdgeBoost_Authored = In_ToonMetal_EdgeBoost;
+		float Slot_EdgeBoost = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_EdgeBoost_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_EdgeBoost_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularContrast_Authored = In_ToonMetal_SpecularContrast;
+		float Slot_SpecularContrast = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularContrast_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_SpecularContrast_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_MetalTint_Authored = In_ToonMetal_MetalTintRGB.rgb;
+		float3 Slot_MetalTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_MetalTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_MetalTint_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_ToonMetal(
 			Slot_DiffuseIntensity,

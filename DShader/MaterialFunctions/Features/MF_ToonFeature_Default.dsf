@@ -12,6 +12,8 @@
 //     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
 //     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_Default(
 	in float MultiBandCelEnable,
 	in float TerminatorWidth,
@@ -64,9 +66,19 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Default", Root="P
 	}
 
 	Graph = {
-		float Slot_MultiBandCelEnable = In_Default_MultiBandCel;
-		float Slot_TerminatorWidth = In_Default_TerminatorWidth;
-		float Slot_BloomWeight = In_Default_BloomWeight;
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C4 = MF_ToonSubMaterial(SubMat_ID, Output="C4");
+		float4 SubMat_W4 = MF_ToonSubMaterial(SubMat_ID, Output="W4");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
+		float Slot_MultiBandCelEnable_Authored = In_Default_MultiBandCel;
+		float Slot_MultiBandCelEnable = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_MultiBandCelEnable_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_MultiBandCelEnable_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_TerminatorWidth_Authored = In_Default_TerminatorWidth;
+		float Slot_TerminatorWidth = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_TerminatorWidth_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_TerminatorWidth_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_BloomWeight_Authored = In_Default_BloomWeight;
+		float Slot_BloomWeight = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_BloomWeight_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_BloomWeight_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_Default(
 			Slot_MultiBandCelEnable,

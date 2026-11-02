@@ -12,6 +12,8 @@
 //     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
 //     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_EmissiveInk(
 	in float LightInfluence,
 	in float ShadowLift,
@@ -88,15 +90,33 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_EmissiveInk", Roo
 	}
 
 	Graph = {
-		float Slot_LightInfluence = In_ToonEmissiveInk_LightInfluence;
-		float Slot_ShadowLift = In_ToonEmissiveInk_ShadowLift;
-		float Slot_InkDarkenStrength = In_ToonEmissiveInk_InkDarkenStrength;
-		float Slot_RoughnessScale = In_ToonEmissiveInk_RoughnessScale;
-		float Slot_SpecularIntensity = In_ToonEmissiveInk_SpecularIntensity;
-		float Slot_EdgeBoost = In_ToonEmissiveInk_EdgeBoost;
-		float Slot_InkBlend = In_ToonEmissiveInk_InkBlend;
-		float3 Slot_InkTint = In_ToonEmissiveInk_InkTintRGB.rgb;
-		float Slot_RimBias = In_ToonEmissiveInk_RimBias;
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C4 = MF_ToonSubMaterial(SubMat_ID, Output="C4");
+		float4 SubMat_W4 = MF_ToonSubMaterial(SubMat_ID, Output="W4");
+		float4 SubMat_C5 = MF_ToonSubMaterial(SubMat_ID, Output="C5");
+		float4 SubMat_W5 = MF_ToonSubMaterial(SubMat_ID, Output="W5");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
+		float Slot_LightInfluence_Authored = In_ToonEmissiveInk_LightInfluence;
+		float Slot_LightInfluence = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_LightInfluence_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_LightInfluence_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_ShadowLift_Authored = In_ToonEmissiveInk_ShadowLift;
+		float Slot_ShadowLift = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_ShadowLift_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_ShadowLift_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_InkDarkenStrength_Authored = In_ToonEmissiveInk_InkDarkenStrength;
+		float Slot_InkDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_InkDarkenStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_InkDarkenStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RoughnessScale_Authored = In_ToonEmissiveInk_RoughnessScale;
+		float Slot_RoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_RoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularIntensity_Authored = In_ToonEmissiveInk_SpecularIntensity;
+		float Slot_SpecularIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SpecularIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_EdgeBoost_Authored = In_ToonEmissiveInk_EdgeBoost;
+		float Slot_EdgeBoost = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_EdgeBoost_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_EdgeBoost_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_InkBlend_Authored = In_ToonEmissiveInk_InkBlend;
+		float Slot_InkBlend = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_InkBlend_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_InkBlend_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_InkTint_Authored = In_ToonEmissiveInk_InkTintRGB.rgb;
+		float3 Slot_InkTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_InkTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_InkTint_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RimBias_Authored = In_ToonEmissiveInk_RimBias;
+		float Slot_RimBias = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RimBias_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_RimBias_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_EmissiveInk(
 			Slot_LightInfluence,

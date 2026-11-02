@@ -781,15 +781,101 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		#EndRegion
 
+		#Region "SubMaterial (T22)"
+		// Sub-material table (G01): the row for this pixel's sub-material ID overrides the parameters it
+		// ticks. Each override sits behind the static switch "Use SubMaterial Table", whose off branch is
+		// the parameter itself, so a material without a table compiles exactly the graph it had before.
+		// Layout and mask bits: MF_ToonSubMaterial.dss. The feature channels are overridden inside the
+		// generated MF_ToonFeature_* functions (Tools/gen_feature_functions.py), on the same switch.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C0 = MF_ToonSubMaterial(SubMat_ID, Output="C0");
+		float4 SubMat_W0 = MF_ToonSubMaterial(SubMat_ID, Output="W0");
+		float4 SubMat_C1 = MF_ToonSubMaterial(SubMat_ID, Output="C1");
+		float4 SubMat_W1 = MF_ToonSubMaterial(SubMat_ID, Output="W1");
+		float4 SubMat_C2 = MF_ToonSubMaterial(SubMat_ID, Output="C2");
+		float4 SubMat_W2 = MF_ToonSubMaterial(SubMat_ID, Output="W2");
+		float Metallic_Sub =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=lerp(Metallic, SubMat_C1.x, SubMat_W1.x),
+				False=Metallic,
+				Group="15 - SubMaterial",
+				SortPriority=0,
+				Desc="子材质表(T22): 打开后按子材质 ID 读 SubMaterial Table 的一行, 覆盖行里勾选的参数. 关 = 和以前完全一样.\r\nSub-material table: reads the row of SubMaterial Table for the pixel's sub-material ID and overrides the parameters it ticks. Off = exactly as before.",
+				ParameterName="Use SubMaterial Table"
+			);
+		float Specular_Sub =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=lerp(Specular, SubMat_C1.y, SubMat_W1.y),
+				False=Specular,
+				Group="15 - SubMaterial",
+				SortPriority=0,
+				ParameterName="Use SubMaterial Table"
+			);
+		float Roughness_Sub =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=lerp(Roughness, SubMat_C1.z, SubMat_W1.z),
+				False=Roughness,
+				Group="15 - SubMaterial",
+				SortPriority=0,
+				ParameterName="Use SubMaterial Table"
+			);
+		float Reflection_Sub =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=lerp(Reflection, SubMat_C1.w, SubMat_W1.w),
+				False=Reflection,
+				Group="15 - SubMaterial",
+				SortPriority=0,
+				ParameterName="Use SubMaterial Table"
+			);
+		float Anisotropy_Sub =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=lerp(Anisotropy, SubMat_C2.x, SubMat_W2.x),
+				False=Anisotropy,
+				Group="15 - SubMaterial",
+				SortPriority=0,
+				ParameterName="Use SubMaterial Table"
+			);
+		float Emissive_Intensity_Sub =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float",
+				True=lerp(Emissive_Intensity, (Emissive_Intensity * SubMat_C2.w), SubMat_W2.w),
+				False=Emissive_Intensity,
+				Group="15 - SubMaterial",
+				SortPriority=0,
+				ParameterName="Use SubMaterial Table"
+			);
+		float3 Shadow_Color_Sub =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=lerp(Shadow_Color.rgb, SubMat_C0.rgb, SubMat_W0.rgb),
+				False=Shadow_Color.rgb,
+				Group="15 - SubMaterial",
+				SortPriority=0,
+				ParameterName="Use SubMaterial Table"
+			);
+		#EndRegion
+
 		float Metallic_Channel_Masked = Metallic_Channel(Input = StaticSwitchParameter_9);
 		float Sampled_Metallic = Metallic_Channel_Masked;
 		#Region "Specular"
-		float Multiply_5 = (Sampled_Metallic * Metallic);
+		float Multiply_5 = (Sampled_Metallic * Metallic_Sub);
 		#EndRegion
 
 		float Metallic_1 = Multiply_5;
 		Attributes.Metallic = Metallic_1;
-		Attributes.Specular = Specular;
+		Attributes.Specular = Specular_Sub;
 		#Region "Texture Sample"
 		float4 StaticSwitchParameter_10 = MF_ToonSampleLinear(Roughness_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_11 =
@@ -818,7 +904,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SortPriority=43,
 				ParameterName="Invert Roughness Channel"
 			);
-		float Multiply_6 = (StaticSwitchParameter_12 * Roughness);
+		float Multiply_6 = (StaticSwitchParameter_12 * Roughness_Sub);
 		#EndRegion
 
 		float Roughness_1 = Multiply_6;
@@ -828,7 +914,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float",
-				True=Anisotropy,
+				True=Anisotropy_Sub,
 				False=0.0,
 				Group="11 - Specular",
 				SortPriority=2,
@@ -844,7 +930,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float3 Sampled_Emissive = StaticSwitchParameter_14;
 		#Region "Emissive"
-		float3 Multiply_7 = (Emissive_Intensity * Sampled_Emissive);
+		float3 Multiply_7 = (Emissive_Intensity_Sub * Sampled_Emissive);
 		float3 StaticSwitchParameter_15 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -1178,7 +1264,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float3 Sampled_Shadow_Color = StaticSwitchParameter_45;
 		#Region "Diffuse"
-		float3 Multiply_14 = (Shadow_Color.rgb * Sampled_Shadow_Color);
+		float3 Multiply_14 = (Shadow_Color_Sub * Sampled_Shadow_Color);
 		float3 Multiply_15 = (Multiply_14 * InnerOutlineColor);
 		#EndRegion
 
@@ -1558,7 +1644,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SpecularColor=Specular_Color_1,
 				SpecularColorRampIndex=Specular_Ramp_Index,
 				SpecularColorRampUVOffset=Specular_Ramp_Offset,
-				ReflectionIntensity=Reflection,
+				ReflectionIntensity=Reflection_Sub,
 				RimLightIntensity=Rim_Intensity,
 				RimLightWidth=Rim_Width,
 				FacialShadowSdfLeft=StaticSwitchParameter_56,
@@ -1579,7 +1665,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SpecularColor=Specular_Color_1,
 				SpecularColorRampIndex=Specular_Ramp_Index,
 				SpecularColorRampUVOffset=Specular_Ramp_Offset,
-				ReflectionIntensity=Reflection,
+				ReflectionIntensity=Reflection_Sub,
 				RimLightIntensity=Rim_Intensity,
 				RimLightWidth=Rim_Width,
 				FacialShadowSdfLeft=StaticSwitchParameter_56,
@@ -1602,7 +1688,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SpecularColor=Specular_Color_1,
 				SpecularColorRampIndex=Specular_Ramp_Index,
 				SpecularColorRampUVOffset=Specular_Ramp_Offset,
-				ReflectionIntensity=Reflection,
+				ReflectionIntensity=Reflection_Sub,
 				RimLightIntensity=Rim_Intensity,
 				RimLightWidth=Rim_Width,
 				FacialShadowSdfLeft=StaticSwitchParameter_56,
@@ -1623,7 +1709,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SpecularColor=Specular_Color_1,
 				SpecularColorRampIndex=Specular_Ramp_Index,
 				SpecularColorRampUVOffset=Specular_Ramp_Offset,
-				ReflectionIntensity=Reflection,
+				ReflectionIntensity=Reflection_Sub,
 				RimLightIntensity=Rim_Intensity,
 				RimLightWidth=Rim_Width,
 				FacialShadowSdfLeft=StaticSwitchParameter_56,
@@ -1644,7 +1730,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				SpecularColor=Specular_Color_1,
 				SpecularColorRampIndex=Specular_Ramp_Index,
 				SpecularColorRampUVOffset=Specular_Ramp_Offset,
-				ReflectionIntensity=Reflection,
+				ReflectionIntensity=Reflection_Sub,
 				RimLightIntensity=Rim_Intensity,
 				RimLightWidth=Rim_Width,
 				FacialShadowSdfLeft=StaticSwitchParameter_56,
@@ -1692,7 +1778,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// can come from the SA map's rgb -- the closure's pin is one float and takes .r.
 		OutBaseColor = StaticSwitchParameter_7.rgb;
 		OutMetallic = Metallic_1;
-		OutSpecular = Specular;
+		OutSpecular = Specular_Sub;
 		OutRoughness = Roughness_1;
 		OutNormal = NormalTS;
 		OutEmissiveColor = Emission;
@@ -1711,7 +1797,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		OutSpecularColor = Specular_Color_1;
 		OutSpecularColorRampIndex = Specular_Ramp_Index;
 		OutSpecularRampUVOffset = Specular_Ramp_Offset;
-		OutReflectionIntensity = Reflection;
+		OutReflectionIntensity = Reflection_Sub;
 		OutStencil = Encoded_Stencil;
 		OutRayTracingShadowFlag = Encoded_Ray_Tracing_Flags;
 		OutFacialShadowSdfLeft = StaticSwitchParameter_56;

@@ -657,6 +657,21 @@ def slot_table_for(feature_key):
     return modules[module]
 
 
+# Sub-material table (T22): slot -> (table column, component) of the generic feature channels. Every
+# feature reads the same seven scalars and one float4 (MoonToonFeatureSlots.h), so the table stores the
+# channel values, not per-feature names. Layout: DShader/MaterialFunctions/Shared/MF_ToonSubMaterial.dss.
+SUBMAT_CHANNEL = {
+    "FeatureInputScalarA": (4, "x"), "FeatureInputScalarB": (4, "y"),
+    "FeatureInputScalarC": (4, "z"), "FeatureInputScalarD": (4, "w"),
+    "FeatureInputScalarE": (5, "x"), "FeatureInputScalarF": (5, "y"),
+    "FeatureInputScalarG": (5, "z"),
+    "FeatureInputVector.x": (6, "x"), "FeatureInputVector.y": (6, "y"),
+    "FeatureInputVector.z": (6, "z"), "FeatureInputVector.w": (6, "w"),
+    "FeatureInputVector.xyz": (6, "xyz"),
+}
+SUBMAT_IMPORT = "Shared/ToonFunctions.dsh"
+
+
 def emit(feature_key, tables):
     dsf_name, id_macro, group = FEATURES[feature_key]
     rows = tables[slot_table_for(feature_key)]
@@ -713,15 +728,35 @@ def emit(feature_key, tables):
         # subgraph -- `MF_ToonHairHighlightMask(...) + In_Hair_Mask` written out in both places
         # would be two of everything in the generated asset.
         channel_type = "float3" if t == "float3" else "float"
-        slot_lines.append("\t\t%s Slot_%s = %s;" % (channel_type, name, expr))
+        # Sub-material table (T22 / G01): the authored channel, overridden by the table row's generic
+        # feature channel when "Use SubMaterial Table" is on and the row ticks it. The off branch is
+        # the authored value itself, so a material without a table compiles what it did before.
+        col, comp = SUBMAT_CHANNEL[slot]
+        slot_lines.append("\t\t%s Slot_%s_Authored = %s;" % (channel_type, name, expr))
+        slot_lines.append(
+            '\t\t%s Slot_%s = UE.Expression(Class="StaticSwitchParameter", OutputType="%s", '
+            'True=lerp(Slot_%s_Authored, SubMat_C%d.%s, SubMat_W%d.%s), False=Slot_%s_Authored, '
+            'Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");'
+            % (channel_type, name, channel_type, name, col, comp, col, comp, name))
         call_lines.append("\t\t\tSlot_%s," % name)
         out_decls.append("\t\t%s %s;" % (channel_type, name))
         out_lines.append("\t\t%s = Slot_%s;" % (name, name))
 
+    used_cols = sorted({SUBMAT_CHANNEL[slot][0] for (_, slot, _) in rows})
+    submat_lines = ["\t\t// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.",
+                    '\t\tfloat SubMat_ID = MF_ToonSubMaterialID(Output="Result");']
+    for c in used_cols:
+        submat_lines.append('\t\tfloat4 SubMat_C%d = MF_ToonSubMaterial(SubMat_ID, Output="C%d");' % (c, c))
+        submat_lines.append('\t\tfloat4 SubMat_W%d = MF_ToonSubMaterial(SubMat_ID, Output="W%d");' % (c, c))
+    pre_lines = submat_lines + ([""] + pre_lines if pre_lines else [])
+
     input_lines = ['\t\topt %s %s = %s [Description="%s"];' % (t, fn_in, default, desc)
                    for (t, fn_in, _, default, desc) in _feature_inputs(feature_key, tables)]
 
-    imports = "".join('\nimport "%s";\n' % spec[2] for spec in helpers.values())
+    import_paths = [spec[2] for spec in helpers.values()]
+    if SUBMAT_IMPORT not in import_paths:
+        import_paths.append(SUBMAT_IMPORT)
+    imports = "".join('\nimport "%s";\n' % p for p in import_paths)
 
     return """%s%s
 Function %s(

@@ -12,6 +12,8 @@
 //     the Substrate Moon toon closure's pins, which wear those same names. No packing, because a
 //     Substrate value cannot come out of an HLSL Custom node and the packer is one.
 
+import "Shared/ToonFunctions.dsh";
+
 Function ToonFeatureWrite_PBRSpecular(
 	in float BloomWeight,
 	out float4 TBufferA, out float4 TBufferB, out float4 TBufferC)
@@ -56,7 +58,13 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_PBRSpecular", Roo
 	}
 
 	Graph = {
-		float Slot_BloomWeight = In_PBRSpecular_BloomWeight;
+		// Sub-material table row (MF_ToonSubMaterial.dss): the generic feature channels.
+		float SubMat_ID = MF_ToonSubMaterialID(Output="Result");
+		float4 SubMat_C6 = MF_ToonSubMaterial(SubMat_ID, Output="C6");
+		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
+
+		float Slot_BloomWeight_Authored = In_PBRSpecular_BloomWeight;
+		float Slot_BloomWeight = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_BloomWeight_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_BloomWeight_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_PBRSpecular(
 			Slot_BloomWeight,

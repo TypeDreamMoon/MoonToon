@@ -466,3 +466,28 @@ GraphFunction SelectGlobalMaskMap(in float4 MapA, in float4 MapB, in float4 MapC
 	float4 Unmasked = float4(1.0, 1.0, 1.0, 1.0);
 	Result = lerp(lerp(lerp(Unmasked, MapA, saturate(MapIndex)), MapB, saturate(MapIndex - 1.0)), MapC, saturate(MapIndex - 2.0));
 }
+
+// Sub-material table (T22 / G01), DShader/MaterialFunctions/Shared/MF_ToonSubMaterial.dss.
+VirtualFunction(Name="MF_ToonSubMaterialID")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSubMaterialID");
+		Description = "The sub-material ID (0..15) from the ID map, vertex colour, UV range or a constant.";
+	}
+	Inputs = { }
+	Outputs = { float Result; float PatternID; }
+}
+
+VirtualFunction(Name="MF_ToonSubMaterial")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonSubMaterial");
+		Description = "One row of the sub-material table: C0..C7 the values, W0..W7 the override weights.";
+	}
+	Inputs = { float ID; }
+	Outputs = {
+		float Result;
+		float4 C0; float4 C1; float4 C2; float4 C3; float4 C4; float4 C5; float4 C6; float4 C7;
+		float4 W0; float4 W1; float4 W2; float4 W3; float4 W4; float4 W5; float4 W6; float4 W7;
+	}
+}
