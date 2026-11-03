@@ -29,6 +29,7 @@
 #include "MoonToonNormalPreviewTool.h"
 #include "MoonToonOutlineAlphaTool.h"
 #include "MoonToonOutlineSetupTool.h"
+#include "MoonToonSectionMergeTool.h"
 #include "MoonToonStrandPreviewActor.h"
 #include "MoonToonStrandTangentTool.h"
 #include "MoonToonTool.h"
@@ -860,6 +861,7 @@ void SMoonToonToolsPanel::BuildToolList()
 	AddTool(UMoonToonStrandTangentTool::StaticClass());
 	AddTool(UMoonToonCharacterMasterTool::StaticClass());
 	AddTool(UMoonToonFixBuildSettingsTool::StaticClass());
+	AddTool(UMoonToonSectionMergeTool::StaticClass());
 }
 
 // --- Target -------------------------------------------------------------------------------------

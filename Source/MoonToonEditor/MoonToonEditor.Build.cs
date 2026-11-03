@@ -62,6 +62,11 @@ public class MoonToonEditor : ModuleRules
 				"MoonToonEditorScripts",
 				// FAssetRegistryModule::AssetCreated, when the sub-material table bakes a new T_<table>.
 				"AssetRegistry",
+				// R9 / T50: the section merge tool -- DuplicateAsset, and the skeletal mesh description it edits.
+				"AssetTools",
+				"MeshDescription",
+				"StaticMeshDescription",
+				"SkeletalMeshDescription",
 			}
 		);
 	}
