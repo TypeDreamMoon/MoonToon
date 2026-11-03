@@ -83,6 +83,8 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float  FaceOverlayOccluderClass;
 		float  FaceOverlayPart;
 		float  FaceOverlayThickness;
+		float  OutRimLightIntensity;
+		float  OutRimLightWidth;
 	}
 }
 

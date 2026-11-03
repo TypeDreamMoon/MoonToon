@@ -534,6 +534,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float  FaceOverlayPart;
 		// The hair-thickness falloff (cm, 0 = engine default). Appended last.
 		float  FaceOverlayThickness;
+		// The rim (11-03): this instance's Rim Light Intensity and Rim Light Width (the width already
+		// through its global-mask / vertex-colour switch, so it can vary per pixel), for the Moon
+		// closure's rim pins. A bound UMoonToonProfile still overrides both. Appended last.
+		float  OutRimLightIntensity;
+		float  OutRimLightWidth;
 	}
 
 	Graph = {
@@ -1805,6 +1810,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		FaceOverlayOccluderClass = Face_Overlay_Occluder_Class;
 		FaceOverlayPart = Face_Overlay_Part;
 		FaceOverlayThickness = Face_Overlay_Thickness;
+		OutRimLightIntensity = Rim_Intensity;
+		OutRimLightWidth = Rim_Width;
 		#EndRegion
 	}
 }

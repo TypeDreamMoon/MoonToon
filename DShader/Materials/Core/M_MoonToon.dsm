@@ -102,6 +102,8 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float  FaceOverlayOccluderClass;
 		float  FaceOverlayPart;
 		float  FaceOverlayThickness;
+		float  OutRimLightIntensity;
+		float  OutRimLightWidth;
 	}
 }
 
@@ -340,6 +342,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		float  Surf_ReflectionIntensity    = MF_MoonToonBaseInput(Output="OutReflectionIntensity");
 		float  Surf_Stencil                = MF_MoonToonBaseInput(Output="OutStencil");
 		float  Surf_RayTracingShadowFlag   = MF_MoonToonBaseInput(Output="OutRayTracingShadowFlag");
+		// The rim (11-03): the instance's own rim for a profile-less material; a profile overrides it.
+		float  Surf_RimLightIntensity      = MF_MoonToonBaseInput(Output="OutRimLightIntensity");
+		float  Surf_RimLightWidth          = MF_MoonToonBaseInput(Output="OutRimLightWidth");
 		float  Surf_FacialShadowSdfLeft    = MF_MoonToonBaseInput(Output="OutFacialShadowSdfLeft");
 		float  Surf_FacialShadowSdfRight   = MF_MoonToonBaseInput(Output="OutFacialShadowSdfRight");
 
@@ -560,6 +565,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
 			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth,
 			MultiBandCelEnable = MF_ToonFeature_Default(Output="MultiBandCelEnable"),
 			TerminatorWidth    = MF_ToonFeature_Default(Output="TerminatorWidth"),
 			BloomWeight        = MF_ToonFeature_Default(Output="BloomWeight"));
@@ -586,7 +593,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_PBRSpecular = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -614,7 +623,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_KajiyaHair = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -653,7 +664,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_ToonKajiyaHair = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -734,6 +747,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
 			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth,
 			Facial_Shadow_SDF_Left  = DFF_SdfLeft,
 			Facial_Shadow_SDF_Right = DFF_SdfRight,
 			ScatterStrength         = MF_ToonFeature_DFFacialShadow(Output="ScatterStrength"),
@@ -782,6 +797,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
 			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth,
 			Facial_Shadow_SDF_Left  = Surf_FacialShadowSdf360,
 			Facial_Shadow_SDF_Right = Surf_FacialShadowSdf360,
 			ScatterStrength         = MF_ToonFeature_DFFacialShadow(Output="ScatterStrength"),
@@ -816,7 +833,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_HairHighlightMask = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -852,7 +871,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_AngelRing = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -885,6 +906,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
 			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth,
 			ScatterStrength         = MF_ToonFeature_Skin(Output="ScatterStrength"),
 			TransmissionStrength    = MF_ToonFeature_Skin(Output="TransmissionStrength"),
 			TransmissionPower       = MF_ToonFeature_Skin(Output="TransmissionPower"),
@@ -918,7 +941,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_Stockings = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -954,7 +979,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_NPRStockings = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -991,6 +1018,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
 			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth,
 			DiffuseWrapStrength     = MF_ToonFeature_Eye(Output="DiffuseWrapStrength"),
 			LimbalDarkenStrength    = MF_ToonFeature_Eye(Output="LimbalDarkenStrength"),
 			SpecularShadowStrength  = MF_ToonFeature_Eye(Output="SpecularShadowStrength"),
@@ -1021,7 +1050,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_ClothVelvet = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
@@ -1058,6 +1089,8 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
 			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth,
 			DiffuseIntensity    = MF_ToonFeature_ToonMetal(Output="DiffuseIntensity"),
 			ShadowSpecularFloor = MF_ToonFeature_ToonMetal(Output="ShadowSpecularFloor"),
 			RampOffset          = MF_ToonFeature_ToonMetal(Output="RampOffset"),
@@ -1087,7 +1120,9 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			Specular_Ramp_UV_Offset = Shade_SpecularRampUVOffset,
 			Reflection_Intensity    = Surf_ReflectionIntensity,
 			Stencil                 = Surf_Stencil,
-			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag);
+			Ray_Tracing_Shadow_Flag = Surf_RayTracingShadowFlag,
+			Rim_Light_Intensity     = Surf_RimLightIntensity,
+			Rim_Light_Width         = Surf_RimLightWidth);
 
 		Substrate Leaf_EmissiveInk = UE.Expression(
 			Class = "MoonToonFeature", OutputType = "Substrate",
