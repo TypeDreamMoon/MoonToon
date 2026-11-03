@@ -49,8 +49,6 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 FaceOverlayData;
 		float4 FaceOverlayParams;
 		float4 FaceOverlayStencilIDs;
-		float4 ModifierData;
-		float ModifierID;
 		float3 OutBaseColor;
 		float  OutMetallic;
 		float  OutSpecular;

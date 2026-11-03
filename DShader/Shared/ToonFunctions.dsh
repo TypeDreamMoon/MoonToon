@@ -7,8 +7,8 @@
 //
 // Import this instead. Declaring one that the importing file never calls costs nothing.
 //
-// The thirteen MF_ToonFeature_* and two MF_ToonModifier_* functions are NOT here: their signatures
-// are generated, because their Outputs follow the engine's slot tables. They live in the generated
+// The thirteen MF_ToonFeature_* functions are NOT here: their signatures are generated, because
+// their Outputs follow the engine's slot tables. They live in the generated
 // Shared/ToonFeatureSignatures.dsh, which M_MoonToon imports to build the closure chain.
 
 VirtualFunction(Name="MF_MoonToonFeatureSelect")
@@ -38,24 +38,6 @@ VirtualFunction(Name="MF_MoonToonFeatureSelect")
 		float4 ToonBufferC;
 		float ShadingFeatureID;
 		float4 DebugColor;
-	}
-}
-VirtualFunction(Name="MF_MoonToonModifierSelect")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/MF_MoonToonModifierSelect");
-		Description = "Static toon modifier selection; see Tools/gen_feature_functions.py.";
-	}
-
-	// Mirrors the Inputs block the generator writes into MF_MoonToonModifierSelect.dsf, in the same
-	// order -- positional, exactly like the feature selector above.
-	Inputs = {
-		opt float3 InNormalTS = float3(0.0, 0.0, 1.0);
-	}
-
-	Outputs = {
-		float4 ModifierData;
-		float ModifierID;
 	}
 }
 VirtualFunction(Name="AppendMany")
@@ -357,8 +339,8 @@ VirtualFunction(Name="MF_ToonMatcap")
 		float3 NormalTS;
 	}
 
-	// One output per MODIFIER SLOT, not one packed float4 -- the packing lives in the engine's
-	// MOON_TOON_MOD_SLOTS_MATCAP table, and MF_ToonModifier_Matcap is generated from it.
+	// The colour (mask and intensity folded in) and the lighting mix; M_MoonToon splits them between
+	// the emissive and the base colour (T29).
 	Outputs = {
 		float3 MatcapColor;
 		float MatcapLightingMix;

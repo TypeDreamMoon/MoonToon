@@ -26,8 +26,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonMatcap", Root="Plugin.MoonT
 
 	Outputs = {
 		// Colour (mask and intensity folded in) and the lighting mix, which M_MoonToon splits between
-		// the emissive and the base colour. The generated legacy MF_ToonModifier_Matcap still packs them
-		// for the retired modifier lane until the next C++ batch removes it.
+		// the emissive and the base colour.
 		float3 MatcapColor;
 		float MatcapLightingMix;
 	}

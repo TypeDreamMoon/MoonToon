@@ -70,7 +70,7 @@ float MoonToonFacialSdfByte(float N)
 /// @library MoonToon|Shared
 /// @param  SdfLeft   The left SDF value (MF_ToonDFFacialShadow), full precision.
 /// @param  SdfRight  The right one.
-/// @return The RT4 payload (Modifier Payload pin). HiLeft / HiRight go to the SDF pins.
+/// @return The RT4 payload (Facial SDF Extension pin). HiLeft / HiRight go to the SDF pins.
 export float4 MF_ToonFacialSdfExt(float SdfLeft, float SdfRight, out float HiLeft, out float HiRight)
 {
 	float L = saturate(SdfLeft) * 255.0;

@@ -17,6 +17,10 @@
 //
 // Not a cast shadow: it does not depend on the shadow maps, and it shows on the side the light faces.
 // Use it with the screen-space hair shadow off on that face, or the two darken twice.
+//
+// Receive On Face Only (R7 / T34, on by default): the copy also asks what toon surface it lands on
+// (the Moon Toon Scene Record node) and darkens only a face -- skin / eye kinds, face-overlay members
+// and eyebrows -- so a strand that drifts over the hair, a collar or the background leaves it alone.
 
 #pragma material(Domain = Surface, ShadingModel = Unlit, BlendMode = Modulate, TwoSided = true, bUsedWithSkeletalMesh = true, bUsedWithMorphTargets = true, Backend = Graph)
 
@@ -47,6 +51,11 @@ uniform float Shadow_Depth_Range = 4.0;
 /// @desc 哪些发缕投影(UV0, R, 白 = 全投). Which strands cast (UV0, R, white = full).
 uniform Texture2D Shadow_Mask;
 
+/// @static
+/// @name Receive On Face Only   @group 01 - Bangs Shadow   @sort 6
+/// @desc 只投到脸上(皮肤/眼睛、脸部叠加成员、眉毛), 落在头发/衣服/背景上的部分不压暗. Only a face receives (skin / eye, face-overlay members, eyebrows).
+uniform bool Receive_On_Face_Only = true;
+
 export void M_MoonToonBangsShadow(inout material m)
 {
 	// Vertex stage: away from the light in the screen plane, then a hair away from the camera.
@@ -65,6 +74,19 @@ export void M_MoonToonBangsShadow(inout material m)
 	float CopyZ = UE.Expression(Class = "PixelDepth");
 	float Behind = SceneZ - CopyZ;
 	float Gate = saturate(1.0 - Behind / max(Shadow_Depth_Range, 0.01)) * step(0.0, Behind);
-	float Amount = saturate(Mask * Shadow_Strength * Gate);
+	float Receiver = 1.0;
+	if (Receive_On_Face_Only)
+	{
+		// The opaque toon pixel under the copy: Kind 1 / 2 = skin / eye; flags bit 1 = face-overlay
+		// member, bit 2 = eyebrow (MOON_TOON_FLAG_*). A non-toon pixel reads all zero.
+		float IsToon = UE.MoonToonSceneRecord()[0];
+		float Kind = UE.MoonToonSceneRecord()[1];
+		float Flags = UE.MoonToonSceneRecord()[3];
+		float FaceKind = step(0.5, Kind) * step(Kind, 2.5);
+		float OverlayMember = floor(Flags / 2.0) - 2.0 * floor(Flags / 4.0);
+		float Eyebrow = floor(Flags / 4.0) - 2.0 * floor(Flags / 8.0);
+		Receiver = IsToon * saturate(FaceKind + OverlayMember + Eyebrow);
+	}
+	float Amount = saturate(Mask * Shadow_Strength * Gate * Receiver);
 	m.EmissiveColor = lerp(float3(1.0, 1.0, 1.0), Shadow_Color.rgb, Amount);
 }

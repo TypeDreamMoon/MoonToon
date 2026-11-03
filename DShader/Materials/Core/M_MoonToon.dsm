@@ -65,8 +65,6 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float4 FaceOverlayData;
 		float4 FaceOverlayParams;
 		float4 FaceOverlayStencilIDs;
-		float4 ModifierData;
-		float ModifierID;
 		// The Substrate lane. Everything above it is the legacy (r.Substrate=0) shape and this
 		// material reads none of it except the three face-overlay float4s, which are storage
 		// independent.
@@ -675,7 +673,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 
 		// T24 / T26 / T27: the face-SDF payload extension (MF_ToonFacialSdfExt), behind the static switch
 		// "Facial SDF Extended Payload" on the classic SDF leaf only. The SDF pins then carry the high bytes
-		// and the Modifier Payload pin -- RT4 / Data9, which the engine decodes as this extension
+		// and the Facial SDF Extension pin -- RT4 / Data9, which the engine decodes as this extension
 		// unconditionally since the matcap and the oil film left it (T29 / T30) -- the low bytes, the
 		// real-N.L mask and the soft shadow ramp. Off = exactly the pins before (8 bits, RT4 zero).
 		float  FacialSdfExt_HiLeft  = MF_ToonFacialSdfExt(Surf_FacialShadowSdfLeft, Surf_FacialShadowSdfRight, Output="HiLeft");
@@ -749,7 +747,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			SecondaryLobeIntensity  = MF_ToonFeature_DFFacialShadow(Output="SecondaryLobeIntensity"),
 			SpecShadowStrength      = MF_ToonFeature_DFFacialShadow(Output="SpecShadowStrength"),
 			WarmTintStrength        = MF_ToonFeature_DFFacialShadow(Output="WarmTintStrength"),
-			Modifier_Payload        = DFF_ModifierPayload);
+			Facial_SDF_Extension    = DFF_ModifierPayload);
 
 		// 3b THE SAME FACE, FULL-ANGLE SDF (G26, R2 / T18). MF_ToonFullAngleSDF evaluates the baked
 		// theta x phi atlas for the character's key light (MF_MoonToonKeyLight: the rig's face direction,
