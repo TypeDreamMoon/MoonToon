@@ -433,6 +433,22 @@ VirtualFunction(Name="MF_ToonEyeHighlight")
 	}
 }
 
+// R9 / T48: procedural catchlight dots, added to the emissive behind "Enable Eye Sparkle".
+VirtualFunction(Name="MF_ToonEyeSparkle")
+{
+	Options = {
+		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Shared/MF_ToonEyeSparkle");
+	}
+
+	Inputs = {
+		float2 UV;
+	}
+
+	Outputs = {
+		float3 SparkleColor;
+	}
+}
+
 // Picks which packed mask map a consumer reads, from the ones the base input already sampled.
 //
 // The point of the indirection: a mask map is sampled ONCE for the whole material and every

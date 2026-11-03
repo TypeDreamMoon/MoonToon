@@ -931,7 +931,21 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		#EndRegion
 
-		float3 Emission = StaticSwitchParameter_15;
+		// R9 / T48: procedural catchlight dots (MF_ToonEyeSparkle), on the parallax-shifted UV so they ride
+		// on the iris. Added after the "Enable Emission" switch, so an eye with no emissive map still gets
+		// them. Off by default: the node is culled and Emission is exactly what it was.
+		float3 Eye_Sparkle = MF_ToonEyeSparkle(Global_UV_Selected, OutputIndex=0);
+		float3 Emission =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=(StaticSwitchParameter_15 + Eye_Sparkle),
+				False=StaticSwitchParameter_15,
+				Group="08 - Eye Sparkle",
+				SortPriority=0,
+				ParameterName="Enable Eye Sparkle",
+				DefaultValue=false
+			);
 		Attributes.EmissiveColor = Emission;
 		#Region "Texture Sample"
 		float4 StaticSwitchParameter_16 = MF_ToonSampleColor(Opacity_Map, Global_UV).rgba;

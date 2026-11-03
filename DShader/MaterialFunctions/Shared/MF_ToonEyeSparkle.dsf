@@ -1,0 +1,167 @@
+// Procedural catchlights (R9 / T48): one or two soft dots drawn in iris space, no texture and no extra
+// sheet of geometry.
+//
+// The painted highlight sheet (MF_ToonEyeHighlight) moves art somebody drew. A lot of eyes have no such
+// sheet, or a sheet whose art is baked into the iris map, and those eyes have no catchlight that answers
+// the light at all. These dots are drawn instead: positioned in the same iris space the parallax and the
+// highlight anchor measure in (same Center/Radius/Columns parameters), nudged toward the key light and/or
+// the camera, and added to the emissive -- a catchlight is a reflection, so the surface's own shading
+// should not dim it.
+//
+// Off by default (Enable Eye Sparkle in the base input); off, the node is culled and nothing changes.
+
+import "Shared/ToonFunctions.dsh";
+
+Function ToonEyeSparkle(
+	in float2 UV,
+	in float3 TangentLightDir,
+	in float3 TangentViewDir,
+	in float4 IrisCenterRadius,
+	in float AtlasColumns,
+	in float4 DotPositions,
+	in float4 DotSizes,
+	in float Softness,
+	in float Travel,
+	in float LightViewBlend,
+	in float4 Color,
+	in float Intensity,
+	out float3 OutColor)
+{
+	float Columns = max(AtlasColumns, 1.0);
+	float2 LocalUV = float2(frac(UV.x * Columns), UV.y);
+	float2 IrisRadius = max(abs(IrisCenterRadius.zw), 1e-4);
+	float2 P = (LocalUV - 0.5 - IrisCenterRadius.xy) / IrisRadius;
+
+	// The same drive the highlight anchor uses: xy of the light / view direction in the eye's tangent
+	// frame, i.e. which way the source is, seen from this eye. The dots land where the anchor would move
+	// painted art, so the two can be used together and agree.
+	float2 Drive = lerp(normalize(TangentLightDir).xy, normalize(TangentViewDir).xy, saturate(LightViewBlend));
+
+	// The smaller dot travels half as far: it reads as a second, farther reflection, and two dots that
+	// move in lock step read as a sticker.
+	float2 C1 = DotPositions.xy + Drive * Travel;
+	float2 C2 = DotPositions.zw + Drive * (Travel * 0.5);
+
+	float Soft = clamp(Softness, 0.01, 1.0);
+	float D1 = length(P - C1) / max(DotSizes.x, 1e-3);
+	float D2 = length(P - C2) / max(DotSizes.y, 1e-3);
+	float M1 = DotSizes.x > 0.0 ? 1.0 - smoothstep(1.0 - Soft, 1.0, D1) : 0.0;
+	float M2 = DotSizes.y > 0.0 ? 1.0 - smoothstep(1.0 - Soft, 1.0, D2) : 0.0;
+
+	// Never on the sclera: faded out over the last 5 % of the iris radius.
+	float Mask = saturate(max(M1, M2)) * (1.0 - smoothstep(0.95, 1.0, length(P)));
+	OutColor = Mask * Color.rgb * Intensity;
+}
+
+ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonEyeSparkle", Root="Plugin.MoonToon")
+{
+	Settings = {
+		Description       = "Procedural eye catchlights: one or two soft dots in iris space, toward the key light / camera.";
+		ExposeToLibrary   = true;
+		LibraryCategories = "MoonToon|Shared";
+	}
+
+	Inputs = {
+		float2 UV [
+			Description="The eye's UV -- the global UV after the parallax stage, so the dots ride on the iris.";
+		];
+	}
+
+	Outputs = {
+		// Emissive to add: mask x colour x intensity.
+		float3 SparkleColor;
+	}
+
+	Properties = {
+		VectorParameter Eye_Sparkle_Color = float4(1.0, 1.0, 1.0, 1.0) [
+			ParameterName="Eye Sparkle Color";
+			Group="08 - Eye Sparkle";
+			SortPriority=1;
+			Description="高光点颜色(线性). 白色最常见; 偏冷的蓝白更像天空反射.\r\n\r\n\r\nThe catchlight colour (linear). White is the usual; a cool blue-white reads as a sky reflection.";
+		];
+		ScalarParameter Eye_Sparkle_Intensity = 1.0 [
+			ParameterName="Eye Sparkle Intensity";
+			Group="08 - Eye Sparkle";
+			SortPriority=2;
+			Description="加到自发光上的强度. 1 = 颜色原值; 场景很亮时可以调到 2~4 才压得住.\r\n\r\n\r\nStrength added to the emissive. 1 is the colour as is; a bright scene may need 2-4 to read.";
+		];
+		VectorParameter Eye_Sparkle_Positions = float4(-0.35, -0.35, 0.3, 0.3) [
+			ParameterName="Eye Sparkle Positions";
+			Group="08 - Eye Sparkle";
+			SortPriority=3;
+			Description="两个高光点在虹膜空间里的位置(单位: 虹膜半径, 0 = 虹膜中心, 光源正对时的位置). xy = 大点, zw = 小点.\r\n虹膜空间的 y 和贴图 UV 同向(向下为正), 所以默认 (-0.35, -0.35) 是左上.\r\n\r\n\r\nWhere the two dots sit in iris space (iris radii, 0 = the iris centre, with the source straight ahead). xy = the large dot, zw = the small one.\r\nIris-space y runs with the texture's V (down is positive), so the default (-0.35, -0.35) is upper left.";
+		];
+		VectorParameter Eye_Sparkle_Sizes = float4(0.22, 0.1, 0.0, 0.0) [
+			ParameterName="Eye Sparkle Sizes";
+			Group="08 - Eye Sparkle";
+			SortPriority=4;
+			Description="x = 大点半径, y = 小点半径(虹膜半径为单位). 0 = 不画这个点.\r\n\r\n\r\nx = the large dot's radius, y = the small one's, in iris radii. 0 leaves that dot out.";
+		];
+		ScalarParameter Eye_Sparkle_Softness = 0.25 [
+			ParameterName="Eye Sparkle Softness";
+			Group="08 - Eye Sparkle";
+			SortPriority=5;
+			Description="边缘软硬: 0.01 = 硬边圆点(赛璐璐), 1 = 从中心一路渐隐.\r\n\r\n\r\nEdge softness: 0.01 is a hard-edged dot (cel style), 1 fades all the way from the centre.";
+		];
+		ScalarParameter Eye_Sparkle_Travel = 0.12 [
+			ParameterName="Eye Sparkle Travel";
+			Group="08 - Eye Sparkle";
+			SortPriority=6;
+			Description="高光点跟着光源/视线走多远(虹膜半径). 0 = 钉死在上面的位置. 小点只走一半.\r\n\r\n\r\nHow far the dots follow the source / view, in iris radii. 0 pins them to the positions above. The small dot travels half as far.";
+		];
+		ScalarParameter Eye_Sparkle_Light_View_Blend = 0.3 [
+			ParameterName="Eye Sparkle Light/View Blend";
+			Group="08 - Eye Sparkle";
+			SortPriority=7;
+			Description="0 = 跟主光, 1 = 跟视线. 和 Eye Highlight Light/View Blend 同义.\r\n\r\n\r\n0 follows the main light, 1 the view -- the same meaning as Eye Highlight Light/View Blend.";
+		];
+		VectorParameter Eye_Iris_Center_Radius = float4(0.0, 0.0, 0.5, 0.5) [
+			ParameterName="Eye Iris Center and Radius";
+			Group="06 - Eye Parallax";
+			SortPriority=2;
+			Description="xy = 虹膜中心相对单眼 UV 中心的偏移, zw = 虹膜半径(可以不等, 用来做椭圆眼).\r\n半径决定了效果的作用范围: 圆盘之外位移为零, 所以眼白和眼眶不会跟着动.\r\n\r\n\r\nxy offsets the iris centre from the middle of one eye's UV square; zw is its radius, per axis so an elliptical eye still works.\r\nThe radius is the extent of the whole effect: outside that disc the offset is zero, so the sclera and the lids stay put.";
+		];
+		ScalarParameter Eye_Atlas_Columns = 2.0 [
+			ParameterName="Eye Atlas Columns";
+			Group="06 - Eye Parallax";
+			SortPriority=5;
+			Description="一张贴图里横向排了几只眼睛. VRM / MMD 常见的左右眼并排就是 2, 单眼一张贴图填 1.\r\n填错的表现: 填 1 而实际是并排, 虹膜中心会落在两眼之间; 填 2 而实际是单眼, 眼睛中间会出现一条接缝.\r\n\r\n\r\nHow many eyes sit side by side across the texture. The VRM / MMD layout with both eyes in one map is 2; one eye per texture is 1.\r\nGetting it wrong shows: 1 on a side-by-side map puts the iris centre between the eyes, and 2 on a single-eye map puts a seam down the middle.";
+		];
+	}
+
+	Graph = {
+		float3 LightWS = MF_MoonMainLightDirection();
+		float3 LightTS =
+			UE.Expression(
+				Class="Transform",
+				OutputType="float3",
+				Input=LightWS,
+				TransformSourceType="TRANSFORMSOURCE_World",
+				TransformType="TRANSFORM_Tangent"
+			);
+		float3 ViewWS = UE.CameraVectorWS();
+		float3 ViewTS =
+			UE.Expression(
+				Class="Transform",
+				OutputType="float3",
+				Input=ViewWS,
+				TransformSourceType="TRANSFORMSOURCE_World",
+				TransformType="TRANSFORM_Tangent"
+			);
+
+		ToonEyeSparkle(
+			UV,
+			LightTS,
+			ViewTS,
+			Eye_Iris_Center_Radius,
+			Eye_Atlas_Columns,
+			Eye_Sparkle_Positions,
+			Eye_Sparkle_Sizes,
+			Eye_Sparkle_Softness,
+			Eye_Sparkle_Travel,
+			Eye_Sparkle_Light_View_Blend,
+			Eye_Sparkle_Color,
+			Eye_Sparkle_Intensity,
+			SparkleColor);
+	}
+}
