@@ -27,6 +27,37 @@ VirtualFunction(Name="MF_ToonHairTip")
 	Outputs = { float Result; float Tip; float Gradient; float Keep; }
 }
 
+// Hair-tip outline (T49): the hull's COVERAGE, decided by the blend mode at shader-compile time --
+// the same reason as M_MoonToon's MoonToonCoverageWeight (under Substrate a translucent blend takes its
+// alpha from the closure's coverage, and the graph cannot see an instance's blend-mode override).
+//   opaque / masked: 1 -- the masked hull cuts the tips through OpacityMask instead;
+//   translucent: the surface cutout times lerp(1, TipOpacity, Tip) -- the whole hull at full coverage off
+//     the tips (it replaces the slot's masked hull) and the tip's own opacity on them. Inside a tip's
+//     footprint the hull's back faces lie behind the tip redraw's front faces, the character's nearest
+//     translucent layer there, so the single-layer clip of the translucent base pass removes them and
+//     only the ring outside the tip survives.
+Function float MoonToonOutlineTipCoverage(in float ClipMask, in float Tip, in float TipOpacity)
+{
+#include "/Engine/Private/Toon/MoonToonMaterialDecls.ush"
+// Tells the engine that this material is an outline hull. The toon translucent prepass leaves it out
+// (ToonTranslucentPrepassPS.usf): the hull is never a layer of its character, so the tip's front faces stay
+// the nearest layer inside the tip and the hull ring outside it is not mistaken for one (the translucent
+// inner line would trace it). The forward pass gives it the deferred rim model (MoonToonForwardHullRim.ush),
+// the rim ToonPass_RimLight puts on the masked hull and most of an opaque outline's colour.
+// HLSL preprocessor, file scope from here on; only compiled where this node is (the switch on).
+#ifndef MOON_TOON_OUTLINE_HULL
+#define MOON_TOON_OUTLINE_HULL 1
+#endif
+#if MATERIALBLENDING_TRANSLUCENT || MATERIALBLENDING_ADDITIVE || MATERIALBLENDING_ALPHACOMPOSITE
+	// The cutout stays binary, exactly as the masked hull clips it (at or above the clip value = whole). Taken as
+	// a continuous coverage, the strand texture's soft alpha edge -- which is where the hull ring samples, right
+	// next to the silhouette -- went see-through and left a dark seam between the hair and its outline.
+	return step(GetMaterialOpacityMaskClipValue(), ClipMask) * lerp(1.0f, TipOpacity, Tip);
+#else
+	return 1.0f;
+#endif
+}
+
 VirtualFunction(Name="MF_MoonToonBaseInput")
 {
 	Options = {
@@ -110,6 +141,10 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		// this costs one extra clip instruction and changes nothing.
 		BlendMode    = "Masked";
 
+		// T49: a translucent instance (the hair-tip outline) needs per-pixel forward toon shading, like
+		// M_MoonToon's translucent instances -- ToonBxDF never runs under the default
+		// VolumetricNonDirectional. Only translucent blends read it; the masked hull is unaffected.
+		TranslucencyLightingMode   = "SurfacePerPixelLighting";
 		bOutputTranslucentVelocity = true;
 		bUsedWithSkeletalMesh      = true;
 		bUsedWithMorphTargets      = true;
@@ -238,7 +273,19 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			ParameterName="Use Hair Tip Translucency";
 			Group="21 - Translucency|Hair Tip";
 			SortPriority=50;
-			Description="发梢区域不画描边: 用和头发材质同一张 Hair Tip Mask(同通道、同阈值)裁掉外壳, 发梢由半透明重画负责. 详见 MoonToon/Docs/HairTipTranslucency.md.\r\nNo outline on the hair tips: the hull is cut by the same Hair Tip Mask (channel, threshold) as the hair material, and the translucent redraw owns the tips.";
+			Description="发梢描边. 和头发材质用同一张 Hair Tip Mask(同通道、同阈值). 同一个开关, 角色由混合模式决定: Masked 实例(槽位原来的描边)在发梢处裁掉外壳; Blend Mode 覆盖为 Translucent 的子实例换上这个槽位的描边后, 整个外壳半透明绘制, 发梢外围按 Hair Tip Root/End Opacity 淡出, 发梢范围内的外壳背面被单层预深度裁掉(角色要有 MoonToonActorComponent). 详见 MoonToon/Docs/HairTipTranslucency.md.\r\nHair-tip outline, with the hair material's Hair Tip Mask (same channel and threshold). One switch, the blend mode picks the role: a Masked instance (the slot's usual outline) cuts the hull at the tips; a child with Blend Mode overridden to Translucent, set as this slot's outline instead, draws the whole hull translucent with the tips' Root / End Opacity, and the single-layer prepass removes its back faces inside the tips (the character needs a MoonToonActorComponent).";
+		];
+		ScalarParameter Hair_Tip_Root_Opacity = 1.0 [
+			ParameterName="Hair Tip Root Opacity";
+			Group="21 - Translucency|Hair Tip";
+			SortPriority=54;
+			Description="(半透明发梢描边) 发梢根部(遮罩值 = 阈值处)描边的不透明度. 和头发重画实例设成一样.\r\n(Translucent hair-tip outline) the outline's opacity where the tip begins (mask = threshold). Set it like the hair's redraw instance.";
+		];
+		ScalarParameter Hair_Tip_End_Opacity = 1.0 [
+			ParameterName="Hair Tip End Opacity";
+			Group="21 - Translucency|Hair Tip";
+			SortPriority=55;
+			Description="(半透明发梢描边) 发梢末端(遮罩值 = 1 处)描边的不透明度. 和头发重画实例设成一样.\r\n(Translucent hair-tip outline) the outline's opacity at the very end (mask = 1). Set it like the hair's redraw instance.";
 		];
 
 
@@ -268,6 +315,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 
 	Outputs = {
 		Substrate ToonClosure;
+		Substrate ToonSurface;
 		float  OpacityMask;
 		float3 WorldPositionOffset;
 		float  AmbientOcclusion;
@@ -276,7 +324,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		float  CustomData0;
 		float  CustomData1;
 
-		Base.FrontMaterial       = ToonClosure;
+		Base.FrontMaterial       = ToonSurface;
 		Base.OpacityMask         = OpacityMask;
 		Base.WorldPositionOffset = WorldPositionOffset;
 		Base.AmbientOcclusion    = AmbientOcclusion;
@@ -676,11 +724,19 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		// Outline v2 clip: the mapped clip channel below its threshold removes the hull there (a
 		// gauze region with no outline). Mapping off = the channel reads 1 = no clip.
 		float OutlineClipMask = (Surf_Opacity * step(Outline_Clip_Threshold, OutlineMapping.b));
-		// Hair-tip translucency (T12): the hull leaves the tips to the translucent redraw.
+		// Hair-tip translucency (T12): the masked hull leaves the tips to the translucent redraw.
 		float2 HairTip_UV = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=0);
+		float HairTip_Tip      = MF_ToonHairTip(HairTip_UV, Output="Tip");
+		float HairTip_Gradient = MF_ToonHairTip(HairTip_UV, Output="Gradient");
 		OpacityMask = Use_Hair_Tip_Translucency(
-			True = (OutlineClipMask * (1.0 - MF_ToonHairTip(HairTip_UV, Output="Tip"))),
+			True = (OutlineClipMask * (1.0 - HairTip_Tip)),
 			False = OutlineClipMask);
+		// T49: a translucent instance is the hair-tip outline (MoonToonOutlineTipCoverage above). The weight
+		// is 1 for the masked hull, and with the switch off the root takes the bare closure -- the old graph.
+		ToonSurface = Use_Hair_Tip_Translucency(
+			True = Substrate.Weight(A = ToonClosure, Weight = MoonToonOutlineTipCoverage(OutlineClipMask, HairTip_Tip,
+				lerp(Hair_Tip_Root_Opacity, Hair_Tip_End_Opacity, HairTip_Gradient))),
+			False = ToonClosure);
 
 		AmbientOcclusion = MF_MoonToonBaseInput(Output="OutAmbientOcclusion");
 		CustomizedUV1    = MF_MoonToonBaseInput(Output="OutCustomizedUV1");

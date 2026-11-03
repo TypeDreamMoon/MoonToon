@@ -16,6 +16,10 @@
    数组下标 = 材质槽位号；不要用组件级的 Overlay Material，那会把整个网格再画一遍）。
 3. **描边**：这个槽位的描边实例（M_MoonToonOutline 的实例）也勾 `Use Hair Tip Translucency`，
    用同一张遮罩、同一个通道和阈值。描边外壳在发梢处被裁掉，发梢由重画负责。
+   **要发梢也有描边（T49）**：以这个描边实例为父新建子实例，**Blend Mode 覆盖为 Translucent**，
+   `Hair Tip Root / End Opacity` 设成和头发重画实例一样，然后把**这个槽位的描边**换成它（组件或网格的
+   Moon Outline Material Slots）。半透明外壳画整圈：发根不透明，发梢按重画的透明度淡出；发梢范围里外壳的背面
+   被单层裁剪去掉，发梢不会被压暗。
 4. **角色要挂 MoonToonActorComponent**（有 toon 角色 id）。toon 半透明的单层裁剪只对带角色 id 的网格生效。
    没有组件时，重画会把每一层发丝都混进来，每个发梢像素显示的是最后画的那一层，通常是里层发丝。
    里层发丝落在贴图里另一块平滑的区域，于是发梢看起来"被压平"：没有明暗带，没有高光，侧缕边缘还会出现锯齿。
@@ -95,7 +99,11 @@
   发梢在交界一侧是可见的半透明层，另一侧没有半透明层。去掉它需要改引擎着色器，
   让预深度 / 内线认出“部分覆盖层”，列在 R2。
 - 发梢不在不透明深度里，屏幕空间发丝阴影、SSAO、景深都不认发梢。发梢很细，一般看不出来。
-- 发梢没有描边：描边外壳在发梢处被裁掉，重画只画发丝本身。终末地另有一个半透明的发梢描边 pass，Moon 还没有。
+- 发梢描边（T49，半透明描边实例）：
+  - 发根描边的颜色靠前向补的 rim（和延迟 rim pass 同一个计算），只按前向主平行光算，灯自己的 rim 覆盖参数
+    （ToonRimIntensity / Width / Color 等）按默认值处理；改了这些参数时，这个槽位的描边会和其它槽位略有不同。
+  - 半透明外壳不写深度和 GBuffer：屏幕空间 pass（内线、头发阴影等）把它当成不存在。
+  - 和 Lvl_StyleTest 实测：发根描边 46 / 255 对不透明描边 42（rim 打出来的那层灰），发梢区域亮度不变。
 - 重画实例的父实例必须是同一个头发实例，或者至少用同一张遮罩、同一阈值，否则裁剪和重画对不上，会出现缝或重叠。
 
 ## DevTest 示例
@@ -105,6 +113,8 @@
 - `MI_Bangs_TipCut`：MI_MI_Bangs + 开关
 - `MI_Bangs_TipTranslucent`：Translucent，End Opacity 0.45
 - `MI_Outline_Bangs_TipCut`：刘海描边 + 开关
+- `MI_Outline_Bangs_TipTranslucent`：它的 Translucent 子实例，End Opacity 0.45（发梢描边，T49）
 
-切换脚本：`DevTest/Saved/MoonToonStyle/scripts/hairtip_ab2.py`（MODE "A" = 原样，"B" = 发梢半透明）。
+切换脚本：`DevTest/Saved/MoonToonStyle/scripts/hairtip_ab2.py`（MODE "A" = 原样，"B" = 发梢半透明）；
+`t49_setup.py`（MODE "prod" / "tipcut" / "tipline"，"tipline" = 再加半透明发梢描边，并自动挂 MoonToonActorComponent）。
 `MT_WW` 本身是一个没挂组件的 SkeletalMeshActor，验收前先用 `t12_toon_actor.py`（`ADD = True`）挂上 MoonToonActorComponent。
