@@ -2,6 +2,7 @@
 
 #include "MoonToonEditor.h"
 
+#include "MoonToonMaterialInstanceExtension.h"
 #include "MoonToonMaterialMenus.h"
 #include "MoonToonSmoothNormalTool.h"
 #include "SMoonToonToolsPanel.h"
@@ -150,10 +151,14 @@ void FMoonToonEditorModule::StartupModule()
 
 	RegisterToolsTab();
 	MoonToonDebugPanel::RegisterTab();
+
+	// R11 T57c: profile-override marking and parameter checks in the material instance editor.
+	MoonToonMaterialInstanceExtension::Register();
 }
 
 void FMoonToonEditorModule::ShutdownModule()
 {
+	MoonToonMaterialInstanceExtension::Unregister();
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(MoonToonToolsTabName);
 	MoonToonDebugPanel::UnregisterTab();
 	MoonToonDebugMcp::Stop();
