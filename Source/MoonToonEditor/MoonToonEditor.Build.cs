@@ -67,7 +67,24 @@ public class MoonToonEditor : ModuleRules
 				"MeshDescription",
 				"StaticMeshDescription",
 				"SkeletalMeshDescription",
+				// The MoonToon debugger: the renderer's debug API (Renderer/Public/MoonToonDebug.h),
+				// the editor subsystem behind the panel / UnrealBridge / MCP, the level viewport's
+				// View Mode menu, capture files (EXR / PNG) and the JSON every call returns.
+				"Renderer",
+				"EditorSubsystem",
+				"LevelEditor",
+				"ImageWrapper",
+				"Json",
+				// The debugger's MCP server: MCP Streamable HTTP on the engine's HTTP server (loopback only,
+				// bearer token), and the peer address check.
+				"HTTPServer",
+				"Sockets",
 			}
 		);
+
+		// The debugger names fields, views and table slots from the same shared headers the shaders
+		// use (Engine/Shaders/Shared: MoonToonDebugDefinitions.h, MoonToonFeatureRegistry.h ...), so
+		// the panel can never disagree with the decoder.
+		PrivateIncludePathModuleNames.Add("Shaders");
 	}
 }

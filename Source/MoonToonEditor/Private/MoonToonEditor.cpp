@@ -5,6 +5,8 @@
 #include "MoonToonMaterialMenus.h"
 #include "MoonToonSmoothNormalTool.h"
 #include "SMoonToonToolsPanel.h"
+#include "Debug/MoonToonDebugMcp.h"
+#include "Debug/SMoonToonDebugPanel.h"
 #include "ToolMenus.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
@@ -133,6 +135,9 @@ namespace
 		AddMoonToonSection(TEXT("ContentBrowser.AssetContextMenu.SkeletalMesh"));
 		RegisterMoonToonMaterialMenus();
 		AddToolsMenuEntry();
+		// The MoonToon debugger: Tools > MoonToon > MoonToon 调试器, and the level viewport's
+		// View Modes > MoonToon 调试视图 submenu.
+		MoonToonDebugPanel::ExtendMenus();
 	}
 }
 
@@ -144,11 +149,14 @@ void FMoonToonEditorModule::StartupModule()
 		FSimpleMulticastDelegate::FDelegate::CreateStatic(&RegisterMoonToonMenus));
 
 	RegisterToolsTab();
+	MoonToonDebugPanel::RegisterTab();
 }
 
 void FMoonToonEditorModule::ShutdownModule()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(MoonToonToolsTabName);
+	MoonToonDebugPanel::UnregisterTab();
+	MoonToonDebugMcp::Stop();
 	UToolMenus::UnRegisterStartupCallback(this);
 	UToolMenus::UnregisterOwner(TEXT("MoonToonEditor"));
 }
