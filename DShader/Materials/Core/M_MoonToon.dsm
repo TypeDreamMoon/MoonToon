@@ -243,7 +243,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 		StaticSwitchParameter Is_KajiyaHair = false [ParameterName="Is KajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=1; Description="启用 Hair Kajiya 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the Hair Kajiya shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken)."];
 		StaticSwitchParameter Is_ToonKajiyaHair = false [ParameterName="Is ToonKajiyaHair"; Group="30 - Shading Feature (pick one)"; SortPriority=2; Description="启用 Hair Toon Kajiya 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the Hair Toon Kajiya shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken)."];
 		StaticSwitchParameter Is_DFFacialShadow = false [ParameterName="Is DFFacialShadow"; Group="30 - Shading Feature (pick one)"; SortPriority=3; Description="启用 SDF Face 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the SDF Face shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken)."];
-		StaticSwitchParameter Use_Full_Angle_SDF = false [ParameterName="Use Full Angle SDF"; Group="20 - Face: SDF Shadow|Full Angle"; SortPriority=0; Description="(配合 Is DFFacialShadow) 脸部阴影改用全角度 SDF 图集(Tools/SDF360 烘焙, T18): 材质按关键光(含灯光装配/脸角度覆盖)求值, 主干直接用结果, 顶光/底光/背光都对. 图集参数从 sdf360.json 抄.\r\n(With Is DFFacialShadow) the face shadow from a full-angle SDF atlas (Tools/SDF360, T18): evaluated in the material for the key light (light rig and face override included), used by the trunk as is, so top, bottom and back light all work."];
+		StaticSwitchParameter Use_Full_Angle_SDF = false [ParameterName="Use Face SDF Full Angle"; Group="20 - Face: SDF Shadow|Full Angle"; SortPriority=0; Description="(配合 Is DFFacialShadow) 脸部阴影改用全角度 SDF 图集(Tools/SDF360 烘焙, T18): 材质按关键光(含灯光装配/脸角度覆盖)求值, 主干直接用结果, 顶光/底光/背光都对. 图集参数从 sdf360.json 抄.\r\n(With Is DFFacialShadow) the face shadow from a full-angle SDF atlas (Tools/SDF360, T18): evaluated in the material for the key light (light rig and face override included), used by the trunk as is, so top, bottom and back light all work."];
 		StaticSwitchParameter Is_AngelRing = false [ParameterName="Is AngelRing"; Group="30 - Shading Feature (pick one)"; SortPriority=100; Description="启用新天使环(鸣潮/异环式, T17): 材质函数 MF_ToonAngelRing 算出环的颜色和暗带, 主干只对主光求值(阴影下限、光色/固定色、暗带压暗漫反射). 只应勾选一个; 勾了多个时靠前的胜出. 旧的 Is HairHighlightMask 可用 Tools/AngelRing/migrate_hair_highlight_mask.py 迁移过来.\r\nThe new angel ring (T17): MF_ToonAngelRing paints the ring and its dark band; the trunk evaluates them on the main light only (shadow floor, light colour or fixed colour, the band darkening the diffuse)."];
 		StaticSwitchParameter Is_HairHighlightMask = false [ParameterName="Is HairHighlightMask"; Group="30 - Shading Feature (pick one)"; SortPriority=4; Description="启用 Hair Highlight Mask 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the Hair Highlight Mask shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken)."];
 		StaticSwitchParameter Is_Skin = false [ParameterName="Is Skin"; Group="30 - Shading Feature (pick one)"; SortPriority=5; Description="启用 Skin 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the Skin shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken)."];
@@ -701,7 +701,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 			ShadowStrength      = MF_ToonFeature_ToonKajiyaHair(Surf_KajiyaStrandShift, Surf_KajiyaStrandShift, Output="ShadowStrength"));
 
 		// T24 / T26 / T27: the face-SDF payload extension (MF_ToonFacialSdfExt), behind the static switch
-		// "Facial SDF Extended Payload" on the classic SDF leaf only. The SDF pins then carry the high bytes
+		// "Face SDF Extended Payload" on the classic SDF leaf only. The SDF pins then carry the high bytes
 		// and the Facial SDF Extension pin -- RT4 / Data9, which the engine decodes as this extension
 		// unconditionally since the matcap and the oil film left it (T29 / T30) -- the low bytes, the
 		// real-N.L mask and the soft shadow ramp. Off = exactly the pins before (8 bits, RT4 zero).
@@ -717,7 +717,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 				Group="20 - Face: SDF Shadow",
 				SortPriority=4,
 				Desc="脸部 SDF 扩展载荷(T24/T26/T27): 用 RT4 通道把左右 SDF 传到 16 位(所有灯), 并带上真实 N·L 遮罩和阴影软渐变. 关 = 和以前完全一样(8 位).\r\nFace-SDF extended payload: the RT4 lane carries the SDF pair to 16 bits for every light, plus the real-N.L mask and the soft shadow ramp. Off = exactly as before (8 bits).",
-				ParameterName="Facial SDF Extended Payload"
+				ParameterName="Face SDF Extended Payload"
 			);
 		float DFF_SdfRight =
 			UE.Expression(
@@ -727,7 +727,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 				False=Surf_FacialShadowSdfRight,
 				Group="20 - Face: SDF Shadow",
 				SortPriority=4,
-				ParameterName="Facial SDF Extended Payload",
+				ParameterName="Face SDF Extended Payload",
 				Desc="脸部 SDF 扩展载荷(T24/T26/T27): 用 RT4 通道把左右 SDF 传到 16 位(所有灯), 并带上真实 N·L 遮罩和阴影软渐变. 关 = 和以前完全一样(8 位).\r\nFace-SDF extended payload: the RT4 lane carries the SDF pair to 16 bits for every light, plus the real-N.L mask and the soft shadow ramp. Off = exactly as before (8 bits)."
 			);
 		float4 DFF_ModifierPayload =
@@ -738,7 +738,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 				False=float4(0.0, 0.0, 0.0, 0.0),
 				Group="20 - Face: SDF Shadow",
 				SortPriority=4,
-				ParameterName="Facial SDF Extended Payload",
+				ParameterName="Face SDF Extended Payload",
 				Desc="脸部 SDF 扩展载荷(T24/T26/T27): 用 RT4 通道把左右 SDF 传到 16 位(所有灯), 并带上真实 N·L 遮罩和阴影软渐变. 关 = 和以前完全一样(8 位).\r\nFace-SDF extended payload: the RT4 lane carries the SDF pair to 16 bits for every light, plus the real-N.L mask and the soft shadow ramp. Off = exactly as before (8 bits)."
 			);
 

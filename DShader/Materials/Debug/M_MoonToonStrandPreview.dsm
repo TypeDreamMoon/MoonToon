@@ -21,36 +21,43 @@ Shader(Name="Materials/Debug/M_MoonToonStrandPreview", Root="Plugin.MoonToon")
 
 	Properties = {
 		VectorParameter Ellipsoid_Center = float4(0.0, 0.0, 150.0, 0.0) [
+			ParameterName="Preview Ellipsoid Center";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=0;
 			Description="(调试预览) 椭球中心, 世界坐标. \r\n(Debug preview) ellipsoid centre, world space.";
 		];
 		VectorParameter Ellipsoid_Radii = float4(12.0, 12.0, 14.0, 0.0) [
+			ParameterName="Preview Ellipsoid Radii";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=1;
 			Description="(调试预览) 椭球半径. \r\n(Debug preview) ellipsoid radii.";
 		];
 		VectorParameter Ellipsoid_Basis_X = float4(1.0, 0.0, 0.0, 0.0) [
+			ParameterName="Preview Ellipsoid Basis X";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=2;
 			Description="(调试预览) 椭球 X 轴. \r\n(Debug preview) ellipsoid X axis.";
 		];
 		VectorParameter Ellipsoid_Basis_Y = float4(0.0, 1.0, 0.0, 0.0) [
+			ParameterName="Preview Ellipsoid Basis Y";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=3;
 			Description="(调试预览) 椭球 Y 轴. \r\n(Debug preview) ellipsoid Y axis.";
 		];
 		VectorParameter Ellipsoid_Basis_Z = float4(0.0, 0.0, 1.0, 0.0) [
+			ParameterName="Preview Ellipsoid Basis Z";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=4;
 			Description="(调试预览) 椭球 Z 轴. \r\n(Debug preview) ellipsoid Z axis.";
 		];
 		VectorParameter Light_Direction = float4(0.0, 0.0, 1.0, 0.0) [
+			ParameterName="Preview Light Direction";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=5;
 			Description="(调试预览) 指向光源的方向, 世界空间; 预览 Actor 会同步关卡的平行光. \r\nDirection toward the light, world space. The preview actor keeps this synced to the level's directional light unless overridden there.";
 		];
 		ScalarParameter Band_Exponent = 60.0 [
+			ParameterName="Preview Band Exponent";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=7;
 			Description="(调试预览) Kajiya 高光带的指数, 越大越细. \r\nKajiya lobe exponent for the preview band. Higher = thinner band.";
@@ -58,11 +65,13 @@ Shader(Name="Materials/Debug/M_MoonToonStrandPreview", Root="Plugin.MoonToon")
 			SliderMax=500;
 		];
 		VectorParameter Band_Color = float4(1.0, 0.55, 0.1, 1.0) [
+			ParameterName="Preview Band Color";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=9;
 			Description="(调试预览) 高光带颜色. \r\n(Debug preview) colour of the highlight band.";
 		];
 		ScalarParameter Base_Gray = 0.32 [
+			ParameterName="Preview Base Gray";
 			Group="90 - Debug|Strand Preview";
 			SortPriority=10;
 			SliderMin=0;

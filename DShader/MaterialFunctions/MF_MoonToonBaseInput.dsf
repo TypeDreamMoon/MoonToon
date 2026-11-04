@@ -639,7 +639,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SliderMax=1;
 		];
 		ScalarParameter Is_Face_Flag = 0.0 [
-			ParameterName="Is Face";
+			ParameterName="Mark As Face (Hair Shadow)";
 			Group="13 - Shadows";
 			SortPriority=11;
 			Description="1 = 整个材质按脸算(发影的接收方), 0 = 只有 ID 等于 Face ID 的像素算脸.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the whole material counts as face (the hair-shadow receiver), 0 = only pixels whose ID equals Face ID do.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
@@ -647,7 +647,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SliderMax=1;
 		];
 		ScalarParameter Is_Hair_Flag = 0.0 [
-			ParameterName="Is Hair";
+			ParameterName="Mark As Hair (Hair Shadow)";
 			Group="13 - Shadows";
 			SortPriority=12;
 			Description="1 = 整个材质按头发算(发影的投射方), 0 = 只有 ID 等于 Hair ID 的像素算头发.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the whole material counts as hair (the hair-shadow caster), 0 = only pixels whose ID equals Hair ID do.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
@@ -823,7 +823,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=StaticSwitchParameter_1,
 				Group="00 - Global|Global Mask Map",
 				SortPriority=6,
-				ParameterName="Use Vertex Color Instead Mask Map",
+				ParameterName="Global Mask Map From Vertex Color",
 				Desc="开 = 用顶点色代替打包遮罩图 1(四个通道一一对应). \r\nOn = vertex colour stands in for Global Mask Map 1, channel for channel."
 			);
 		#EndRegion
@@ -1202,13 +1202,13 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=0.0,
 				Group="14 - Emissive",
 				SortPriority=0,
-				ParameterName="Enable Emission",
+				ParameterName="Enable Emissive",
 				Desc="开 = 自发光(自发光贴图 x 强度). \r\nOn = emissive (emissive map times intensity)."
 			);
 		#EndRegion
 
 		// R9 / T48: procedural catchlight dots (MF_ToonEyeSparkle), on the parallax-shifted UV so they ride
-		// on the iris. Added after the "Enable Emission" switch, so an eye with no emissive map still gets
+		// on the iris. Added after the "Enable Emissive" switch, so an eye with no emissive map still gets
 		// them. Off by default: the node is culled and Emission is exactly what it was.
 		float3 Eye_Sparkle = MF_ToonEyeSparkle(Global_UV_Selected, OutputIndex=0);
 		float3 Emission =
@@ -1395,7 +1395,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=0.0,
 				Group="33 - Feature: Hair Kajiya",
 				SortPriority=100,
-				ParameterName="Use Highlight Tangent baked in Houdini UV23",
+				ParameterName="Kajiya Tangent From UV2 UV3",
 				DefaultValue=true,
 				Desc="开 = Kajiya 发丝切线取 UV2/UV3 里烘焙的方向(Houdini 导出), 不用网格切线. \r\nOn = the Kajiya strand tangent comes from the direction baked into UV2 / UV3 (Houdini), not the mesh tangent."
 			);
@@ -1419,7 +1419,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=MaterialExpressionTextureCoordinate_6,
 				Group="33 - Feature: Hair Kajiya",
 				SortPriority=100,
-				ParameterName="Use Highlight Tangent baked in Houdini UV23",
+				ParameterName="Kajiya Tangent From UV2 UV3",
 				DefaultValue=true,
 				Desc="开 = Kajiya 发丝切线取 UV2/UV3 里烘焙的方向(Houdini 导出), 不用网格切线. \r\nOn = the Kajiya strand tangent comes from the direction baked into UV2 / UV3 (Houdini), not the mesh tangent."
 			);
@@ -1447,7 +1447,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=MaterialExpressionTextureCoordinate_7,
 				Group="33 - Feature: Hair Kajiya",
 				SortPriority=100,
-				ParameterName="Use Highlight Tangent baked in Houdini UV23",
+				ParameterName="Kajiya Tangent From UV2 UV3",
 				DefaultValue=true,
 				Desc="开 = Kajiya 发丝切线取 UV2/UV3 里烘焙的方向(Houdini 导出), 不用网格切线. \r\nOn = the Kajiya strand tangent comes from the direction baked into UV2 / UV3 (Houdini), not the mesh tangent."
 			);
@@ -1859,7 +1859,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=FacialShadowSdfLeft,
 				Group="20 - Face: SDF Shadow",
 				SortPriority=0,
-				ParameterName="SDF Face Shadow From SA Map",
+				ParameterName="Face SDF From SA Map",
 				Desc="开 = SDF 脸阴影取 SA Map 的 R 通道(左半, 右半镜像). \r\nOn = the face SDF comes from the SA Map's red channel (left half, mirrored for the right)."
 			);
 		float2 MaterialExpressionTextureCoordinate_0_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
@@ -1895,7 +1895,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				False=FacialShadowSdfRight,
 				Group="20 - Face: SDF Shadow",
 				SortPriority=0,
-				ParameterName="SDF Face Shadow From SA Map",
+				ParameterName="Face SDF From SA Map",
 				Desc="开 = SDF 脸阴影取 SA Map 的 R 通道(左半, 右半镜像). \r\nOn = the face SDF comes from the SA Map's red channel (left half, mirrored for the right)."
 			);
 		#Region "RayTracing Shadow"

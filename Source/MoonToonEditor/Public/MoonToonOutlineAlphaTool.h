@@ -84,7 +84,7 @@ enum class EMoonToonIslandOrientation : uint8
  * Drives vertex-colour alpha from a curve, so outline width can be authored as a taper instead of
  * painted by hand.
  *
- * The material reads alpha as an outline width multiplier ("Use Vertex Color A as Outline Width"), so
+ * The material reads alpha as an outline width multiplier ("Outline Width From Vertex Color A"), so
  * this is the procedural half of that workflow: lay down a clean root-to-tip falloff here, then
  * refine locally with Mesh Paint if needed. Blend modes exist so a re-run does not have to discard
  * that hand work -- Multiply in particular keeps a painted mask intact underneath.

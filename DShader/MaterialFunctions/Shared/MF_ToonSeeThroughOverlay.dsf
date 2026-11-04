@@ -48,7 +48,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		float4 FaceOverlayStencilIDs;
 		// This material's own occluder class (engine #10): non-zero registers its meshes in the
 		// FaceOverlay occluder layer (Moon_MeshPass_FaceOverlayOccluder). Constant zero while
-		// 'Is Face Overlay Occluder' is off, which keeps the material out of that pass entirely.
+		// 'Write Face Overlay Occluder' is off, which keeps the material out of that pass entirely.
 		float FaceOverlayOccluderClass;
 		// Which see-through group this material is in, for the per-character tier on
 		// MoonToonActorComponent (Face Overlay Mode): 0 = auto (eyebrow-tagged = brow, else eye),
@@ -118,7 +118,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			ParameterName="Through Hair Occluder ID A";
 			Group="21 - Face: See Through Overlay";
 			SortPriority=15;
-			Description="Extra occluder to show through, named by its FaceOverlay occluder CLASS (1-255) -- the 'Face Overlay Occluder Class' the occluder's material sets with 'Is Face Overlay Occluder' on. Use for occluders other than front hair: hat brims, hair accessories, glasses frames. -1 = unused. (Engine #10: no longer a CustomDepth stencil value; the occluder needs no custom depth.)\r\n额外可透的遮挡物, 按它的眉透遮挡类别(1-255)指定: 帽檐、发饰、眼镜等不是前发的遮挡物用这个. -1 = 不用.";
+			Description="Extra occluder to show through, named by its FaceOverlay occluder CLASS (1-255) -- the 'Face Overlay Occluder Class' the occluder's material sets with 'Write Face Overlay Occluder' on. Use for occluders other than front hair: hat brims, hair accessories, glasses frames. -1 = unused. (Engine #10: no longer a CustomDepth stencil value; the occluder needs no custom depth.)\r\n额外可透的遮挡物, 按它的眉透遮挡类别(1-255)指定: 帽檐、发饰、眼镜等不是前发的遮挡物用这个. -1 = 不用.";
 			SliderMin=-1;
 			SliderMax=255;
 		];
@@ -136,7 +136,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		// Off by default: with no custom depth authored the IsHair test reads the far-plane dummy
 		// and would zero the overlay everywhere.
 		ScalarParameter Hair_Stencil_Value = 8.0 [
-			ParameterName="Hair Stencil Value";
+			ParameterName="Front Hair Gate Stencil";
 			Group="21 - Face: See Through Overlay";
 			SortPriority=19;
 			Description="算作前发的 CustomDepth 模板值(项目约定: 眉眼 1, 脸 2, 头发 8). \r\nCustomDepth stencil value that counts as front hair (project convention: eye/brow=1, face=2, hair=8).";
@@ -144,7 +144,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			SliderMax=255;
 		];
 		ScalarParameter Front_Depth_Threshold = 0.01 [
-			ParameterName="Front Depth Threshold";
+			ParameterName="Front Hair Gate Depth Threshold";
 			Group="21 - Face: See Through Overlay";
 			SortPriority=20;
 			Description="眼睛到遮挡物的最小深度差, cm. \r\nMinimum positive eye-to-occluder depth gap in centimeters.";
@@ -152,7 +152,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			SliderMax=5;
 		];
 		ScalarParameter Front_View_Fade_Start = 0.3 [
-			ParameterName="Front View Fade Start";
+			ParameterName="Front Hair Gate View Fade Start";
 			Group="21 - Face: See Through Overlay";
 			SortPriority=21;
 			Description="头朝向对齐度在这里开始出现透视. \r\nHead-forward alignment where the overlay starts to appear.";
@@ -160,7 +160,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 			SliderMax=1;
 		];
 		ScalarParameter Front_View_Fade_End = 0.7 [
-			ParameterName="Front View Fade End";
+			ParameterName="Front Hair Gate View Fade End";
 			Group="21 - Face: See Through Overlay";
 			SortPriority=22;
 			Description="头朝向对齐度在这里达到全强度. \r\nHead-forward alignment where the overlay reaches full strength.";
@@ -346,7 +346,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 				False=0.0,
 				Group="21 - Face: See Through Overlay",
 				SortPriority=6,
-				ParameterName="Is Face Overlay Occluder",
+				ParameterName="Write Face Overlay Occluder",
 				Desc="开 = 这个材质是眉透/瞳透的遮挡物(通常是前发), 写入专用遮挡层. \r\nOn = this material is a see-through occluder (usually front hair) and writes the overlay occluder layer."
 			);
 		FaceOverlayPart = Through_Hair_Part;

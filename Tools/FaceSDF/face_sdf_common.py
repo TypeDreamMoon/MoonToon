@@ -10,7 +10,7 @@ Delivery formats (Docs/FaceSDF.md):
   R+G      8-bit RGBA PNG with v spread over R and G, read back as (R + G) / 2: 511 levels (~9 bits) from an
            uncompressed BGRA8 texture -- Endfield's layout. Material switch "Distance Field Facial Shadow Map
            R+G Average".
-Either way only "Facial SDF Extended Payload" carries more than 8 bits to the lights.
+Either way only "Face SDF Extended Payload" carries more than 8 bits to the lights.
 
 Pure numpy + Pillow. Image IO and the signed distance come from ../SDF360 (same conventions)."""
 import os

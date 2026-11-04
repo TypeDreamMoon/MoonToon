@@ -31,6 +31,17 @@ for path, ops in by_mi.items():
             ok = tex is not None and MEL.set_material_instance_texture_parameter_value(obj, name, tex)
         elif kind == "v":
             ok = MEL.set_material_instance_vector_parameter_value(obj, name, unreal.LinearColor(*value))
+        elif kind == "d":
+            # T57b: drop a stale override (any value) left under a renamed parameter's old name.
+            # value names the section: "scalars" / "vectors" / "textures".
+            prop = {"scalars": "scalar_parameter_values", "vectors": "vector_parameter_values",
+                    "textures": "texture_parameter_values"}[value]
+            vals = list(obj.get_editor_property(prop))
+            keep = [v for v in vals
+                    if str(v.get_editor_property("parameter_info").get_editor_property("name")) != name]
+            if len(keep) < len(vals):
+                obj.set_editor_property(prop, keep)
+                ok = True
         elif kind == "x":
             # A11: clear a texture override, but only while it still holds the texture the plan expects.
             vals = list(obj.get_editor_property("texture_parameter_values"))

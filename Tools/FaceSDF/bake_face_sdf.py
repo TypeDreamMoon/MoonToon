@@ -15,7 +15,7 @@ A texel lit in every mask gets the last angle, one dark in every mask the first.
 shrink as the angle grows; a texel that turns lit again later keeps its first crossing.
 
 Outputs: <out>.png (16-bit, or 8-bit with --bits 8), <out>_rg.png with --rg (R+G split), <out>.json.
-If the shadows come out on the wrong half in Unreal, tick "Flip Left Right" on the material."""
+If the shadows come out on the wrong half in Unreal, tick "Face SDF Flip Left Right" on the material."""
 import argparse
 import json
 import os

@@ -171,7 +171,7 @@ namespace
 			}
 			else if (A.IsConstant() && A.Min < 0.01f)
 			{
-				Lines.Add(TEXT("      -> Alpha is zero everywhere. 'Use Vertex Color A as Outline Width' "
+				Lines.Add(TEXT("      -> Alpha is zero everywhere. 'Outline Width From Vertex Color A' "
 					"would collapse the outline hull onto the surface."));
 			}
 		}

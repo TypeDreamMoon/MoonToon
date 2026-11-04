@@ -6,14 +6,14 @@ Runs inside the Unreal Editor (UnrealBridge exec or the Python console). Optiona
                                         # current look depends on the old import (e.g. sRGB on): "keep", not "fix"
     REPORT = "<Project>/Saved/MoonToon/FaceSdfCheck.json"
 
-For every MaterialInstanceConstant with "Is DFFacialShadow" on (and "Use Full Angle SDF" off -- a full-angle
-face does not read the classic map) it reports the "Distance Field Facial Shadow Map" texture and the switches
+For every MaterialInstanceConstant with "Is DFFacialShadow" on (and "Use Face SDF Full Angle" off -- a full-angle
+face does not read the classic map) it reports the "Face SDF Map" texture and the switches
 that decide its precision, and flags:
   ERROR  sRGB on                   the map is data; sRGB bends the threshold curve (and its dark end)
   ERROR  BC1 / BC3 / default       5-6 bit block endpoints: terraces and patches along the terminator
   ERROR  R+G Average on a compressed texture   BC7 / BC1 mix R and G per block: the 9 bits are gone
   WARN   BC7 / BC4                 lossy; fine for 8-bit-class maps, not for a 16-bit bake
-  WARN   >8-bit texture, "Facial SDF Extended Payload" off   the lights still see 8 bits
+  WARN   >8-bit texture, "Face SDF Extended Payload" off   the lights still see 8 bits
   INFO   mips                      the SDF is read at mip 0 (MF_ToonDFFacialShadow), mips only cost memory
 Nothing is changed or saved; nothing world-owned is kept in globals."""
 import gc
@@ -32,10 +32,10 @@ PRECISE = {TC.TC_HALF_FLOAT: "R16F", TC.TC_SINGLE_FLOAT: "R32F", TC.TC_GRAYSCALE
 HIGH = {TC.TC_HALF_FLOAT, TC.TC_SINGLE_FLOAT, TC.TC_HDR, TC.TC_HDR_F32}
 LOSSY_OK = {TC.TC_ALPHA: "BC4", TC.TC_BC7: "BC7"}
 SWITCH_DFF = "Is DFFacialShadow"
-SWITCH_RG = "Distance Field Facial Shadow Map R+G Average"
-SWITCH_EXT = "Facial SDF Extended Payload"
-SWITCH_360 = "Use Full Angle SDF"
-TEX = "Distance Field Facial Shadow Map"
+SWITCH_RG = "Face SDF R+G Average"  # a 0/1 scalar since R11 B4
+SWITCH_EXT = "Face SDF Extended Payload"
+SWITCH_360 = "Use Face SDF Full Angle"
+TEX = "Face SDF Map"
 
 
 KEEP_PREFIXES = []
@@ -48,13 +48,21 @@ def _switch(mi, name):
         return False
 
 
+def _flag(mi, name):
+    # R11 B4 made the R+G average a 0/1 scalar (>= 0.5 = on); a static-switch read always said off.
+    try:
+        return unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(mi, name) >= 0.5
+    except Exception:
+        return False
+
+
 def _check(mi, grandfathered):
     tex = unreal.MaterialEditingLibrary.get_material_instance_texture_parameter_value(mi, TEX)
     if not tex:
         return None
     comp = tex.get_editor_property("compression_settings")
     srgb = tex.get_editor_property("srgb")
-    rg = _switch(mi, SWITCH_RG)
+    rg = _flag(mi, SWITCH_RG)
     ext = _switch(mi, SWITCH_EXT)
     issues = []
     if srgb:
@@ -70,7 +78,7 @@ def _check(mi, grandfathered):
     if rg and comp != TC.TC_VECTOR_DISPLACEMENTMAP:
         issues.append(("ERROR", "R+G Average needs an uncompressed RGBA8 texture (VectorDisplacementmap)"))
     if (comp in HIGH or rg) and not ext:
-        issues.append(("WARN", ">8-bit map but Facial SDF Extended Payload is off: the lights still get 8 bits"))
+        issues.append(("WARN", ">8-bit map but Face SDF Extended Payload is off: the lights still get 8 bits"))
     if tex.get_editor_property("mip_gen_settings") != unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS:
         issues.append(("INFO", "has mips; the SDF is read at mip 0, mips only cost memory"))
     path = mi.get_path_name().split(".")[0]

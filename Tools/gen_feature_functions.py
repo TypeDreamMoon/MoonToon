@@ -558,6 +558,22 @@ DESC_EN = {
     },
 }
 
+# R11 T57b: the PARAMETER NAME an artist sees (and an instance stores its override under) is
+# "<feature> <slot words>"; the identifier (In_<Feature>_<Slot>) stays, it is only the graph's local name.
+# Renaming one of these is a migration (Tools/Migration/r11_t57b_renames.json + r11_rename_plan.py).
+DISPLAY_PREFIX = {"Default": "Toon", "PBRSpecular": "PBR Specular", "KajiyaHair": "Kajiya", "ToonKajiyaHair": "Toon Kajiya",
+                  "DFFacialShadow": "Face Skin", "HairHighlightMask": "Hair Highlight", "Skin": "Skin",
+                  "Stockings": "Stockings", "NPRStockings": "Stockings", "Eye": "Eye", "ClothVelvet": "Velvet",
+                  "ToonMetal": "Metal", "EmissiveInk": "Ink"}
+DISPLAY_SLOT_WORDS = {"MultiBandCelEnable": "Multi Band Cel", "Mask": "Mask Bias", "Density": "Denier",
+                      "WrapStrength": "Diffuse Wrap Strength", "EyeTint": "Tint", "MetalTint": "Tint", "InkTint": "Tint"}
+
+
+def display_name(feature_key, slot):
+    words = DISPLAY_SLOT_WORDS.get(slot) or re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", slot)
+    return "%s %s" % (DISPLAY_PREFIX[feature_key], words)
+
+
 # R11 T57a: the name the "Is <Feature>" switch's description uses, where the panel group no longer says it.
 FEATURE_LABELS = {"DFFacialShadow": "SDF Face", "Eye": "Eye", "NPRStockings": "NPR Stockings"}
 
@@ -866,8 +882,8 @@ def emit(feature_key, tables):
         # A parameter whose slot the record dropped says so, in the one place an artist is looking
         # when they type a value into it.
         desc = desc + collapsed_slot_warning(slot, perpixel) + "\\r\\n" + desc_en
-        prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d; %sDescription="%s"];'
-                          % (kind, pname, default, group, i, slider, desc))
+        prop_lines.append('\t\t%s %s = %s [ParameterName="%s"; Group="%s"; SortPriority=%d; %sDescription="%s"];'
+                          % (kind, pname, default, display_name(feature_key, name), group, i, slider, desc))
         expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")
         if name in derived:
             local, tmpl, comment = derived[name]

@@ -2,15 +2,15 @@
 
 经典的"阈值图"式脸部阴影：一张 SDF 贴图记下每个像素在灯转到多少度时变暗，着色时拿灯相对脸的方位角和它比较，
 脸上的明暗线就按美术画好的形状移动，而不是按法线。这页讲精度（T24）、两个可选扩展通道（T26 / T27）
-和贴图导入规范（T28）。全角度 SDF（`Use Full Angle SDF`，顶光 / 底光 / 背光都对）另见 `Tools/SDF360`。
+和贴图导入规范（T28）。全角度 SDF（`Use Face SDF Full Angle`，顶光 / 底光 / 背光都对）另见 `Tools/SDF360`。
 
 ## 基本配置
 
 在 **M_MoonToon** 的材质实例上：
 
 1. 勾 **`Is DFFacialShadow`**。
-2. **`Distance Field Facial Shadow Map`** 指向 SDF 贴图，**`Distance Field Facial Shadow Map Channel`** 选通道。
-3. 网格要带头朝前向量（`Use Highlight Tangent baked in Houdini UV23` 那一套，UV1 / UV2）。
+2. **`Face SDF Map`** 指向 SDF 贴图，**`Face SDF Map Channel`** 选通道。
+3. 网格要带头朝前向量（`Kajiya Tangent From UV2 UV3` 那一套，UV1 / UV2）。
    角色挂了 `MoonToonActorComponent` 并设了头部坐标系时，左右判断和方位角改用头部骨骼的朝向，转头也准。
 
 灯在脸的正前方或正后方 ±3° 内，左右两半 SDF 会交叉过渡，不会裂成斑块。
@@ -20,7 +20,7 @@
 SDF 值交给每一盏灯时走 GBuffer / Substrate 记录里的两个 8 位通道，也就是 256 级：
 灯慢慢转的时候，明暗线是一格一格跳的（每格不到 1°），贴图很平的地方会出现等高线一样的台阶。
 
-**`Facial SDF Extended Payload`**（组 `02 - Distance Field Facial Shadow`，静态开关，默认关）把精度提到每侧 16 位：
+**`Face SDF Extended Payload`**（组 `02 - Distance Field Facial Shadow`，静态开关，默认关）把精度提到每侧 16 位：
 高 8 位仍走原来的通道，低 8 位走 RT4 / Data9（这条通道原来给 Matcap / 油膜修饰器用，T29 / T30 把它们搬进材质后，
 它专门给脸 SDF 用）。所有灯都拿到 16 位，副光、补光灯也一样。
 
@@ -33,15 +33,15 @@ SDF 值交给每一盏灯时走 GBuffer / Substrate 记录里的两个 8 位通�
 
 **真实 N·L 遮罩（T26，学终末地 mask.G）**
 
-- `Facial SDF NoL Mask`：一张线性灰度图，1 的地方回到灯自己的 N·L 明暗。用在耳朵、脖子、发际线这些
+- `Face SDF NoL Mask`：一张线性灰度图，1 的地方回到灯自己的 N·L 明暗。用在耳朵、脖子、发际线这些
   SDF 画不准的地方，让它们按真实形体受光。
-- `Facial SDF NoL Mask Channel` 选通道，`Facial SDF NoL Mask Strength` 整体强度。
+- `Face SDF NoL Mask Channel` 选通道，`Face SDF NoL Mask Strength` 整体强度。
 
 **阴影软渐变（T27，学鸣潮 B 通道）**
 
-- `Facial SDF Soft Ramp` 设 1 打开。打开后，SDF 判成阴影的地方，ramp 坐标改由 `Facial SDF Soft Map` 决定；
+- `Face SDF Soft Ramp` 设 1 打开。打开后，SDF 判成阴影的地方，ramp 坐标改由 `Face SDF Soft Map` 决定；
   硬的明暗分界线不动，只是阴影里面的颜色有了渐变（0 = 最深的阴影色，1 = 靠近明暗线的阴影色）。
-- `Facial SDF Soft Map Channel`、`Facial SDF Soft Power`（鸣潮用 1.5）、`Facial SDF Soft Range`（x / y = 软图 0 / 1 落在阴影半边 ramp 的哪里）。
+- `Face SDF Soft Map Channel`、`Face SDF Soft Power`（鸣潮用 1.5）、`Face SDF Soft Range`（x / y = 软图 0 / 1 落在阴影半边 ramp 的哪里）。
 
 ## 贴图导入规范（T28）
 
@@ -51,7 +51,7 @@ SDF 是数据，不是颜色：
 | --- | --- | --- |
 | sRGB | **关** | sRGB 会把阈值曲线弯掉，暗端尤其明显 |
 | 压缩 | **R16F（HalfFloat）** 最好；8 位贴图用 **Grayscale（G8）** 或 **BC4** | BC1 / BC3 / Default 的块端点只有 5–6 位，明暗线上会出台阶和斑块 |
-| R+G 两通道 | 压缩设 **VectorDisplacementmap（不压缩 RGBA8）**，材质勾 `Distance Field Facial Shadow Map R+G Average` | 终末地的做法：R、G 各存一半精度，平均后约 9 位；任何块压缩都会把 R、G 混掉 |
+| R+G 两通道 | 压缩设 **VectorDisplacementmap（不压缩 RGBA8）**，材质勾 `Face SDF R+G Average` | 终末地的做法：R、G 各存一半精度，平均后约 9 位；任何块压缩都会把 R、G 混掉 |
 | Mip | 可以关（`NoMipmaps`） | SDF 在 mip 0 采样，mip 只占内存 |
 
 **已有贴图不动**：ww_yy 的两张 SDF 是 BC1 + sRGB，现在的观感就是按这个调出来的，改成线性会明显变样。
@@ -81,7 +81,7 @@ check_face_sdf_textures.py    # 可选前置变量 ROOTS / GRANDFATHERED / REPOR
 | `INFO` | 有 mip |
 | `KEEP` | 老资产，观感依赖旧导入方式，保持不动 |
 
-开了 `Use Full Angle SDF` 的实例不读经典贴图，脚本跳过。
+开了 `Use Face SDF Full Angle` 的实例不读经典贴图，脚本跳过。
 
 ## 实现位置
 

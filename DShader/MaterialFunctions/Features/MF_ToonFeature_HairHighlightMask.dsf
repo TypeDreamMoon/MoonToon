@@ -65,10 +65,10 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_HairHighlightMask
 	}
 
 	Properties = {
-		ScalarParameter In_Hair_HighlightMask = 0.0 [Group="35 - Feature: Hair Highlight Mask"; SortPriority=0; SliderMin=0; SliderMax=1; Description="天使环遮罩, 一般由发丝高光贴图驱动. 逐像素输入会与这个常量相加. 取值 0~1, 默认 0.0.\r\nAngel ring mask, usually driven by the hair highlight texture; the per-pixel input is added to this constant. Range 0 to 1, default 0.0."];
-		ScalarParameter In_Hair_HighlightMaskIntensity = 0.0 [Group="35 - Feature: Hair Highlight Mask"; SortPriority=1; SliderMin=0; SliderMax=1; Description="天使环强度. 0 = 关闭. 取值 0~1, 默认 0.0.\r\nAngel ring strength. 0 = off. Range 0 to 1, default 0.0."];
-		ScalarParameter In_Hair_HighlightMaskShadowIntensity = 0.0 [Group="35 - Feature: Hair Highlight Mask"; SortPriority=2; SliderMin=0; SliderMax=1; Description="天使环在阴影中保留多少. 0 = 阴影里完全消失, 1 = 不受阴影影响. 取值 0~1, 默认 0.0.\r\nHow much of the ring survives in shadow. 0 = gone in shadow, 1 = unaffected. Range 0 to 1, default 0.0."];
-		ScalarParameter In_Hair_HighlightViewAnchorBlend = 0.0 [Group="35 - Feature: Hair Highlight Mask"; SortPriority=3; SliderMin=0; SliderMax=1; Description="0 = 天使环锚定在光照角度(旧行为); 1 = 锚定在视角, 环会跟着相机走, 更接近手绘动画的做法. 取值 0~1, 默认 0.0.\r\n0 = the ring is anchored to the light angle (legacy); 1 = to the view, so it follows the camera like hand-drawn animation. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Hair_HighlightMask = 0.0 [ParameterName="Hair Highlight Mask Bias"; Group="35 - Feature: Hair Highlight Mask"; SortPriority=0; SliderMin=0; SliderMax=1; Description="天使环遮罩, 一般由发丝高光贴图驱动. 逐像素输入会与这个常量相加. 取值 0~1, 默认 0.0.\r\nAngel ring mask, usually driven by the hair highlight texture; the per-pixel input is added to this constant. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Hair_HighlightMaskIntensity = 0.0 [ParameterName="Hair Highlight Intensity"; Group="35 - Feature: Hair Highlight Mask"; SortPriority=1; SliderMin=0; SliderMax=1; Description="天使环强度. 0 = 关闭. 取值 0~1, 默认 0.0.\r\nAngel ring strength. 0 = off. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Hair_HighlightMaskShadowIntensity = 0.0 [ParameterName="Hair Highlight Shadow Intensity"; Group="35 - Feature: Hair Highlight Mask"; SortPriority=2; SliderMin=0; SliderMax=1; Description="天使环在阴影中保留多少. 0 = 阴影里完全消失, 1 = 不受阴影影响. 取值 0~1, 默认 0.0.\r\nHow much of the ring survives in shadow. 0 = gone in shadow, 1 = unaffected. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Hair_HighlightViewAnchorBlend = 0.0 [ParameterName="Hair Highlight View Anchor Blend"; Group="35 - Feature: Hair Highlight Mask"; SortPriority=3; SliderMin=0; SliderMax=1; Description="0 = 天使环锚定在光照角度(旧行为); 1 = 锚定在视角, 环会跟着相机走, 更接近手绘动画的做法. 取值 0~1, 默认 0.0.\r\n0 = the ring is anchored to the light angle (legacy); 1 = to the view, so it follows the camera like hand-drawn animation. Range 0 to 1, default 0.0."];
 	}
 
 	Graph = {

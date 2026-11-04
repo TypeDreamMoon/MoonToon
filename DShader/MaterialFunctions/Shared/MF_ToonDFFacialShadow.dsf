@@ -26,21 +26,21 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 
 	Properties = {
 		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel = float4(1.0, 0.0, 0.0, 0.0) [
-			ParameterName="Distance Field Facial Shadow Map Channel";
+			ParameterName="Face SDF Map Channel";
 			Group="20 - Face: SDF Shadow";
 			MaskChannel=Red;
 			SortPriority=13;
 			Description="SDF 脸阴影图用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ChannelMaskParameter Distance_Field_Facial_Shadow_Map_Channel_1 = float4(1.0, 0.0, 0.0, 0.0) [
-			ParameterName="Distance Field Facial Shadow Map Channel";
+			ParameterName="Face SDF Map Channel";
 			Group="20 - Face: SDF Shadow";
 			MaskChannel=Red;
 			SortPriority=13;
 			Description="SDF 脸阴影图用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Flip_Left_Right_Flag = 0.0 [
-			ParameterName="Flip Left Right";
+			ParameterName="Face SDF Flip Left Right";
 			Group="20 - Face: SDF Shadow";
 			SortPriority=2;
 			Description="1 = 左右两半的 SDF 互换(贴图按另一侧画的时候用).\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = swap the two halves' SDF values (for a map authored for the other side).\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
@@ -48,7 +48,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 			SliderMax=1;
 		];
 		ScalarParameter RG_Average_Flag = 0.0 [
-			ParameterName="Distance Field Facial Shadow Map R+G Average";
+			ParameterName="Face SDF R+G Average";
 			Group="20 - Face: SDF Shadow";
 			SortPriority=3;
 			Description="1 = 距离场面影贴图按终末地式 R+G 分半格式读: 阈值 = (R + G) / 2, 约 9 位精度(Tools/FaceSDF 可输出). 0 = 按上面的通道读.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = read the map as an Endfield-style R+G split: threshold = (R + G) / 2, about 9 bits (Tools/FaceSDF writes it). 0 = the channel above.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
@@ -66,7 +66,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 				Class="TextureSampleParameter2D",
 				OutputType="float4",
 				OutputIndex=5,
-				ParameterName="Distance Field Facial Shadow Map",
+				ParameterName="Face SDF Map",
 				Group="20 - Face: SDF Shadow",
 				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
 				Coordinates=Multiply_19,
@@ -91,7 +91,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 				Class="TextureSampleParameter2D",
 				OutputType="float4",
 				OutputIndex=5,
-				ParameterName="Distance Field Facial Shadow Map",
+				ParameterName="Face SDF Map",
 				Group="20 - Face: SDF Shadow",
 				Desc="距离场面影贴图, 关于制作方法搜索\"Distance Field Facial Shadow\".\r\n压缩格式必须是\"Half Float (R16F)\", 且禁用sRGB.\r\n\r\n\r\nDistance Field Facial Shadow Map, search \"Distance Field Facial Shadow\" for the production method.\r\nThe compression format must be \"Half Float (R16F)\", and disable sRGB.",
 				Coordinates=MaterialExpressionTextureCoordinate_2_1,

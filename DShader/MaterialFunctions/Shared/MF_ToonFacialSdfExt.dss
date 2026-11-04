@@ -17,40 +17,40 @@
 // Every byte is written as (n + 0.25) / 255: the Substrate packer truncates (uint(x * 255)) and an RGBA8
 // target rounds, and both store that as n.
 //
-// M_MoonToon applies it behind the static switch "Facial SDF Extended Payload" on the classic SDF leaf
+// M_MoonToon applies it behind the static switch "Face SDF Extended Payload" on the classic SDF leaf
 // only. Off = exactly the graph before.
 
-/// @name Facial SDF NoL Mask   @group 20 - Face: SDF Shadow   @sort 5   @sampler LinearColor
+/// @name Face SDF NoL Mask   @group 20 - Face: SDF Shadow   @sort 5   @sampler LinearColor
 /// @default /MoonToon/Textures/T_Black_Linear
-/// @desc 真实 N·L 混合遮罩(关 sRGB): 1 = 这里回到灯自己的 N·L 明暗(耳朵 / 脖子 / 发际线, 学终末地 mask.G). 需要打开 Facial SDF Extended Payload. Real-N.L blend mask (sRGB off): 1 = back to the light's own N.L band (ears, neck, hairline). Needs Facial SDF Extended Payload.
+/// @desc 真实 N·L 混合遮罩(关 sRGB): 1 = 这里回到灯自己的 N·L 明暗(耳朵 / 脖子 / 发际线, 学终末地 mask.G). 需要打开 Face SDF Extended Payload. Real-N.L blend mask (sRGB off): 1 = back to the light's own N.L band (ears, neck, hairline). Needs Face SDF Extended Payload.
 uniform Texture2D Facial_SDF_NoL_Mask;
 
-/// @name Facial SDF NoL Mask Channel   @group 20 - Face: SDF Shadow   @sort 6   @slider 0 3
+/// @name Face SDF NoL Mask Channel   @group 20 - Face: SDF Shadow   @sort 6   @slider 0 3
 /// @desc 遮罩在哪个通道: 0 R, 1 G, 2 B, 3 A. Channel of the mask.
 uniform float Facial_SDF_NoL_Mask_Channel = 0.0;
 
-/// @name Facial SDF NoL Mask Strength   @group 20 - Face: SDF Shadow   @sort 7   @slider 0 1
+/// @name Face SDF NoL Mask Strength   @group 20 - Face: SDF Shadow   @sort 7   @slider 0 1
 /// @desc 遮罩强度(乘到遮罩上). Multiplies the mask.
 uniform float Facial_SDF_NoL_Mask_Strength = 1.0;
 
-/// @name Facial SDF Soft Ramp   @group 20 - Face: SDF Shadow   @sort 8   @slider 0 1
+/// @name Face SDF Soft Ramp   @group 20 - Face: SDF Shadow   @sort 8   @slider 0 1
 /// @desc 1 = 阴影内的 ramp 坐标改由软渐变图决定(学鸣潮 B 通道), 硬阴影边缘不动. 0 = 关. 1 = inside the shadow the ramp coordinate comes from the soft map (Wuthering Waves' B channel); the hard edge stays. 0 = off.
 uniform float Facial_SDF_Soft_Ramp = 0.0;
 
-/// @name Facial SDF Soft Map   @group 20 - Face: SDF Shadow   @sort 9   @sampler LinearColor
+/// @name Face SDF Soft Map   @group 20 - Face: SDF Shadow   @sort 9   @sampler LinearColor
 /// @default /MoonToon/Textures/T_White_Linear
 /// @desc 软渐变图(关 sRGB): 0 = 最深的阴影色, 1 = 靠近明暗交界的阴影色. Soft gradient map (sRGB off): 0 = deepest shadow, 1 = shadow next to the terminator.
 uniform Texture2D Facial_SDF_Soft_Map;
 
-/// @name Facial SDF Soft Map Channel   @group 20 - Face: SDF Shadow   @sort 10   @slider 0 3
+/// @name Face SDF Soft Map Channel   @group 20 - Face: SDF Shadow   @sort 10   @slider 0 3
 /// @desc 软渐变在哪个通道: 0 R, 1 G, 2 B, 3 A. Channel of the soft gradient.
 uniform float Facial_SDF_Soft_Map_Channel = 0.0;
 
-/// @name Facial SDF Soft Power   @group 20 - Face: SDF Shadow   @sort 11   @slider 0.1 4
+/// @name Face SDF Soft Power   @group 20 - Face: SDF Shadow   @sort 11   @slider 0.1 4
 /// @desc 软渐变的幂(鸣潮用 1.5). Power applied to the soft gradient (Wuthering Waves uses 1.5).
 uniform float Facial_SDF_Soft_Power = 1.5;
 
-/// @name Facial SDF Soft Range   @group 20 - Face: SDF Shadow   @sort 12
+/// @name Face SDF Soft Range   @group 20 - Face: SDF Shadow   @sort 12
 /// @desc x = 软渐变 0 处, y = 1 处的阴影 ramp 位置(0..1 = 阴影半边的 ramp 0..0.5). x / y = where 0 / 1 of the soft gradient land on the shadow half of the ramp (0..1 = ramp U 0..0.5).
 uniform float4 Facial_SDF_Soft_Range = float4(0.0, 1.0, 0.0, 0.0);
 

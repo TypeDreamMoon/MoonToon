@@ -89,8 +89,8 @@
 ### 6. 发丝线条压在上面
 
 - **内描线**（屏幕空间线）：`r.MoonToon.FaceOverlay.HairLinesOnTop 1`（默认）让叠加在内描线之前画，头发的发丝线保留在透出的眉眼上面；`0` 是旧顺序（眉眼盖住线）。
-- **头发描边外壳**：在头发对应的**描边**材质实例（M_MoonToonOutline）上勾 `Is Face Overlay Occluder`，类别保持 `9`（组 `10 - See Through`）。
-  眉眼不接受类别 9，所以在发丝轮廓线处会让开。**前提：头发本体也要登记成类别 8**（M_MoonToon 的 `Is Face Overlay Occluder`），
+- **头发描边外壳**：在头发对应的**描边**材质实例（M_MoonToonOutline）上勾 `Write Face Overlay Occluder`，类别保持 `9`（组 `10 - See Through`）。
+  眉眼不接受类别 9，所以在发丝轮廓线处会让开。**前提：头发本体也要登记成类别 8**（M_MoonToon 的 `Write Face Overlay Occluder`），
   否则发片内部最近的登记面就是描边外壳，眉眼整片都不透。
 
 ### 7. 眉眼自己的描边一起透
@@ -116,7 +116,7 @@
 
 遮挡物登记走专用遮挡层（#10），不再用 CustomDepth / CustomStencil：
 
-1. 遮挡物的材质勾 `Is Face Overlay Occluder`，设 `Face Overlay Occluder Class`（1–255；8 = 默认接受的"前发"）。
+1. 遮挡物的材质勾 `Write Face Overlay Occluder`，设 `Face Overlay Occluder Class`（1–255；8 = 默认接受的"前发"）。
 2. 非 8 的类别，在眉眼材质的 `Through Hair Occluder ID A/B` 里写上同一个数字表示接受。
 
 没有任何登记的场景走回退规则：遮挡物是皮肤 / 眼睛 / 眉毛就不透，其他（头发、帽子、未标记材质）都透。
@@ -154,7 +154,7 @@
 
 建议：
 - 要透视的角色都挂 **MoonToonActorComponent**（有角色 ID，跨角色 / 道具判定才可靠）。
-- 有帽子、长袖抬手这类动作的角色，把头发登记为 8（头发材质勾 `Is Face Overlay Occluder`）。
+- 有帽子、长袖抬手这类动作的角色，把头发登记为 8（头发材质勾 `Write Face Overlay Occluder`）。
 - 眼镜这类夹层物体目前没有办法。可行的做法是加一个"阻挡层"：眼镜材质登记成阻挡类别，单独画一层最近深度，眉眼片元前方只要有阻挡层的表面就不透（和现在的遮挡登记层同一套机制，多一张深度 + ID 目标）。尚未实现。
 
 ## 全局开关

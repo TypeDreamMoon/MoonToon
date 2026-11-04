@@ -412,7 +412,7 @@ FText UMoonToonOutlineAlphaTool::GetToolDescription() const
 	return LOCTEXT("AlphaDesc",
 		"Writes vertex colour alpha from a curve, so outline width can be authored as a root-to-tip "
 		"taper instead of painted by hand.\n\n"
-		"The material reads alpha through 'Use Vertex Color A as Outline Width'. Only alpha is "
+		"The material reads alpha through 'Outline Width From Vertex Color A'. Only alpha is "
 		"written -- RGB is preserved, because the base material reads it for feature ID, rim width "
 		"and opacity.\n\n"
 		"Use Preview Only to check a curve before committing, and Multiply to re-run without "
@@ -766,7 +766,7 @@ FString UMoonToonOutlineAlphaTool::Run(const FMoonToonToolContext& Context)
 	else
 	{
 		Lines.Add(TEXT(""));
-		Lines.Add(TEXT("Enable 'Use Vertex Color A as Outline Width' on the outline material to see this."));
+		Lines.Add(TEXT("Enable 'Outline Width From Vertex Color A' on the outline material to see this."));
 	}
 	return FString::Join(Lines, TEXT("\n"));
 }

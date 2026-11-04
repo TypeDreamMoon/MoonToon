@@ -97,12 +97,12 @@ void AMoonToonStrandPreviewActor::Tick(float DeltaSeconds)
 	const FQuat Rotation = GetActorQuat();
 	const FVector Radii = GetActorScale3D().GetAbs() * GShellSphereRadius;
 
-	PreviewMID->SetVectorParameterValue(TEXT("Ellipsoid_Center"), GetActorLocation());
-	PreviewMID->SetVectorParameterValue(TEXT("Ellipsoid_Radii"), Radii);
-	PreviewMID->SetVectorParameterValue(TEXT("Ellipsoid_Basis_X"), Rotation.GetAxisX());
-	PreviewMID->SetVectorParameterValue(TEXT("Ellipsoid_Basis_Y"), Rotation.GetAxisY());
-	PreviewMID->SetVectorParameterValue(TEXT("Ellipsoid_Basis_Z"), Rotation.GetAxisZ());
-	PreviewMID->SetScalarParameterValue(TEXT("Band_Exponent"), BandExponent);
+	PreviewMID->SetVectorParameterValue(TEXT("Preview Ellipsoid Center"), GetActorLocation());
+	PreviewMID->SetVectorParameterValue(TEXT("Preview Ellipsoid Radii"), Radii);
+	PreviewMID->SetVectorParameterValue(TEXT("Preview Ellipsoid Basis X"), Rotation.GetAxisX());
+	PreviewMID->SetVectorParameterValue(TEXT("Preview Ellipsoid Basis Y"), Rotation.GetAxisY());
+	PreviewMID->SetVectorParameterValue(TEXT("Preview Ellipsoid Basis Z"), Rotation.GetAxisZ());
+	PreviewMID->SetScalarParameterValue(TEXT("Preview Band Exponent"), BandExponent);
 
 	FVector LightDirection = LightDirectionOverride.GetSafeNormal();
 	if (bSyncLightFromScene)
@@ -121,7 +121,7 @@ void AMoonToonStrandPreviewActor::Tick(float DeltaSeconds)
 	{
 		LightDirection = FVector::UpVector;
 	}
-	PreviewMID->SetVectorParameterValue(TEXT("Light_Direction"), LightDirection);
+	PreviewMID->SetVectorParameterValue(TEXT("Preview Light Direction"), LightDirection);
 }
 
 void AMoonToonStrandPreviewActor::SyncEllipsoidWithTool()

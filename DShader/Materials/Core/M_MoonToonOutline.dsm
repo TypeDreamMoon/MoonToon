@@ -165,7 +165,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			SliderMax=4;
 		];
 		ScalarParameter Max_Distance = 1000.0 [
-			ParameterName="Max Distance";
+			ParameterName="Outline Max Distance";
 			Group="70 - Outline";
 			SortPriority=2;
 			Description="宽度曲线最右端对应的相机距离. \r\nCamera distance that maps to the right-hand end of the width ramp.";
@@ -173,7 +173,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			SliderMax=5000;
 		];
 		ScalarParameter Use_Smooth_Normal = 1.0 [
-			ParameterName="Use Smooth Normal Baked In TexCoord23";
+			ParameterName="Outline Smooth Normal From UV2 UV3";
 			Group="70 - Outline";
 			SortPriority=3;
 			Description="0 = 沿原始顶点法线外扩(硬边会裂开), 1 = 沿烘焙的平滑法线. \r\n0 = extrude along the raw vertex normal (splits at hard edges), 1 = along the baked smoothed normal.";
@@ -203,7 +203,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 			SliderMax=1;
 		];
 		ScalarParameter Outline_Use_Shadow_Tint = 1.0 [
-			ParameterName="Derive From Shadow Color";
+			ParameterName="Outline Color From Shadow Color";
 			Group="70 - Outline";
 			SortPriority=9;
 			Description="逐区域颜色的来源: 1 = 材质的暗部颜色(描边就是最深的那一档影), 0 = 原始底色. \r\nSource for the per-region colour. 1 = the material's authored MainLightShadowColor (an outline is the darkest shadow band), 0 = raw albedo.";
@@ -538,7 +538,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				OutputType="float",
 				True=(UE.Expression(Class="VertexColor", OutputType="float4")).a,
 				False=1.0,
-				ParameterName="Use Vertex Color A as Outline Width",
+				ParameterName="Outline Width From Vertex Color A",
 				Group="70 - Outline",
 				SortPriority=1,
 				Desc="开 = 描边宽度乘顶点色 A. \r\nOn = the outline width is multiplied by vertex colour alpha."
@@ -677,7 +677,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				OutputType="float3",
 				True=pow(max((UE.Expression(Class="VertexColor", OutputType="float4")).rgb, 0.0), 2.2),
 				False=float3(1.0, 1.0, 1.0),
-				ParameterName="Use Vertex Color RGB as Outline Color",
+				ParameterName="Outline Color From Vertex Color RGB",
 				Group="70 - Outline",
 				SortPriority=7,
 				Desc="开 = 描边颜色取顶点色 RGB. \r\nOn = the outline colour comes from the vertex colour RGB."
@@ -824,7 +824,7 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				False=0.0,
 				Group="21 - Face: See Through Overlay",
 				SortPriority=6,
-				ParameterName="Is Face Overlay Occluder",
+				ParameterName="Write Face Overlay Occluder",
 				Desc="开 = 这个材质是眉透/瞳透的遮挡物(通常是前发), 写入专用遮挡层. \r\nOn = this material is a see-through occluder (usually front hair) and writes the overlay occluder layer."
 			);
 		FaceOverlayPart = Through_Hair_Part;

@@ -75,14 +75,14 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonMetal", Root=
 	}
 
 	Properties = {
-		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [Group="40 - Feature: Metal"; SortPriority=0; SliderMin=0; SliderMax=1; Description="金属漫反射强度. 金属通常很低. 取值 0~1, 默认 0.0.\r\nMetal diffuse strength; usually low for metal. Range 0 to 1, default 0.0."];
-		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [Group="40 - Feature: Metal"; SortPriority=1; SliderMin=0; SliderMax=1; Description="阴影中高光的保底值. 0 = 阴影里高光全灭. 取值 0~1, 默认 0.0.\r\nHighlight floor in shadow. 0 = the highlight vanishes in shadow. Range 0 to 1, default 0.0."];
-		ScalarParameter In_ToonMetal_RampOffset = 0.0 [Group="40 - Feature: Metal"; SortPriority=2; SliderMin=-1; SliderMax=0.99; Description="高光在 Specular Ramp 上的横向偏移, 用来整体调亮或调暗. 取值 -1~0.99, 默认 0.0.\r\nHorizontal offset of the highlight on the Specular Ramp, to brighten or darken it as a whole. Range -1 to 0.99, default 0.0."];
-		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [Group="40 - Feature: Metal"; SortPriority=3; SliderMin=0; SliderMax=1; Description="高光粗糙度倍数. 取值 0~1, 默认 1.0.\r\nHighlight roughness multiplier. Range 0 to 1, default 1.0."];
-		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [Group="40 - Feature: Metal"; SortPriority=4; SliderMin=0; SliderMax=1; Description="高光总强度. 取值 0~1, 默认 0.0.\r\nOverall highlight strength. Range 0 to 1, default 0.0."];
-		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [Group="40 - Feature: Metal"; SortPriority=5; SliderMin=0; SliderMax=1; Description="掠射角高光增益, 做出金属边缘的亮边. 取值 0~1, 默认 0.0.\r\nGrazing-angle highlight boost, for the bright rim of metal. Range 0 to 1, default 0.0."];
-		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [Group="40 - Feature: Metal"; SortPriority=6; SliderMin=1; SliderMax=16.9; Description="高光对比度(Ramp 的幂次). 越大高光越硬、越集中. 取值 1~16.9, 默认 1.0.\r\nHighlight contrast (a power on the ramp). Larger is harder and tighter. Range 1 to 16.9, default 1.0."];
-		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="40 - Feature: Metal"; SortPriority=7; Description="金属高光染色.\r\nMetal highlight tint."];
+		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [ParameterName="Metal Diffuse Intensity"; Group="40 - Feature: Metal"; SortPriority=0; SliderMin=0; SliderMax=1; Description="金属漫反射强度. 金属通常很低. 取值 0~1, 默认 0.0.\r\nMetal diffuse strength; usually low for metal. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [ParameterName="Metal Shadow Specular Floor"; Group="40 - Feature: Metal"; SortPriority=1; SliderMin=0; SliderMax=1; Description="阴影中高光的保底值. 0 = 阴影里高光全灭. 取值 0~1, 默认 0.0.\r\nHighlight floor in shadow. 0 = the highlight vanishes in shadow. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_RampOffset = 0.0 [ParameterName="Metal Ramp Offset"; Group="40 - Feature: Metal"; SortPriority=2; SliderMin=-1; SliderMax=0.99; Description="高光在 Specular Ramp 上的横向偏移, 用来整体调亮或调暗. 取值 -1~0.99, 默认 0.0.\r\nHorizontal offset of the highlight on the Specular Ramp, to brighten or darken it as a whole. Range -1 to 0.99, default 0.0."];
+		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [ParameterName="Metal Roughness Scale"; Group="40 - Feature: Metal"; SortPriority=3; SliderMin=0; SliderMax=1; Description="高光粗糙度倍数. 取值 0~1, 默认 1.0.\r\nHighlight roughness multiplier. Range 0 to 1, default 1.0."];
+		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [ParameterName="Metal Specular Intensity"; Group="40 - Feature: Metal"; SortPriority=4; SliderMin=0; SliderMax=1; Description="高光总强度. 取值 0~1, 默认 0.0.\r\nOverall highlight strength. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [ParameterName="Metal Edge Boost"; Group="40 - Feature: Metal"; SortPriority=5; SliderMin=0; SliderMax=1; Description="掠射角高光增益, 做出金属边缘的亮边. 取值 0~1, 默认 0.0.\r\nGrazing-angle highlight boost, for the bright rim of metal. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [ParameterName="Metal Specular Contrast"; Group="40 - Feature: Metal"; SortPriority=6; SliderMin=1; SliderMax=16.9; Description="高光对比度(Ramp 的幂次). 越大高光越硬、越集中. 取值 1~16.9, 默认 1.0.\r\nHighlight contrast (a power on the ramp). Larger is harder and tighter. Range 1 to 16.9, default 1.0."];
+		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [ParameterName="Metal Tint"; Group="40 - Feature: Metal"; SortPriority=7; Description="金属高光染色.\r\nMetal highlight tint."];
 	}
 
 	Graph = {
