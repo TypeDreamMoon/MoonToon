@@ -36,15 +36,17 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonStockingsSheenMask", Root="
 		ScalarParameter Stockings_Sheen_Mask_Source = 0.0 [
 			ParameterName="Stockings Sheen Mask Source";
 			Group="38 - Feature: Stockings";
-			SortPriority=20;
+			SortPriority=102;
 			Description="织纹遮罩读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由 Stockings Sheen Mask Channel 决定. 0 = 全白, 高光没有逐像素结构(默认, 等于这个功能关着).\r\n\r\n这张遮罩乘在 Stockings Spec Intensity 上, 所以它画的是'哪里反光强' —— 针织的纱线走向、菱形网眼、提花纹样都放这里. 丝袜自身的颜色仍然走材质的 Base Color, 两者是分开的: 颜色贴图管'什么颜色', 这张管'怎么反光'.\r\n\r\n共用的是基础输入那一次采样, 不额外带贴图也不额外取样.";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ChannelMaskParameter Stockings_Sheen_Mask_Channel = float4(1.0, 0.0, 0.0, 0.0) [
 			ParameterName="Stockings Sheen Mask Channel";
 			Group="38 - Feature: Stockings";
-			SortPriority=21;
+			SortPriority=103;
 			MaskChannel=Red;
-			Description="上面那张图里, 织纹遮罩占哪个通道.";
+			Description="上面那张图里, 织纹遮罩占哪个通道. \r\nWhich channel of that map holds the weave mask.";
 		];
 	}
 

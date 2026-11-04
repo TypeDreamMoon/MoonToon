@@ -15,12 +15,16 @@ Shader(Name="Materials/Debug/M_MoonToonStrandPreviewShell", Root="Plugin.MoonToo
 
 	Properties = {
 		VectorParameter Shell_Color = float4(0.15, 0.8, 1.0, 1.0) [
-			Group="Preview";
-			SortPriority=10;
+			Group="90 - Debug|Strand Preview";
+			SortPriority=6;
+			Description="(调试预览) 外壳颜色. \r\n(Debug preview) colour of the shell.";
 		];
 		ScalarParameter Shell_Opacity = 0.10 [
-			Group="Preview";
-			SortPriority=20;
+			Group="90 - Debug|Strand Preview";
+			SortPriority=8;
+			SliderMin=0;
+			SliderMax=1;
+			Description="(调试预览) 外壳不透明度. \r\n(Debug preview) opacity of the shell.";
 		];
 	}
 

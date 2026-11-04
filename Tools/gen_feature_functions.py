@@ -36,15 +36,15 @@ FEATURES = {
     "PBRSpecular":       ("PBRSpecular",       "MOON_SHADING_FEATURE_ID_PBR_SPECULAR",
                           "32 - Feature: PBR Specular"),
     "KajiyaHair":        ("KajiyaHair",        "MOON_SHADING_FEATURE_ID_KAJIYA_HAIR_SPECULAR",
-                          "34 - Feature: Hair Kajiya Kay"),
+                          "33 - Feature: Hair Kajiya"),
     "ToonKajiyaHair":    ("ToonKajiyaHair",    "MOON_SHADING_FEATURE_ID_TOON_KAJIYA_HAIR_SPECULAR",
-                          "35 - Feature: Hair Toon Kajiya Kay"),
+                          "34 - Feature: Hair Toon Kajiya"),
     "DFFacialShadow":    ("DFFacialShadow",    "MOON_SHADING_FEATURE_ID_DISTANCE_FIELD_FACIAL_SHADOW",
-                          "37 - Feature: SDF Face"),
+                          "20 - Face: SDF Shadow|Skin Shading"),
     "HairHighlightMask": ("HairHighlightMask", "MOON_SHADING_FEATURE_ID_HAIR_HIGHLIGHT_MASK",
-                          "33 - Feature: Hair Highlight Mask"),
+                          "35 - Feature: Hair Highlight Mask"),
     "Skin":              ("Skin",              "MOON_SHADING_FEATURE_ID_SKIN",
-                          "36 - Feature: Skin"),
+                          "37 - Feature: Skin"),
     "Stockings":         ("Stockings",         "MOON_SHADING_FEATURE_ID_PBR_STOCKINGS",
                           "38 - Feature: Stockings"),
     # Same slots, same parameter NAMES, same panel group as Stockings -- only the lighting path
@@ -54,13 +54,13 @@ FEATURES = {
     "NPRStockings":      ("NPRStockings",      "MOON_SHADING_FEATURE_ID_NPR_STOCKINGS",
                           "38 - Feature: Stockings"),
     "Eye":               ("Eye",               "MOON_SHADING_FEATURE_ID_EYE",
-                          "39 - Feature: Eye"),
+                          "22 - Eye|Shading"),
     "ClothVelvet":       ("ClothVelvet",       "MOON_SHADING_FEATURE_ID_CLOTH_VELVET",
-                          "40 - Feature: Cloth Velvet"),
+                          "39 - Feature: Cloth Velvet"),
     "ToonMetal":         ("ToonMetal",         "MOON_SHADING_FEATURE_ID_TOON_METAL",
-                          "41 - Feature: Metal"),
+                          "40 - Feature: Metal"),
     "EmissiveInk":       ("EmissiveInk",       "MOON_SHADING_FEATURE_ID_TOON_EMISSIVE_INK",
-                          "42 - Feature: Emissive Ink"),
+                          "41 - Feature: Emissive Ink"),
     # No Matcap entry. A matcap is additive on top of the lighting result (MToon 1.0), so it composes
     # with every feature rather than being a 14th mutually exclusive one -- as a feature, ticking it
     # turned skin/hair shading OFF. It is authored in the material (M_MoonToon, T29), as is the oil
@@ -350,7 +350,7 @@ DESC_COMMON = {
     # Skin / SDF face
     "ScatterStrength":         "次表面散射强度. 会把明暗交界线向暗部推, 让皮肤过渡更软.",
     "TransmissionStrength":    "背光透射强度(耳朵、鼻翼的透光).",
-    "TransmissionPower":       "背光透射的集中度. 越大越集中在正背光方向.",
+    "TransmissionPower":       "背光透射的范围. 越大越宽: 0 = 只在正背光方向很窄的一圈, 1 = 侧逆光也透.",
     "PrimaryRoughnessScale":   "主高光粗糙度倍数. 小于 1 让高光更小更锐.",
     "SecondaryRoughnessScale": "次高光粗糙度倍数, 通常比主高光大, 做出油光的外圈.",
     "SecondaryRampOffset":     "次高光在 Specular Ramp 上的横向偏移.",
@@ -449,6 +449,133 @@ DESC = {
         "OverallSpecIntensity": "两道高光的总强度. 在这次重构之前这个槽位写不进去, 所以每张 SDF 脸的 toon 高光都是 0 —— 现在可以打开了.",
     },
 }
+
+# R11 T57a: the English half of every description above, same keys. The panel shows "<zh> <range>\r\n<en> <range>".
+DESC_EN_COMMON = {
+    "TangentRotate":           "Rotates the strand tangent about the normal, in units of PI radians. Only when the material gives no anisotropy direction.",
+    "PrimaryShift":            "Shifts the primary highlight (the one nearer the root) along the normal. Positive moves it up, negative down.",
+    "SecondaryShift":          "Shifts the secondary highlight (the one nearer the tip) along the normal.",
+    "SecondaryMask":           "Mask for the secondary highlight, usually driven by a strand mask texture.",
+    "PrimaryExpScale":         "Sharpness multiplier of the primary highlight. Above 1 sharper, below 1 broader.",
+    "SecondaryExpScale":       "Sharpness multiplier of the secondary highlight.",
+    "OverallIntensity":        "Overall strength of both highlights. 0 turns the Kajiya highlight off.",
+    "PrimaryIntensity":        "Primary highlight strength.",
+    "SecondaryIntensity":      "Secondary highlight strength.",
+    "SecondaryShiftScale":     "Extra scale on the secondary shift, to set the two highlights apart.",
+    "ShadowStrength":          "How much shadow dims the highlight. 0 = full strength in shadow, 1 = follows the shadow fully.",
+    "ScatterStrength":         "Subsurface scattering strength. Pushes the terminator into the dark side so skin transitions softly.",
+    "TransmissionStrength":    "Back-light transmission strength (light through ears and nostrils).",
+    "TransmissionPower":       "Width of the back-light transmission. Larger is broader: 0 = a narrow ring straight against the light, 1 = side back light shows through too.",
+    "PrimaryRoughnessScale":   "Roughness multiplier of the primary highlight. Below 1 makes it smaller and sharper.",
+    "SecondaryRoughnessScale": "Roughness multiplier of the secondary highlight; usually larger than the primary, for an oily outer halo.",
+    "SecondaryRampOffset":     "Horizontal offset of the secondary highlight on the Specular Ramp.",
+    "OverallSpecIntensity":    "Overall strength of both highlights. 0 = no highlight.",
+    "PrimaryLobeIntensity":    "Primary lobe strength.",
+    "SecondaryLobeIntensity":  "Secondary lobe strength.",
+    "SpecShadowStrength":      "How much shadow dims the highlight.",
+    "WarmTintStrength":        "Warm hue shift of the scattering. Larger reads redder.",
+}
+STOCKINGS_DESC_EN = {
+    "Density":               "Stocking denier, as on the packet: 10D very sheer, 30D semi-sheer, 80-120D opaque, 250D fully opaque. "
+                             "Coverage is 1-pow(0.5, D/35), so 35D is half coverage and every further 35D halves what gets through; 0 = no stocking. "
+                             "Denier drives coverage, transmission and highlight sharpness; the per-pixel thickness map multiplies it.",
+    "FresnelPower":          "Power of the grazing-angle darkening. Larger keeps the darkening closer to the silhouette.",
+    "TransmissionStrength":  "Back-light transmission: how much light from behind the leg reaches the eye through the stocking.",
+    "TransmissionDistortion":"Normal distortion of the back-light transmission (DICE GDC 2011). 0 = only straight behind; larger lets the sides of the calf glow too, usually 0.1-0.3.",
+    "SpecularIntensity":     "Overall highlight strength.",
+    "ShadowStrength":        "How much shadow dims the diffuse.",
+    "GrazingDarkenStrength": "Grazing-angle darkening, for the deeper edge of a stocking.",
+    "SkinColor":             "Colour of the skin showing through (the leg, not the stocking; the stocking's colour is Base Color). "
+                             "Black = unset, then the cloth colour is used.",
+    "GrazingSpecBoost":      "Grazing-angle highlight boost, for a bright rim along the edge.",
+}
+DESC_EN = {
+    "Default": {
+        "MultiBandCelEnable": "Above 0.5 skips the hard terminator and lets the Diffuse Ramp define the bands. 0 keeps the two-tone cel.",
+        "TerminatorWidth":    "Per-material terminator width, independent of the per-light ToonLightSmooth: soft skin and hard cloth under one light. 0 leaves it to the ramp.",
+        "BloomWeight":        "This material's bloom weight; 0 = unset (treated as 1.0). Lets eyes glow without the skin blooming.",
+    },
+    "PBRSpecular": {
+        "BloomWeight":        "This material's bloom weight; 0 = unset (treated as 1.0).",
+    },
+    "HairHighlightMask": {
+        "Mask":            "Angel ring mask, usually driven by the hair highlight texture; the per-pixel input is added to this constant.",
+        "Intensity":       "Angel ring strength. 0 = off.",
+        "ShadowIntensity": "How much of the ring survives in shadow. 0 = gone in shadow, 1 = unaffected.",
+        "ViewAnchorBlend": "0 = the ring is anchored to the light angle (legacy); 1 = to the view, so it follows the camera like hand-drawn animation.",
+    },
+    "Stockings": STOCKINGS_DESC_EN,
+    "NPRStockings": STOCKINGS_DESC_EN,
+    "Eye": {
+        "DiffuseWrapStrength":    "Wrap of the eye's diffuse, for a softer light falloff.",
+        "LimbalDarkenStrength":   "Limbal darkening: the eye's edge deepens as the view turns away.",
+        "SpecularShadowStrength": "How much shadow dims the highlight.",
+        "PrimaryRoughnessScale":  "Roughness multiplier of the primary highlight (the small sharp one).",
+        "SecondaryRoughnessScale":"Roughness multiplier of the secondary highlight (the large soft one).",
+        "PrimaryIntensity":       "Primary highlight strength.",
+        "SecondaryIntensity":     "Secondary highlight strength.",
+        "EyeTint":                "Eye tint. Black = unset, then Base Color is used.",
+        "SecondaryRampOffset":    "Horizontal offset of the secondary highlight on the Specular Ramp.",
+    },
+    "ClothVelvet": {
+        "WrapStrength":          "Wrap of the cloth's diffuse.",
+        "SheenPower":            "Sheen power. Larger keeps the sheen closer to the silhouette.",
+        "SheenShadowStrength":   "How much shadow dims the sheen.",
+        "RoughnessScale":        "Highlight roughness multiplier.",
+        "SheenIntensity":        "Sheen strength. 0 = no velvet look.",
+        "RetroDiffuseStrength":  "Retro-reflection: extra brightening when the light comes from the camera, typical of velvet.",
+        "GrazingDarkenStrength": "Grazing-angle darkening.",
+        "SheenTint":             "Colour of the velvet sheen.",
+        "RimBias":               "Sheen floor on the side away from the light. 0 = no sheen there.",
+    },
+    "ToonMetal": {
+        "DiffuseIntensity":    "Metal diffuse strength; usually low for metal.",
+        "ShadowSpecularFloor": "Highlight floor in shadow. 0 = the highlight vanishes in shadow.",
+        "RampOffset":          "Horizontal offset of the highlight on the Specular Ramp, to brighten or darken it as a whole.",
+        "RoughnessScale":      "Highlight roughness multiplier.",
+        "SpecularIntensity":   "Overall highlight strength.",
+        "EdgeBoost":           "Grazing-angle highlight boost, for the bright rim of metal.",
+        "SpecularContrast":    "Highlight contrast (a power on the ramp). Larger is harder and tighter.",
+        "MetalTint":           "Metal highlight tint.",
+    },
+    "EmissiveInk": {
+        "LightInfluence":    "How much lighting applies. 0 = pure emissive, 1 = lit normally.",
+        "ShadowLift":        "Shadow lift: how much brightness survives in shadow. 0 = black shadow.",
+        "InkDarkenStrength": "Grazing-angle darkening, so the ink deepens towards the edge.",
+        "RoughnessScale":    "Highlight roughness multiplier.",
+        "SpecularIntensity": "Overall highlight strength.",
+        "EdgeBoost":         "Grazing-angle highlight boost.",
+        "InkBlend":          "Mix between Base Color and the ink colour. 0 = all Base Color, 1 = all ink.",
+        "InkTint":           "Colour of the ink.",
+        "RimBias":           "Fresnel bias of the edge highlight.",
+    },
+    "_RetiredMatcap": {
+        "Intensity":   "unused -- matcap is no longer a feature",
+        "MatcapColor": "unused -- matcap is no longer a feature",
+    },
+    "DFFacialShadow": {
+        "OverallSpecIntensity": "Overall strength of both highlights. This slot used to be unwritable, so every SDF face had no toon highlight; it works now.",
+    },
+}
+
+# R11 T57a: the name the "Is <Feature>" switch's description uses, where the panel group no longer says it.
+FEATURE_LABELS = {"DFFacialShadow": "SDF Face", "Eye": "Eye", "NPRStockings": "NPR Stockings"}
+
+# R11 T57a: slider and range sentence from the slot's record encoding (MoonToonFeatureSlots.h, fifth column).
+# The slider is UI only; a typed value outside it still reaches the record's clamp.
+ENC_UI_RANGE = {"Unorm": (0.0, 1.0), "Signed": (-1.0, 0.99), "Exp8": (0.0, 7.9), "Contrast16": (1.0, 16.9), "Pow16": (0.0, 15.9)}
+# Parameters whose value is not the slot's value (it goes through a formula first).
+PARAM_UI_RANGE = {"In_Stockings_Denier": (0.0, 250.0)}
+
+
+def _fmt(v):
+    return ("%g" % v)
+
+
+def range_sentences(lo, hi, default):
+    return (" 取值 %s~%s, 默认 %s." % (_fmt(lo), _fmt(hi), default),
+            " Range %s to %s, default %s." % (_fmt(lo), _fmt(hi), default))
+
 
 # Colours for the "Debug Shading Feature" base-material view. Kept exactly as the old writer's
 # DebugColor branches so the view still reads the same.
@@ -552,6 +679,26 @@ def parse_slot_defaults(path, prefix="MOON_TOON_SLOTS_"):
             r"X\(\s*\w+\s*,\s*[\w.]+\s*,\s*(\w+)\s*,\s*((?:[^,()]|\([^)]*\))+?)\s*(?:,\s*\w+\s*)?\)", body)
         if rows:
             out[name] = {n: d.strip() for n, d in rows}
+        else:
+            ref = re.search(r"(%s\w+)\(X\)" % prefix, body)
+            if ref:
+                alias[name] = ref.group(1)
+    for a, target in alias.items():
+        if target in out:
+            out[a] = out[target]
+    return out
+
+
+def parse_slot_encodings(path, prefix="MOON_TOON_SLOTS_"):
+    """table-macro -> {slot Name: record encoding} (R11 A5's fifth column; Unorm when a row has none)."""
+    src = open(path, encoding="utf-8").read()
+    out, alias = {}, {}
+    for m in re.finditer(r"#define\s+(%s\w+)\(X\)((?:[^\n]*\\\n)*[^\n]*)" % prefix, src):
+        name, body = m.group(1), m.group(2)
+        rows = re.findall(
+            r"X\(\s*\w+\s*,\s*[\w.]+\s*,\s*(\w+)\s*,\s*(?:[^,()]|\([^)]*\))+?\s*(?:,\s*(\w+)\s*)?\)", body)
+        if rows:
+            out[name] = {n: (e or "Unorm") for n, e in rows}
         else:
             ref = re.search(r"(%s\w+)\(X\)" % prefix, body)
             if ref:
@@ -674,6 +821,9 @@ SUBMAT_CHANNEL = {
 SUBMAT_IMPORT = "Shared/ToonFunctions.dsh"
 
 
+ENCODINGS = {}
+
+
 def emit(feature_key, tables):
     dsf_name, id_macro, group = FEATURES[feature_key]
     rows = tables[slot_table_for(feature_key)]
@@ -701,14 +851,23 @@ def emit(feature_key, tables):
         pname, default = params[name]
         kind = "VectorParameter" if t == "float3" else "ScalarParameter"
         desc = DESC.get(feature_key, {}).get(name) or DESC_COMMON.get(name)
-        if not desc:
-            raise SystemExit("%s.%s has no description -- add one to DESC or DESC_COMMON"
+        desc_en = DESC_EN.get(feature_key, {}).get(name) or DESC_EN_COMMON.get(name)
+        if not desc or not desc_en:
+            raise SystemExit("%s.%s has no description -- add one to DESC / DESC_COMMON and DESC_EN / DESC_EN_COMMON"
                              % (feature_key, name))
+        # R11 T57a: bilingual, with the range the record keeps (the slot's encoding) and a matching slider.
+        slider = ""
+        if kind == "ScalarParameter":
+            enc = ENCODINGS.get(slot_table_for(feature_key), {}).get(name, "Unorm")
+            lo, hi = PARAM_UI_RANGE.get(pname, ENC_UI_RANGE[enc])
+            range_zh, range_en = range_sentences(lo, hi, default)
+            desc, desc_en = desc + range_zh, desc_en + range_en
+            slider = "SliderMin=%s; SliderMax=%s; " % (_fmt(lo), _fmt(hi))
         # A parameter whose slot the record dropped says so, in the one place an artist is looking
         # when they type a value into it.
-        desc = desc + collapsed_slot_warning(slot, perpixel)
-        prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d; Description="%s"];'
-                          % (kind, pname, default, group, i, desc))
+        desc = desc + collapsed_slot_warning(slot, perpixel) + "\\r\\n" + desc_en
+        prop_lines.append('\t\t%s %s = %s [Group="%s"; SortPriority=%d; %sDescription="%s"];'
+                          % (kind, pname, default, group, i, slider, desc))
         expr = "%s%s" % (pname, ".rgb" if t == "float3" else "")
         if name in derived:
             local, tmpl, comment = derived[name]
@@ -738,7 +897,7 @@ def emit(feature_key, tables):
         slot_lines.append(
             '\t\t%s Slot_%s = UE.Expression(Class="StaticSwitchParameter", OutputType="%s", '
             'True=lerp(Slot_%s_Authored, SubMat_C%d.%s, SubMat_W%d.%s), False=Slot_%s_Authored, '
-            'Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");'
+            'Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");'
             % (channel_type, name, channel_type, name, col, comp, col, comp, name))
         call_lines.append("\t\t\tSlot_%s," % name)
         out_decls.append("\t\t%s %s;" % (channel_type, name))
@@ -912,12 +1071,19 @@ def emit_selector(tables, ids):
     def switch_label(k):
         return "Is %s" % FEATURES[k][0]
 
+    # The feature's own name, not its panel group: since T57a two features live in face / eye groups.
+    def feature_label(k):
+        return FEATURE_LABELS.get(k, FEATURES[k][2].split(": ")[-1])
+
     props = "\n".join(
         '\t\tStaticSwitchParameter %s = false '
         '[ParameterName="%s"; Group="30 - Shading Feature (pick one)"; SortPriority=%d; '
         'Description="启用 %s 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. '
-        '勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支)."];'
-        % (switch_id(k), switch_label(k), i, FEATURES[k][2].split(": ")[-1])
+        '勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\\r\\n'
+        'Turns on the %s shading feature. Tick only one; if several are ticked, the earliest in this list wins, '
+        'and none ticked is plain toon. Once ticked, the other features\' parameters leave the instance panel '
+        '(the static switch removes the branches not taken)."];'
+        % (switch_id(k), switch_label(k), i, feature_label(k), feature_label(k))
         for i, k in enumerate(picks))
 
     def call(k, out_index):
@@ -1168,6 +1334,7 @@ def main():
     opts = ap.parse_args()
 
     tables = parse_slot_tables(SLOT_TABLE)
+    ENCODINGS.update(parse_slot_encodings(SLOT_TABLE))
 
     slot_defaults = parse_slot_defaults(SLOT_TABLE)
     problems = (check_registry_agreement() + check_bloom_weight_list(tables)
@@ -1201,6 +1368,17 @@ def main():
 
     if stale:
         print("stale, re-run the generator: %s" % ", ".join(stale))
+        return 1
+
+    # R11 T57a: the parameter lint over every DShader source, not only the files written here -- group map,
+    # unique sort, bilingual descriptions, colour-space notes, sliders (Tools/lint_params.py).
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import lint_params
+    issues, _ = lint_params.lint(lint_params.collect(lint_params.DSHADER))
+    for rule, name, where, message in issues:
+        sys.stdout.buffer.write(("lint %s  %s: %s  (%s)\n" % (rule, name, message, where)).encode("utf-8"))
+    if issues:
+        print("lint_params: %d issue(s) -- fix them before regenerating the materials" % len(issues))
         return 1
     return 0
 

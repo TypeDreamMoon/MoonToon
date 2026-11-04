@@ -27,32 +27,33 @@
 /// @asset /MoonToon/MaterialFunctions/MF_MoonMainLightDirection
 extern float3 MF_MoonMainLightDirection();
 
-/// @name Shadow Color   @group 01 - Bangs Shadow   @sort 0
-/// @desc 投影颜色(乘到下面的脸上, 线性). The colour multiplied onto the face (linear).
+/// @name Shadow Color   @group 10 - Diffuse   @sort 0
+/// @desc 暗部颜色, 乘暗部颜色贴图.  Shadow colour, times the shadow colour map.
 uniform float4 Shadow_Color = float4(0.78, 0.62, 0.62, 1.0);
 
-/// @name Shadow Strength   @group 01 - Bangs Shadow   @sort 1   @slider 0 1
+/// @name Shadow Strength   @group 80 - Bangs Shadow   @sort 0   @slider 0 1
+/// @desc 刘海投影的浓度. 0 = 没有, 1 = 最深. Strength of the bangs shadow; 0 none, 1 full.
 uniform float Shadow_Strength = 1.0;
 
-/// @name Shadow Shift   @group 01 - Bangs Shadow   @sort 2   @slider 0 10
+/// @name Shadow Shift   @group 80 - Bangs Shadow   @sort 1   @slider 0 10
 /// @desc 沿屏幕平面背向光的偏移, cm. How far the copy moves away from the light in the screen plane, cm.
 uniform float Shadow_Shift = 1.2;
 
-/// @name Shadow Push Back   @group 01 - Bangs Shadow   @sort 3   @slider 0 5
+/// @name Shadow Push Back   @group 80 - Bangs Shadow   @sort 2   @slider 0 5
 /// @desc 往相机反方向推的距离, cm: 让副本落到刘海后面, 不压暗刘海本身. Away from the camera, cm, so the copy sits behind the real fringe.
 uniform float Shadow_Push_Back = 0.5;
 
-/// @name Shadow Depth Range   @group 01 - Bangs Shadow   @sort 4   @slider 0.5 30
+/// @name Shadow Depth Range   @group 80 - Bangs Shadow   @sort 3   @slider 0.5 30
 /// @desc 只压暗副本身后这么深以内的表面, cm. Only surfaces within this depth behind the copy are darkened, cm.
 uniform float Shadow_Depth_Range = 4.0;
 
-/// @name Shadow Mask   @group 01 - Bangs Shadow   @sort 5   @sampler LinearColor
+/// @name Shadow Mask   @group 80 - Bangs Shadow   @sort 4   @sampler LinearColor
 /// @default /MoonToon/Textures/T_White_Linear
-/// @desc 哪些发缕投影(UV0, R, 白 = 全投). Which strands cast (UV0, R, white = full).
+/// @desc 哪些发缕投影(UV0, R, 白 = 全投). Which strands cast (UV0, R, white = full). 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 uniform Texture2D Shadow_Mask;
 
 /// @static
-/// @name Receive On Face Only   @group 01 - Bangs Shadow   @sort 6
+/// @name Receive On Face Only   @group 80 - Bangs Shadow   @sort 5
 /// @desc 只投到脸上(皮肤/眼睛、脸部叠加成员、眉毛), 落在头发/衣服/背景上的部分不压暗. Only a face receives (skin / eye, face-overlay members, eyebrows).
 uniform bool Receive_On_Face_Only = true;
 

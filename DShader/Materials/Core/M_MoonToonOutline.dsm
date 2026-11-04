@@ -158,136 +158,175 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 	Properties = {
 		ScalarParameter Outline_Width = 1.0 [
 			ParameterName="Outline Width";
-			Group="00 - Outline";
-			SortPriority=10;
-			Description="Multiplier on the width ramp, in world units at the ramp's reference distance.";
+			Group="70 - Outline";
+			SortPriority=0;
+			Description="宽度曲线的倍数, 世界单位(以曲线参考距离为准). \r\nMultiplier on the width ramp, in world units at the ramp's reference distance.";
+			SliderMin=0;
+			SliderMax=4;
 		];
 		ScalarParameter Max_Distance = 1000.0 [
 			ParameterName="Max Distance";
-			Group="00 - Outline";
-			SortPriority=15;
-			Description="Camera distance that maps to the right-hand end of the width ramp.";
+			Group="70 - Outline";
+			SortPriority=2;
+			Description="宽度曲线最右端对应的相机距离. \r\nCamera distance that maps to the right-hand end of the width ramp.";
+			SliderMin=100;
+			SliderMax=5000;
 		];
 		ScalarParameter Use_Smooth_Normal = 1.0 [
 			ParameterName="Use Smooth Normal Baked In TexCoord23";
-			Group="00 - Outline";
-			SortPriority=20;
-			Description="0 = extrude along the raw vertex normal (splits at hard edges), 1 = along the baked smoothed normal.";
+			Group="70 - Outline";
+			SortPriority=3;
+			Description="0 = 沿原始顶点法线外扩(硬边会裂开), 1 = 沿烘焙的平滑法线. \r\n0 = extrude along the raw vertex normal (splits at hard edges), 1 = along the baked smoothed normal.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Reject_Inverted_Smooth_Normal = 0.0 [
 			ParameterName="Reject Inverted Smooth Normal";
-			Group="00 - Outline";
-			SortPriority=21;
-			Description="逐顶点丢弃与顶点法线夹角超过 90 度的烘焙平滑法线, 改用顶点法线外扩. 0 = 关(默认, 照单全收), 1 = 全开.\n\n默认关: 在 weld 过重合几何的导入角色上, '反向'极其常见 —— SK_ww_yy 脸部 23% 的顶点如此, 因为睫毛/眉毛/表情片/腮红这些浮在脸皮前面的薄片被焊进脸皮后法线相互抵消. 沿反向法线外扩会让壳沉进模型内部、被深度剔除, 结果就是脸上没有内描边 —— 那恰好是美术要的.\n\n开启的场景是单面开放片(裙摆/飘带): 那里没有'内部'可藏, 壳向内穿到背面会露出错误的描边. 按实例开.";
+			Group="70 - Outline";
+			SortPriority=4;
+			Description="逐顶点丢弃与顶点法线夹角超过 90 度的烘焙平滑法线, 改用顶点法线外扩. 0 = 关(默认, 照单全收), 1 = 全开.\n\n默认关: 在 weld 过重合几何的导入角色上, '反向'极其常见 —— SK_ww_yy 脸部 23% 的顶点如此, 因为睫毛/眉毛/表情片/腮红这些浮在脸皮前面的薄片被焊进脸皮后法线相互抵消. 沿反向法线外扩会让壳沉进模型内部、被深度剔除, 结果就是脸上没有内描边 —— 那恰好是美术要的.\n\n开启的场景是单面开放片(裙摆/飘带): 那里没有'内部'可藏, 壳向内穿到背面会露出错误的描边. 按实例开.\r\nPer vertex, drops a baked smooth normal that is more than 90 degrees from the vertex normal and extrudes along the vertex normal instead. 0 = off (default), 1 = on. Off is right for welded imported characters, whose overlapping face layers cancel normals; on is for single-sided open sheets such as skirt hems.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		VectorParameter Outline_Color = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="Outline Color";
-			Group="00 - Outline";
-			SortPriority=30;
+			Group="70 - Outline";
+			SortPriority=6;
+			Description="描边颜色(Blend Outline Color From Surface 为 0 时). \r\nOutline colour (when Blend Outline Color From Surface is 0).";
 		];
 		ScalarParameter Outline_Color_From_Base = 0.0 [
 			ParameterName="Blend Outline Color From Surface";
-			Group="00 - Outline";
-			SortPriority=40;
-			Description="0 = flat Outline Color everywhere, 1 = derive the outline colour from the surface so skin outlines read as skin, hair as hair.";
+			Group="70 - Outline";
+			SortPriority=8;
+			Description="0 = 处处用 Outline Color, 1 = 描边颜色取自表面(皮肤像皮肤, 头发像头发). \r\n0 = flat Outline Color everywhere, 1 = derive the outline colour from the surface so skin outlines read as skin, hair as hair.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Outline_Use_Shadow_Tint = 1.0 [
 			ParameterName="Derive From Shadow Color";
-			Group="00 - Outline";
-			SortPriority=41;
-			Description="Source for the per-region colour. 1 = the material's authored MainLightShadowColor (already art-directed and palette-consistent -- an outline is just the darkest shadow band). 0 = raw albedo.";
+			Group="70 - Outline";
+			SortPriority=9;
+			Description="逐区域颜色的来源: 1 = 材质的暗部颜色(描边就是最深的那一档影), 0 = 原始底色. \r\nSource for the per-region colour. 1 = the material's authored MainLightShadowColor (an outline is the darkest shadow band), 0 = raw albedo.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Outline_Gamma = 1.8 [
 			ParameterName="Outline Darken Gamma";
-			Group="00 - Outline";
-			SortPriority=42;
-			Description="Darkens via pow(), which raises saturation and keeps hue -- unlike a flat multiply, which only dims and reads muddy. 1 = no change, 1.5-2.5 typical.";
+			Group="70 - Outline";
+			SortPriority=10;
+			Description="用 pow() 压暗: 提饱和保色相, 不像直接乘那样发脏. 1 = 不变, 常用 1.5~2.5. \r\nDarkens via pow(), which raises saturation and keeps hue, unlike a flat multiply. 1 = no change, 1.5-2.5 typical.";
+			SliderMin=1;
+			SliderMax=4;
 		];
 		VectorParameter Outline_Tint = float4(1.0, 1.0, 1.0, 1.0) [
 			ParameterName="Outline Tint";
-			Group="00 - Outline";
-			SortPriority=43;
-			Description="Multiplies the region-derived colour. Keep near white: darkening is Gamma's job, and a dark multiplier would crush every region back to black.";
+			Group="70 - Outline";
+			SortPriority=11;
+			Description="乘在逐区域颜色上. 保持接近白: 压暗交给 Gamma. \r\nMultiplies the region-derived colour. Keep near white: darkening is Gamma's job, and a dark multiplier would crush every region back to black.";
 		];
 
 		// --- Outline v2 (G04, task T07). Every default reproduces the outline as it was. ---
 		ScalarParameter Outline_Width_Space = 0.0 [
 			ParameterName="Outline Width Space";
-			Group="01 - Outline v2";
-			SortPriority=10;
+			Group="71 - Outline v2";
+			SortPriority=0;
 			Description="描边宽度用什么空间算: 0 = 距离曲线(Outline Width Ramp Map, 原来的做法), 1 = 世界宽度(Outline World Width), 2 = 屏幕像素(Outline Pixel Width, 按 FOV 和 1080p 归一, 鸣潮/终末地式). 小数 = 相邻两种之间混合.\r\nWidth space: 0 = distance ramp (as before), 1 = world width, 2 = screen pixels (FOV- and 1080p-normalised). Fractions blend the two neighbours.";
+			SliderMin=0;
+			SliderMax=2;
 		];
 		ScalarParameter Outline_World_Width = 0.1 [
 			ParameterName="Outline World Width";
-			Group="01 - Outline v2";
-			SortPriority=11;
+			Group="71 - Outline v2";
+			SortPriority=1;
 			Description="(Width Space 1) 世界宽度, cm. 乘 Outline Width 之前的值不变, 只是换了来源. World width in cm.";
+			SliderMin=0;
+			SliderMax=2;
 		];
 		ScalarParameter Outline_Pixel_Width = 1.5 [
 			ParameterName="Outline Pixel Width";
-			Group="01 - Outline v2";
-			SortPriority=12;
+			Group="71 - Outline v2";
+			SortPriority=2;
 			Description="(Width Space 2) 屏幕宽度, 像素(1080p 基准: 1440p 下自动变 1.33 倍). Screen width in pixels at a 1080p reference.";
+			SliderMin=0;
+			SliderMax=8;
 		];
 		ScalarParameter Outline_Min_Pixels = 0.0 [
 			ParameterName="Outline Min Pixels";
-			Group="01 - Outline v2";
-			SortPriority=13;
+			Group="71 - Outline v2";
+			SortPriority=3;
 			Description="任何宽度空间下的最小像素宽度(1080p 基准), 0 = 不限. 少前2 1.2, 终末地 0.5. Floor in pixels (1080p reference), 0 = none.";
+			SliderMin=0;
+			SliderMax=8;
 		];
 		ScalarParameter Outline_Max_Pixels = 0.0 [
 			ParameterName="Outline Max Pixels";
-			Group="01 - Outline v2";
-			SortPriority=14;
+			Group="71 - Outline v2";
+			SortPriority=4;
 			Description="任何宽度空间下的最大像素宽度(1080p 基准), 0 = 不限. 少前2 2.5. Ceiling in pixels (1080p reference), 0 = none.";
+			SliderMin=0;
+			SliderMax=16;
 		];
 		ScalarParameter Outline_Push_Back = 0.0 [
 			ParameterName="Outline Push Back";
-			Group="01 - Outline v2";
-			SortPriority=20;
+			Group="71 - Outline v2";
+			SortPriority=5;
 			Description="沿视线把外壳往后推多少 cm(屏幕位置不变, 只是更远), 用来压掉脸上的内描线. 终末地: 头发 0.1, 脸最多 7.5. 乘 Push Back 通道(若开了顶点色映射).\r\nPushes the hull away from the camera along the view ray, in cm, so it hides behind the face instead of drawing inner lines. Scaled by the push-back channel when vertex colour mapping is on.";
+			SliderMin=0;
+			SliderMax=10;
 		];
 		ScalarParameter Outline_Width_Channel = 4.0 [
 			ParameterName="Outline Width Channel";
-			Group="01 - Outline v2";
-			SortPriority=31;
+			Group="71 - Outline v2";
+			SortPriority=7;
 			Description="(Use Vertex Color Mapping) 宽度读顶点色哪个通道: 0 = 不读, 1 R, 2 G, 3 B, 4 A. 鸣潮拆包: G. Vertex colour channel for width: 0 none, 1 R, 2 G, 3 B, 4 A.";
+			SliderMin=0;
+			SliderMax=4;
 		];
 		ScalarParameter Outline_Push_Back_Channel = 0.0 [
 			ParameterName="Outline Push Back Channel";
-			Group="01 - Outline v2";
-			SortPriority=32;
+			Group="71 - Outline v2";
+			SortPriority=8;
 			Description="(Use Vertex Color Mapping) 后推读哪个通道: 0 = 不读(=1), 1 R, 2 G, 3 B, 4 A. 鸣潮拆包: B. Channel scaling the push back: 0 none (1), 1 R, 2 G, 3 B, 4 A.";
+			SliderMin=0;
+			SliderMax=4;
 		];
 		ScalarParameter Outline_Clip_Channel = 0.0 [
 			ParameterName="Outline Clip Channel";
-			Group="01 - Outline v2";
-			SortPriority=33;
+			Group="71 - Outline v2";
+			SortPriority=9;
 			Description="(Use Vertex Color Mapping) 裁剪读哪个通道: 0 = 不裁, 1 R, 2 G, 3 B, 4 A. 低于 Clip Threshold 的地方不画描边(例如薄纱). 鸣潮拆包: A. Channel that clips the outline: 0 none, 1 R, 2 G, 3 B, 4 A.";
+			SliderMin=0;
+			SliderMax=4;
 		];
 		ScalarParameter Outline_Clip_Threshold = 0.5 [
 			ParameterName="Outline Clip Threshold";
-			Group="01 - Outline v2";
-			SortPriority=34;
+			Group="71 - Outline v2";
+			SortPriority=10;
 			Description="(Use Vertex Color Mapping) 裁剪通道低于这个值时不画描边. The clip channel below this value removes the outline.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		StaticSwitchParameter Use_Hair_Tip_Translucency = false [
 			ParameterName="Use Hair Tip Translucency";
-			Group="21 - Translucency|Hair Tip";
-			SortPriority=50;
+			Group="03 - Opacity & Translucency|Hair Tip";
+			SortPriority=0;
 			Description="发梢描边. 和头发材质用同一张 Hair Tip Mask(同通道、同阈值). 同一个开关, 角色由混合模式决定: Masked 实例(槽位原来的描边)在发梢处裁掉外壳; Blend Mode 覆盖为 Translucent 的子实例换上这个槽位的描边后, 整个外壳半透明绘制, 发梢外围按 Hair Tip Root/End Opacity 淡出, 发梢范围内的外壳背面被单层预深度裁掉(角色要有 MoonToonActorComponent). 详见 MoonToon/Docs/HairTipTranslucency.md.\r\nHair-tip outline, with the hair material's Hair Tip Mask (same channel and threshold). One switch, the blend mode picks the role: a Masked instance (the slot's usual outline) cuts the hull at the tips; a child with Blend Mode overridden to Translucent, set as this slot's outline instead, draws the whole hull translucent with the tips' Root / End Opacity, and the single-layer prepass removes its back faces inside the tips (the character needs a MoonToonActorComponent).";
 		];
 		ScalarParameter Hair_Tip_Root_Opacity = 1.0 [
 			ParameterName="Hair Tip Root Opacity";
-			Group="21 - Translucency|Hair Tip";
-			SortPriority=54;
-			Description="(半透明发梢描边) 发梢根部(遮罩值 = 阈值处)描边的不透明度. 和头发重画实例设成一样.\r\n(Translucent hair-tip outline) the outline's opacity where the tip begins (mask = threshold). Set it like the hair's redraw instance.";
+			Group="03 - Opacity & Translucency|Hair Tip";
+			SortPriority=4;
+			Description="(半透明重画)发梢根部(遮罩值 = 阈值处)的不透明度, 再乘底色 alpha. 保持 1 与不透明部分无缝衔接.\r\n(Translucent redraw) opacity where the tip begins (mask = threshold), times the base colour alpha. Keep 1 for a seamless join with the opaque part.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Hair_Tip_End_Opacity = 1.0 [
 			ParameterName="Hair Tip End Opacity";
-			Group="21 - Translucency|Hair Tip";
-			SortPriority=55;
-			Description="(半透明发梢描边) 发梢末端(遮罩值 = 1 处)描边的不透明度. 和头发重画实例设成一样.\r\n(Translucent hair-tip outline) the outline's opacity at the very end (mask = 1). Set it like the hair's redraw instance.";
+			Group="03 - Opacity & Translucency|Hair Tip";
+			SortPriority=5;
+			Description="(半透明重画)发梢末端(遮罩值 = 1 处)的不透明度, 再乘底色 alpha. 二值遮罩 + 底色 alpha(终末地)保持 1; 渐变遮罩可降到 0.6 左右(异环).\r\n(Translucent redraw) opacity at the very end (mask = 1), times the base colour alpha. 1 with a binary mask and an authored alpha (Endfield); about 0.6 with a gradient mask (NTE).";
+			SliderMin=0;
+			SliderMax=1;
 		];
 
 
@@ -297,21 +336,27 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 		// its own, and an enrolled hull is rasterised again by the ordering prepass).
 		ScalarParameter Through_Hair_Opacity = 1.0 [
 			ParameterName="Through Hair Opacity";
-			Group="10 - See Through";
-			SortPriority=10;
+			Group="21 - Face: See Through Overlay";
+			SortPriority=4;
 			Description="(配合 Enable See Through Overlay) 眉毛/眼睛的描边被前发挡住时, 以这个不透明度透到头发上面, 跟眉眼本体一起透. 一般和对应眉眼材质的 Through Hair Opacity 设成一样.\r\n(With Enable See Through Overlay) the opacity this brow / eye outline re-blends with where front hair covers it, so the line reads through together with the part it outlines.";
+			SliderMin=0;
+			SliderMax=2;
 		];
 		ScalarParameter Through_Hair_Part = 1.0 [
 			ParameterName="Through Hair Part";
-			Group="10 - See Through";
-			SortPriority=11;
-			Description="这条描边在角色眉眼透视档位里算眉(1)还是眼(2). 描边外壳没有眉毛标记, 自动(0)会算成眼.\r\nWhich see-through group this outline follows in the per-character tier: 1 = brow, 2 = eye. The hull carries no eyebrow tag, so auto (0) reads as eye.";
+			Group="21 - Face: See Through Overlay";
+			SortPriority=3;
+			Description="这个材质在角色'眉眼透视档位'(MoonToonActorComponent 的 Face Overlay Mode: 不透/仅透眉/半透/全透)里算眉还是算眼: 0 = 自动(标了眉毛特性的算眉, 其余算眼), 1 = 眉, 2 = 眼(瞳孔/睫毛/眼白/高光). 睫毛卡片用普通 toon 着色时请手动设 2.\r\nWhich see-through group the per-character tier (Face Overlay Mode on MoonToonActorComponent: none / brows only / half / full) treats this material as: 0 = auto (eyebrow-tagged is a brow, everything else an eye), 1 = brow, 2 = eye (iris, lashes, eye white, highlights).";
+			SliderMin=0;
+			SliderMax=2;
 		];
 		ScalarParameter Face_Overlay_Occluder_Class = 9.0 [
 			ParameterName="Face Overlay Occluder Class";
-			Group="10 - See Through";
-			SortPriority=21;
-			Description="(配合 Is Face Overlay Occluder) 把头发描边登记进 FaceOverlay 遮挡层. 用一个眉眼材质不接受的类别(默认 9), 透出的眉眼就会在描边处让开, 发丝轮廓线保留在最上面. 前提: 头发本体也要以 8 登记(Is Face Overlay Occluder), 否则发片内部最近的登记面就是描边外壳, 眉眼会整片不透.\r\n(With Is Face Overlay Occluder) registers a HAIR outline in the FaceOverlay occluder layer under a class the brows / eyes do not accept (9 by default), so the see-through parts step aside along the hair's silhouette line and it stays on top. The hair itself must be registered too (class 8), otherwise the hull is the nearest registered surface inside every strand and nothing reads through.";
+			Group="21 - Face: See Through Overlay";
+			SortPriority=7;
+			Description="(配合 Is Face Overlay Occluder 开关) 把这个材质登记为眉透/瞳透的遮挡物(通常是前发), 写入 FaceOverlay 专用遮挡层, 不再需要 CustomDepth / CustomStencil. 遮挡类别(1-255). 默认 8 = 引擎默认接受的'前发'类别(r.MoonToon.FaceOverlay.HairStencil). 帽檐/发饰等可用其他类别, 再在眉眼材质的 Through Hair Occluder ID A/B 里接受它.\r\n(With the Is Face Overlay Occluder switch) registers this material as a see-through occluder, usually front hair, in the FaceOverlay occluder layer -- no CustomDepth / CustomStencil needed. Occluder class (1-255). 8 is the class the engine accepts as front hair by default; give hat brims / accessories another class and accept it on the brow / eye material's Occluder ID A/B.";
+			SliderMin=1;
+			SliderMax=255;
 		];
 	}
 
@@ -494,8 +539,9 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				True=(UE.Expression(Class="VertexColor", OutputType="float4")).a,
 				False=1.0,
 				ParameterName="Use Vertex Color A as Outline Width",
-				Group="00 - Outline",
-				SortPriority=12
+				Group="70 - Outline",
+				SortPriority=1,
+				Desc="开 = 描边宽度乘顶点色 A. \r\nOn = the outline width is multiplied by vertex colour alpha."
 			);
 
 		// Outline v2: configurable vertex colour mapping (G04). One switch for the whole mapping so a
@@ -519,8 +565,9 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				True=OutlineMappedChannels.rgb,
 				False=float3(1.0, 1.0, 1.0),
 				ParameterName="Use Vertex Color Mapping",
-				Group="01 - Outline v2",
-				SortPriority=30
+				Group="71 - Outline v2",
+				SortPriority=6,
+				Desc="开 = 按下面的通道选择从顶点色读宽度、后推和裁剪(鸣潮式). \r\nOn = width, push back and clip come from the vertex colour channels picked below (Wuthering Waves style)."
 			);
 		// With the mapping on, its width channel replaces the legacy A switch (both on = mapping wins).
 		float WidthMask =
@@ -530,8 +577,9 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				True=OutlineMapping.r,
 				False=WidthMaskLegacy,
 				ParameterName="Use Vertex Color Mapping",
-				Group="01 - Outline v2",
-				SortPriority=30
+				Group="71 - Outline v2",
+				SortPriority=6,
+				Desc="开 = 按下面的通道选择从顶点色读宽度、后推和裁剪(鸣潮式). \r\nOn = width, push back and clip come from the vertex colour channels picked below (Wuthering Waves style)."
 			);
 
 		// Ramp the width by camera distance so the outline keeps a roughly constant screen weight.
@@ -541,9 +589,9 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				Class="TextureSampleParameter2D",
 				OutputType="float4",
 				ParameterName="Outline Width Ramp Map",
-				Group="00 - Outline",
-				SortPriority=25,
-				Desc="X axis: camera distance to the character. Y axis: outline width. Generate with a Curve Atlas.",
+				Group="70 - Outline",
+				SortPriority=5,
+				Desc="横轴 = 相机到角色的距离, 纵轴 = 描边宽度. 用 Curve Atlas 生成. \r\nX axis: camera distance to the character. Y axis: outline width. Generate with a Curve Atlas. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.",
 				Coordinates=float2(saturate(PixelDepth / Max_Distance), 0.5),
 				Texture=Path(Plugins.MoonToon, "Assets/OutlineWidthRamps/CA_OutlineWidthRamp"),
 				SamplerType="SAMPLERTYPE_LinearColor"
@@ -630,8 +678,9 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				True=pow(max((UE.Expression(Class="VertexColor", OutputType="float4")).rgb, 0.0), 2.2),
 				False=float3(1.0, 1.0, 1.0),
 				ParameterName="Use Vertex Color RGB as Outline Color",
-				Group="00 - Outline",
-				SortPriority=35
+				Group="70 - Outline",
+				SortPriority=7,
+				Desc="开 = 描边颜色取顶点色 RGB. \r\nOn = the outline colour comes from the vertex colour RGB."
 			);
 
 		// Tint applied after the flat/derived lerp so it modulates whichever source is active, and
@@ -673,8 +722,9 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				True=OutlineFacingNormalTS,
 				False=Surf_Normal,
 				ParameterName="Outline Face Camera Normal",
-				Group="01 - Outline v2",
-				SortPriority=40
+				Group="71 - Outline v2",
+				SortPriority=11,
+				Desc="开 = 描边外壳的着色法线朝向相机, 描边颜色不随光照角度变. \r\nOn = the hull's shading normal faces the camera, so the outline colour does not change with the light angle."
 			);
 		#EndRegion
 
@@ -755,9 +805,10 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				OutputType="float4",
 				True=float4(OutlineColor, Through_Hair_Opacity),
 				False=float4(0.0, 0.0, 0.0, 0.0),
-				Group="10 - See Through",
-				SortPriority=5,
-				ParameterName="Enable See Through Overlay"
+				Group="21 - Face: See Through Overlay",
+				SortPriority=0,
+				ParameterName="Enable See Through Overlay",
+				Desc="开 = 这个部件(眉/眼)被前发挡住时透出来. \r\nOn = this part (brow / eye) shows through the front hair that covers it."
 			);
 		// z/w = a view fade that can never bite: the hull is drawn as BACK faces, so its normal
 		// points away from the camera and the engine's N.V fade would read 0 everywhere.
@@ -771,9 +822,10 @@ Shader(Name="Materials/Core/M_MoonToonOutline", Root="Plugin.MoonToon")
 				OutputType="float",
 				True=Face_Overlay_Occluder_Class,
 				False=0.0,
-				Group="10 - See Through",
-				SortPriority=20,
-				ParameterName="Is Face Overlay Occluder"
+				Group="21 - Face: See Through Overlay",
+				SortPriority=6,
+				ParameterName="Is Face Overlay Occluder",
+				Desc="开 = 这个材质是眉透/瞳透的遮挡物(通常是前发), 写入专用遮挡层. \r\nOn = this material is a see-through occluder (usually front hair) and writes the overlay occluder layer."
 			);
 		FaceOverlayPart = Through_Hair_Part;
 		#EndRegion

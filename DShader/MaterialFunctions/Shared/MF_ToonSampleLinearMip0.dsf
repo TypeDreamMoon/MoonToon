@@ -31,9 +31,9 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSampleLinearMip0", Root="Pl
 	Properties = {
 		StaticSwitchParameter Enable_Per_Texture_Sampler = false [
 			ParameterName="Enable Per Texture Sampler";
-			Group="00 - Global Settings";
-			SortPriority=32;
-			Description="开启后每张贴图使用自己的采样器设置; 关闭则共用 World 采样器组(省采样器槽位, UE 上限 16). 这一个开关同时作用于本材质的全部贴图.";
+			Group="00 - Global";
+			SortPriority=0;
+			Description="开启后每张贴图使用自己的采样器设置; 关闭则共用 World 采样器组(省采样器槽位, UE 上限 16). 这一个开关同时作用于本材质的全部贴图. \r\nOn = every texture uses its own sampler settings; off = they share the World sampler group (saves sampler slots; UE allows 16). One switch for all of this material's textures.";
 		];
 	}
 

@@ -16,44 +16,44 @@
 /// @asset /MoonToon/MaterialFunctions/MF_MoonMainLightDirection
 extern float3 MF_MoonMainLightDirection();
 
-/// @name Full Angle SDF Atlas   @group 32 - SDF Face|Full Angle   @sort 0   @sampler LinearColor
+/// @name Full Angle SDF Atlas   @group 20 - Face: SDF Shadow|Full Angle   @sort 1   @sampler LinearColor
 /// @default /MoonToon/Textures/T_White_Linear
 /// @desc 全角度 SDF 图集(Tools/SDF360 烘焙, 关 sRGB, 不要 mip, Clamp). Full-angle SDF atlas from Tools/SDF360 (sRGB off, no mips, clamp).
 uniform Texture2D Full_Angle_SDF_Atlas;
 
-/// @name Full Angle SDF Theta Count   @group 32 - SDF Face|Full Angle   @sort 1   @slider 2 36
-/// @desc sdf360.json grid.theta_count.
+/// @name Full Angle SDF Theta Count   @group 20 - Face: SDF Shadow|Full Angle   @sort 2   @slider 2 36
+/// @desc 全角度 SDF 图集的水平角数(sdf360.json grid.theta_count). Number of horizontal angles in the atlas, from sdf360.json grid.theta_count.
 uniform float Full_Angle_SDF_Theta_Count = 8.0;
 
-/// @name Full Angle SDF Phi Count   @group 32 - SDF Face|Full Angle   @sort 2   @slider 1 19
-/// @desc sdf360.json grid.phi_count.
+/// @name Full Angle SDF Phi Count   @group 20 - Face: SDF Shadow|Full Angle   @sort 3   @slider 1 19
+/// @desc 全角度 SDF 图集的仰角数(grid.phi_count). Number of elevation angles in the atlas, from grid.phi_count.
 uniform float Full_Angle_SDF_Phi_Count = 7.0;
 
-/// @name Full Angle SDF Phi Min   @group 32 - SDF Face|Full Angle   @sort 3   @slider -90 90
-/// @desc sdf360.json grid.phi_min (degrees).
+/// @name Full Angle SDF Phi Min   @group 20 - Face: SDF Shadow|Full Angle   @sort 4   @slider -90 90
+/// @desc 最低仰角, 度(grid.phi_min). Lowest elevation in degrees, from grid.phi_min.
 uniform float Full_Angle_SDF_Phi_Min = -90.0;
 
-/// @name Full Angle SDF Phi Max   @group 32 - SDF Face|Full Angle   @sort 4   @slider -90 90
-/// @desc sdf360.json grid.phi_max (degrees).
+/// @name Full Angle SDF Phi Max   @group 20 - Face: SDF Shadow|Full Angle   @sort 5   @slider -90 90
+/// @desc 最高仰角, 度(grid.phi_max). Highest elevation in degrees, from grid.phi_max.
 uniform float Full_Angle_SDF_Phi_Max = 90.0;
 
-/// @name Full Angle SDF Cell Size   @group 32 - SDF Face|Full Angle   @sort 5
-/// @desc sdf360.json atlas.cell_size (x = width, y = height, texels).
+/// @name Full Angle SDF Cell Size   @group 20 - Face: SDF Shadow|Full Angle   @sort 6
+/// @desc 单元格尺寸, 像素(x 宽 y 高, atlas.cell_size). Cell size in texels, x width and y height, from atlas.cell_size.
 uniform float4 Full_Angle_SDF_Cell_Size = float4(256.0, 256.0, 0.0, 0.0);
 
-/// @name Full Angle SDF Padding   @group 32 - SDF Face|Full Angle   @sort 6   @slider 0 16
-/// @desc sdf360.json atlas.padding (texels).
+/// @name Full Angle SDF Padding   @group 20 - Face: SDF Shadow|Full Angle   @sort 7   @slider 0 16
+/// @desc 单元格留边, 像素(atlas.padding). Padding around each cell in texels, from atlas.padding.
 uniform float Full_Angle_SDF_Padding = 4.0;
 
-/// @name Full Angle SDF Mirror   @group 32 - SDF Face|Full Angle   @sort 7   @slider 0 1
+/// @name Full Angle SDF Mirror   @group 20 - Face: SDF Shadow|Full Angle   @sort 8   @slider 0 1
 /// @desc sdf360.json grid.mirror: 1 = 只烘了 0..180 度, 另一半镜像脸 UV. 1 = only 0..180 baked, the other half mirrors the face UV.
 uniform float Full_Angle_SDF_Mirror = 0.0;
 
-/// @name Full Angle SDF Spread Texels   @group 32 - SDF Face|Full Angle   @sort 8   @slider 1 64
-/// @desc sdf360.json encoding.spread_texels (R).
+/// @name Full Angle SDF Spread Texels   @group 20 - Face: SDF Shadow|Full Angle   @sort 9   @slider 1 64
+/// @desc SDF 编码跨度, 像素(encoding.spread_texels). Encoding spread in texels, from encoding.spread_texels.
 uniform float Full_Angle_SDF_Spread_Texels = 8.0;
 
-/// @name Full Angle SDF Soft Texels   @group 32 - SDF Face|Full Angle   @sort 9   @slider 0.1 16
+/// @name Full Angle SDF Soft Texels   @group 20 - Face: SDF Shadow|Full Angle   @sort 10   @slider 0.1 16
 /// @desc 明暗交界软化宽度(格子像素). How many cell texels the terminator softens over.
 uniform float Full_Angle_SDF_Soft_Texels = 1.5;
 

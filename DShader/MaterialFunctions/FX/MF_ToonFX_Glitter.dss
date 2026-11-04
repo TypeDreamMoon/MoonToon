@@ -14,56 +14,56 @@
 
 #include "Shared/ToonFXCommon.dsh"
 
-/// @name FX Glitter Texture   @group 50 - FX: Glitter   @sort 0   @sampler LinearColor
+/// @name FX Glitter Texture   @group 51 - FX: Glitter   @sort 0   @sampler LinearColor
 /// @default /MoonToon/Textures/FX/T_ToonFX_GlitterDots
-/// @desc 点阵贴图: R = 闪点强度, G = 色相随机. Dot pattern: R intensity, G hue random.
+/// @desc 点阵贴图: R = 闪点强度, G = 色相随机. Dot pattern: R is the sparkle strength, G a random hue. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 uniform Texture2D FX_Glitter_Texture;
 
-/// @name FX Glitter Tiling   @group 50 - FX: Glitter   @sort 1   @slider 1 64
-/// @desc 点阵平铺次数(鸣潮 6). Dot tiling.
+/// @name FX Glitter Tiling   @group 51 - FX: Glitter   @sort 1   @slider 1 64
+/// @desc 点阵平铺次数(鸣潮 6). How many times the dot pattern tiles.
 uniform float FX_Glitter_Tiling = 6.0;
 
-/// @name FX Glitter Parallax   @group 50 - FX: Glitter   @sort 2   @slider 0 1
+/// @name FX Glitter Parallax   @group 51 - FX: Glitter   @sort 2   @slider 0 1
 /// @desc 第二层随视角偏移的强度(鸣潮 0.2). How far the second layer slides with the view.
 uniform float FX_Glitter_Parallax = 0.2;
 
-/// @name FX Glitter Parallax Offset   @group 50 - FX: Glitter   @sort 3   @slider 0 1
+/// @name FX Glitter Parallax Offset   @group 51 - FX: Glitter   @sort 3   @slider 0 1
 /// @desc 第二层的固定偏移(鸣潮 0.4). Constant offset of the second layer.
 uniform float FX_Glitter_Parallax_Offset = 0.4;
 
-/// @name FX Glitter Scroll Speed   @group 50 - FX: Glitter   @sort 4   @slider -0.1 0.1
+/// @name FX Glitter Scroll Speed   @group 51 - FX: Glitter   @sort 4   @slider -0.1 0.1
 /// @desc 第二层随时间滚动的速度(鸣潮 -0.01). Second layer's scroll speed.
 uniform float FX_Glitter_Scroll_Speed = -0.01;
 
-/// @name FX Glitter Threshold   @group 50 - FX: Glitter   @sort 5   @slider 0 1
+/// @name FX Glitter Threshold   @group 51 - FX: Glitter   @sort 5   @slider 0 1
 /// @desc 点亮阈值(鸣潮 0.8), 越低点越多. Lit when the product is above this.
 uniform float FX_Glitter_Threshold = 0.8;
 
-/// @name FX Glitter Near Gain   @group 50 - FX: Glitter   @sort 6   @slider 0 20
+/// @name FX Glitter Near Gain   @group 51 - FX: Glitter   @sort 6   @slider 0 20
 /// @desc 近处增益(鸣潮 1.5). Gain at the camera.
 uniform float FX_Glitter_Near_Gain = 1.5;
 
-/// @name FX Glitter Far Gain   @group 50 - FX: Glitter   @sort 7   @slider 0 40
+/// @name FX Glitter Far Gain   @group 51 - FX: Glitter   @sort 7   @slider 0 40
 /// @desc 远处增益(鸣潮 15), 让远处的闪点不消失. Gain at Distance.
 uniform float FX_Glitter_Far_Gain = 15.0;
 
-/// @name FX Glitter Distance   @group 50 - FX: Glitter   @sort 8   @slider 100 5000
+/// @name FX Glitter Distance   @group 51 - FX: Glitter   @sort 8   @slider 100 5000
 /// @desc 增益从近到远过渡的相机距离, cm(鸣潮 1000). Camera distance of the far gain, cm.
 uniform float FX_Glitter_Distance = 1000.0;
 
-/// @name FX Glitter Tint   @group 50 - FX: Glitter   @sort 9
+/// @name FX Glitter Tint   @group 51 - FX: Glitter   @sort 9
 /// @desc 闪点颜色 = 底色 x 此色(鸣潮 1.105, 1.22, 1.3). Sparkle colour = base colour x this.
 uniform float4 FX_Glitter_Tint = float4(1.105, 1.22, 1.3, 1.0);
 
-/// @name FX Glitter Intensity   @group 50 - FX: Glitter   @sort 10   @slider 0 20
-/// @desc 自发光强度. Emissive intensity.
+/// @name FX Glitter Intensity   @group 51 - FX: Glitter   @sort 10   @slider 0 20
+/// @desc 闪点自发光强度. Emissive strength of the glitter.
 uniform float FX_Glitter_Intensity = 1.0;
 
-/// @name FX Glitter Hue Jitter   @group 50 - FX: Glitter   @sort 11   @slider 0 6.2832
+/// @name FX Glitter Hue Jitter   @group 51 - FX: Glitter   @sort 11   @slider 0 6.2832
 /// @desc 每个点的色相随机旋转幅度, 弧度(鸣潮 2pi x 0.02). Per-dot hue jitter, radians.
 uniform float FX_Glitter_Hue_Jitter = 0.1257;
 
-/// @name FX Glitter FOV Compensation   @group 50 - FX: Glitter   @sort 12   @slider 0 1
+/// @name FX Glitter FOV Compensation   @group 51 - FX: Glitter   @sort 12   @slider 0 1
 /// @desc FOV 补偿强度: 镜头拉近(FOV 变小)时压暗, 避免近景点阵过亮. FOV compensation strength.
 uniform float FX_Glitter_FOV_Compensation = 0.0;
 

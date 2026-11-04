@@ -12,14 +12,14 @@
 
 /// @name Shadow Color LUT   @group 10 - Diffuse|Shadow Color LUT   @sort 0   @sampler LinearColor
 /// @default /MoonToon/Textures/ShadowColorLUT/T_ShadowColorLUT_Skin
-/// @desc 阴影色 LUT(32x32x32 展开成 1024x32): 按底色查暗部颜色. 1024x32 strip, albedo -> shadow colour.
+/// @desc 阴影色 LUT(32x32x32 展开成 1024x32): 按底色查暗部颜色. A 1024x32 strip mapping the albedo to its shadow colour. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 uniform Texture2D Shadow_Color_LUT;
 
-/// @name Shadow Color LUT Strength   @group 10 - Diffuse|Shadow Color LUT   @sort 1   @slider 0 1
+/// @name Shadow Color LUT Strength   @group 10 - Diffuse|Shadow Color LUT   @sort 2   @slider 0 1
 /// @desc 0 = 用原来的阴影色, 1 = 完全用 LUT 的结果. 0 = the authored shadow colour, 1 = the LUT.
 uniform float Shadow_Color_LUT_Strength = 1.0;
 
-/// @name Shadow Color LUT Tint   @group 10 - Diffuse|Shadow Color LUT   @sort 2
+/// @name Shadow Color LUT Tint   @group 10 - Diffuse|Shadow Color LUT   @sort 3
 /// @desc LUT 结果再乘的颜色(线性). Multiplies the LUT result (linear).
 uniform float4 Shadow_Color_LUT_Tint = float4(1.0, 1.0, 1.0, 1.0);
 

@@ -56,8 +56,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonTranslucencyShadow", Root="Plu
 	Properties = {
 		ScalarParameter Dither_Noise_Strength = 1.0 [
 			ParameterName="Dither Noise Strength";
-			Group="MT >> 00 << Global";
-			Description="Scales the high-frequency noise that breaks up the 5 dither steps. 1.0 matches MooaToon.";
+			Group="03 - Opacity & Translucency";
+			Description="打散 5 级抖动的高频噪声强度, 1 = 和 MooaToon 一致. \r\nScales the high-frequency noise that breaks up the 5 dither steps. 1.0 matches MooaToon.";
+			SortPriority=9;
+			SliderMin=0;
+			SliderMax=2;
 		];
 	}
 

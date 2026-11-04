@@ -36,37 +36,43 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonMatcap", Root="Plugin.MoonT
 			ParameterName="Matcap Map";
 			Group="44 - Matcap";
 			SortPriority=1;
-			Description="Matcap 贴图: 一张正对镜头的球体渲染. 用视线坐标架投影法线取 UV, 所以它自带光照与材质感. 默认白图 —— 忘记指定会明显发白, 而不是悄悄变黑.";
+			Description="Matcap 贴图: 一张正对镜头的球体渲染. 用视线坐标架投影法线取 UV, 所以它自带光照与材质感. 默认白图 —— 忘记指定会明显发白, 而不是悄悄变黑. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.\r\nMatcap texture: a sphere rendered facing the camera, looked up by the normal in view space, so it carries its own lighting. The default is white, so a missing map shows up as white rather than black.";
 		];
 		TextureObjectParameter Matcap_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Matcap Mask Map";
 			Group="44 - Matcap";
 			SortPriority=2;
-			Description="遮罩(取 R 通道), 控制哪里出 matcap: 白=全强度, 黑=完全不出. 对应 MToon 的 rimMultiplyTexture.";
+			Description="遮罩(取 R 通道), 控制哪里出 matcap: 白=全强度, 黑=完全不出. 对应 MToon 的 rimMultiplyTexture. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.\r\nMask (red channel) for where the matcap shows: white = full strength, black = none (MToon's rimMultiplyTexture).";
 		];
 		ScalarParameter Matcap_Intensity = 1.0 [
 			ParameterName="Matcap Intensity";
 			Group="44 - Matcap";
 			SortPriority=3;
-			Description="Matcap 强度, 直接乘在采样结果上. 对应 MToon 的 matcapFactor.";
+			Description="Matcap 强度, 直接乘在采样结果上. 对应 MToon 的 matcapFactor. \r\nMatcap strength, multiplied onto the sample (MToon's matcapFactor).";
+			SliderMin=0;
+			SliderMax=4;
 		];
 		ScalarParameter Matcap_Lighting_Mix = 0.0 [
 			ParameterName="Matcap Lighting Mix";
 			Group="44 - Matcap";
 			SortPriority=4;
-			Description="Matcap 受场景光照影响的程度. 0 = 完全不受光(常规做法, 暗部也保持高光), 1 = 完全被光照结果调制. 对应 MToon 的 rimLightingMix.";
+			Description="Matcap 受场景光照影响的程度. 0 = 完全不受光(常规做法, 暗部也保持高光), 1 = 完全被光照结果调制. 对应 MToon 的 rimLightingMix. \r\nHow much scene lighting modulates the matcap. 0 = unlit (the usual choice, it stays bright in shadow), 1 = fully lit (MToon's rimLightingMix).";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Matcap_Mask_UV_Channel = 0.0 [
 			ParameterName="Matcap Mask UV Channel";
 			Group="44 - Matcap";
 			SortPriority=5;
-			Description="遮罩贴图使用的 UV 通道. 只影响遮罩 —— matcap 本身的 UV 是从视线和法线算出来的, 与网格 UV 无关.";
+			Description="遮罩贴图使用的 UV 通道. 只影响遮罩, matcap 本身的 UV 是从视线和法线算出来的. \r\nUV channel of the mask map. Only the mask uses it; the matcap UV comes from the view and the normal.";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		VectorParameter Matcap_Mask_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
 			ParameterName="Matcap Mask UV Scale/Offset";
 			Group="44 - Matcap";
 			SortPriority=6;
-			Description="遮罩 UV 的缩放(xy)与偏移(zw).";
+			Description="遮罩 UV 的缩放(xy)与偏移(zw). \r\nScale (xy) and offset (zw) of the mask UV.";
 		];
 	}
 

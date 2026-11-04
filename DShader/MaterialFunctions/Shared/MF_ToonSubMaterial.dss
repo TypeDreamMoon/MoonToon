@@ -35,33 +35,33 @@
 //   2 UV range: the ID is which sixteenth of [0, 1) the U of the chosen UV channel falls in
 //   3 constant SubMaterial ID Constant
 
-/// @name SubMaterial Table   @group 15 - SubMaterial   @sort 1   @sampler LinearColor
+/// @name SubMaterial Table   @group 15 - Sub Material   @sort 100   @sampler LinearColor
 /// @default /MoonToon/Textures/T_Black_Linear
-/// @desc 子材质表纹理(8x16 浮点, 由子材质表资产或 Tools/SubMaterial 烘焙). The baked sub-material table (8 x 16 float).
+/// @desc 子材质表纹理(8x16 浮点, 由子材质表资产或 Tools/SubMaterial 烘焙). The baked sub-material table (8 x 16 float). 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 uniform Texture2D SubMaterial_Table;
 
-/// @name SubMaterial ID Source   @group 15 - SubMaterial   @sort 2   @slider 0 3
+/// @name SubMaterial ID Source   @group 15 - Sub Material   @sort 101   @slider 0 3
 /// @desc 子材质 ID 从哪来: 0 ID 贴图, 1 顶点色, 2 UV 范围, 3 常量. Where the ID comes from: 0 ID map, 1 vertex colour, 2 UV range, 3 constant.
 uniform float SubMaterial_ID_Source = 0.0;
 
-/// @name SubMaterial ID Map   @group 15 - SubMaterial   @sort 3   @sampler LinearColor
+/// @name SubMaterial ID Map   @group 15 - Sub Material   @sort 102   @sampler LinearColor
 /// @default /MoonToon/Textures/T_Black_Linear
 /// @desc 子材质 ID 贴图(关 sRGB, Nearest, 无 mip). 8 位值 = ID x 16 / 255. Sub-material ID map (sRGB off, nearest, no mips); 8-bit value = ID x 16 / 255.
 uniform Texture2D SubMaterial_ID_Map;
 
-/// @name SubMaterial ID Channel   @group 15 - SubMaterial   @sort 4   @slider 0 3
+/// @name SubMaterial ID Channel   @group 15 - Sub Material   @sort 103   @slider 0 3
 /// @desc ID 在哪个通道(贴图或顶点色): 0 R, 1 G, 2 B, 3 A. Channel of the ID map / vertex colour.
 uniform float SubMaterial_ID_Channel = 0.0;
 
-/// @name SubMaterial ID UV Channel   @group 15 - SubMaterial   @sort 5   @slider 0 1
+/// @name SubMaterial ID UV Channel   @group 15 - Sub Material   @sort 104   @slider 0 1
 /// @desc ID 贴图 / UV 范围用哪套 UV: 0 = UV0, 1 = UV1. UV set of the ID map and the UV-range source.
 uniform float SubMaterial_ID_UV_Channel = 0.0;
 
-/// @name SubMaterial ID Constant   @group 15 - SubMaterial   @sort 6   @slider 0 15
+/// @name SubMaterial ID Constant   @group 15 - Sub Material   @sort 105   @slider 0 15
 /// @desc 常量来源时的 ID. The ID when the source is the constant.
 uniform float SubMaterial_ID_Constant = 0.0;
 
-/// @name SubMaterial ID Split   @group 15 - SubMaterial   @sort 7   @slider 0 1
+/// @name SubMaterial ID Split   @group 15 - Sub Material   @sort 106   @slider 0 1
 /// @desc 1 = 8 位按 4+4 拆: 高 4 位是 ID, 低 4 位是花纹 ID. 1 = split the byte 4 + 4: high nibble ID, low nibble pattern ID.
 uniform float SubMaterial_ID_Split = 0.0;
 

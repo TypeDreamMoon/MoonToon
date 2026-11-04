@@ -45,19 +45,19 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			ParameterName="Is KajiyaHair";
 			Group="30 - Shading Feature (pick one)";
 			SortPriority=1;
-			Description="启用 Kajiya Kay 发丝高光. 同时决定是否解码 UV23 里烘焙的高光切线 —— 旧版这是另一个叫 Enable Feature Kajiya Hair Specular 的开关, 忘了同步就会静默不生效.";
+			Description="启用 Hair Kajiya 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the Hair Kajiya shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken).";
 		];
 		StaticSwitchParameter Is_ToonKajiyaHair = false [
 			ParameterName="Is ToonKajiyaHair";
 			Group="30 - Shading Feature (pick one)";
 			SortPriority=2;
-			Description="启用 Toon Kajiya Kay 发丝高光. 与上面一样会解码烘焙的高光切线.";
+			Description="启用 Hair Toon Kajiya 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the Hair Toon Kajiya shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken).";
 		];
 		StaticSwitchParameter Is_DFFacialShadow = false [
 			ParameterName="Is DFFacialShadow";
 			Group="30 - Shading Feature (pick one)";
 			SortPriority=3;
-			Description="启用距离场脸部阴影. 同时决定是否采样 SDF 贴图、以及切线通道解码成脸朝向而不是高光切线 —— 旧版这是另一个叫 Enable Feature Distance Field Facial Shadow 的开关.";
+			Description="启用 SDF Face 着色特征. 只应勾选一个; 若勾了多个, 本文件中靠前的胜出. 一个都不勾 = 普通 toon. 勾选后, 未选中特征的参数会从材质实例面板里消失(静态开关会裁掉未走的分支).\r\nTurns on the SDF Face shading feature. Tick only one; if several are ticked, the earliest in this list wins, and none ticked is plain toon. Once ticked, the other features' parameters leave the instance panel (the static switch removes the branches not taken).";
 		];
 		// The matcap is not in this list because it is not a shading feature. Per MToon 1.0
 		// (VRMC_materials_mtoon) it is additive on top of the lighting result, so a matcap surface is
@@ -65,82 +65,99 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// is selected here.
 		TextureObjectParameter Global_Mask_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Global Mask Map";
-			Group="01 - Global Mask Map";
+			Group="00 - Global|Global Mask Map";
 			Description="用于存放各种线性数据的贴图, 每个通道存放什么数据可以根据你的项目需求定制.\r\n颜色空间: 线性.\r\n\r\n\r\nTexture used to store various linear data. What data is stored in each channel can be customized according to your project needs.\r\nColor space: linear.";
+			SortPriority=8;
 		];
 		TextureObjectParameter Global_Mask_Map_2 = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Global Mask Map 2";
-			Group="01 - Global Mask Map";
-			SortPriority=10;
-			Description="第二张打包遮罩图, 结构和第一张完全一样: 一次采样, 四个通道各存一份遮罩.\r\n它存在的理由是四个通道不够分 —— 与其让每个新特征各自带一张只用一个通道的贴图, 不如多开一张共享的.\r\n关着的时候一次采样都不发生; 打开之后无论多少个特征读它, 整个材质只多一次取样.\r\nUV 沿用第一张的通道与缩放偏移(同一个模型的打包图没有理由用不同的 UV).\r\n\r\n\r\nA second packed mask map, identical in shape to the first: one sample, four channels, one mask each.\r\nIt exists because four channels run out -- rather than every new feature carrying its own texture to read one channel from, open another shared one.\r\nWith the switch off nothing is sampled; with it on the whole material pays one extra fetch no matter how many features read it.\r\nIt reuses the first map's UV channel and scale/offset: packed masks for the same model have no reason to sit on a different UV.";
+			Group="00 - Global|Global Mask Map";
+			SortPriority=1;
+			Description="第二张打包遮罩图, 结构和第一张完全一样: 一次采样, 四个通道各存一份遮罩.\r\n它存在的理由是四个通道不够分 —— 与其让每个新特征各自带一张只用一个通道的贴图, 不如多开一张共享的.\r\n关着的时候一次采样都不发生; 打开之后无论多少个特征读它, 整个材质只多一次取样.\r\nUV 沿用第一张的通道与缩放偏移(同一个模型的打包图没有理由用不同的 UV).\r\n\r\n\r\nA second packed mask map, identical in shape to the first: one sample, four channels, one mask each.\r\nIt exists because four channels run out -- rather than every new feature carrying its own texture to read one channel from, open another shared one.\r\nWith the switch off nothing is sampled; with it on the whole material pays one extra fetch no matter how many features read it.\r\nIt reuses the first map's UV channel and scale/offset: packed masks for the same model have no reason to sit on a different UV. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.";
 		];
 		TextureObjectParameter Global_Mask_Map_3 = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Global Mask Map 3";
-			Group="01 - Global Mask Map";
-			SortPriority=12;
-			Description="第三张打包遮罩图. 与第二张同理, 再多四个通道.\r\n\r\n\r\nA third packed mask map. Same as the second, for four more channels.";
+			Group="00 - Global|Global Mask Map";
+			SortPriority=3;
+			Description="第三张打包遮罩图. 与第二张同理, 再多四个通道.\r\n\r\n\r\nA third packed mask map. Same as the second, for four more channels. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.";
 		];
 		TextureObjectParameter Base_Color_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
 			ParameterName="Base Color Map";
-			Group="10 - Diffuse";
-			SortPriority=5;
+			Group="01 - Base Color";
+			SortPriority=1;
+			Description="底色贴图(漫反射颜色). A 通道可作不透明度(Opacity From Base Color Map). \r\nBase colour (albedo) map; its alpha can drive opacity (Opacity From Base Color Map). 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.";
 		];
 		TextureObjectParameter Metallic_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Metallic Map";
 			Group="11 - Specular";
-			SortPriority=51;
+			SortPriority=18;
+			Description="金属度贴图, 通道由 Metallic Channel 选. 0 = 非金属, 1 = 金属. \r\nMetallic map; Metallic Channel picks the channel. 0 = dielectric, 1 = metal. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.";
 		];
 		TextureObjectParameter Roughness_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Roughness Map";
 			Group="11 - Specular";
-			SortPriority=41;
+			SortPriority=12;
+			Description="粗糙度贴图, 通道由 Roughness Channel 选. 0 = 光滑, 1 = 粗糙(toon 高光在 1 时为 0). \r\nRoughness map; Roughness Channel picks the channel. 0 = smooth, 1 = rough (the toon highlight is zero at 1). 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.";
 		];
 		TextureObjectParameter Emissive_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
 			ParameterName="Emissive Map";
-			Group="23 - Emissive";
+			Group="14 - Emissive";
+			SortPriority=2;
+			Description="自发光颜色贴图, 乘 Emissive Intensity. \r\nEmissive colour map, times Emissive Intensity. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.";
 		];
 		TextureObjectParameter Opacity_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Opacity Map";
-			Group="21 - Translucency";
+			Group="03 - Opacity & Translucency";
 			Description="不透明度遮罩, 通道由 Opacity Channel 选. 颜色空间: 线性(导入时关闭 sRGB, 压缩用 Default / BC7; Masks / Grayscale / Alpha 压缩和这个采样器不匹配).\r\nOpacity mask; Opacity Channel picks the channel. Color space: linear (import with sRGB off, Default or BC7 compression; Masks / Grayscale / Alpha compression does not match this sampler).";
+			SortPriority=8;
 		];
 		TextureObjectParameter SA_Map = Path(Plugins.MoonToon, "Textures/T_Black_Linear") [
 			ParameterName="SA Map";
-			Group="00 - Global Settings";
+			Group="20 - Face: SDF Shadow";
 			Description="SDF 脸阴影 / AO 打包图(R = 左半 SDF, G = AO). 颜色空间: 线性(导入时关闭 sRGB, 压缩用 Default / BC7).\r\nSDF face shadow / AO pack (R = left-half SDF, G = AO). Color space: linear (import with sRGB off, Default or BC7 compression).";
+			SortPriority=1;
 		];
 		TextureObjectParameter AO_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="AO Map";
 			Group="10 - Diffuse";
+			SortPriority=19;
+			Description="AO 贴图, 通道由 AO Channel 选: 0 = 始终在阴影里, 1 = 正常受光. \r\nAO map; AO Channel picks the channel. 0 = always in shadow, 1 = lit normally. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.";
 		];
 		TextureObjectParameter Normal_Map = Path(Engine, "EngineMaterials/BaseFlattenNormalMap") [
 			ParameterName="Normal Map";
-			Group="20 - Normal";
+			Group="02 - Normal";
+			SortPriority=3;
+			Description="法线贴图(切线空间), 强度由 Normal Scale 控制. \r\nTangent-space normal map; Normal Scale sets its strength. 颜色空间: 线性, 法线贴图压缩(TC_Normalmap). Colour space: linear, normal-map compression.";
 		];
 		TextureObjectParameter ID_Map_R_ = Path(Plugins.MoonToon, "Textures/T_Black_Linear") [
 			ParameterName="Shadow Group ID Map";
-			Group="13 - Ray Tracing Shadow";
+			Group="13 - Shadows";
 			Description="ID Map是指将角色的不同部位填充不同的颜色, 以便在制作贴图或者后期效果时方便抠图.\r\n在影视工作流中通常是必备的贴图, 其分辨率可以很低, 只要保证不溢出UV边界即可.\r\n不同的值代表不同的ID, ID之间至少要有0.031(也就是8/255)的数值差.\r\n颜色空间: 线性.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID Map refers to filling different parts of the character with different colors to facilitate cutout when making textures or post-effects.\r\nID Map are usually necessary in film production workflows, and their resolution can be very low, as long as they do not overflow the UV boundary.\r\nDifferent values ​​represent different IDs, and there must be at least a numerical difference of 0.031 (that is, 8/255) between IDs.\r\nColor space: linear.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.";
+			SortPriority=15;
 		];
 		TextureObjectParameter Shadow_Color_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
 			ParameterName="Shadow Color Map";
 			Group="10 - Diffuse";
-			SortPriority=15;
+			SortPriority=8;
+			Description="暗部颜色贴图, 乘 Shadow Color. 和底色图是同一张时打开 Shadow Color From Base Color Map 省一次采样. \r\nShadow colour map, times Shadow Color. If it is the base colour map, tick Shadow Color From Base Color Map to save a fetch. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.";
 		];
 		TextureObjectParameter Diffuse_Ramp_Offset_Map = Path(Plugins.MoonToon, "Assets/Textures/T_Gray_Linear") [
 			ParameterName="Diffuse Ramp Offset Map";
 			Group="10 - Diffuse";
-			SortPriority=36;
+			SortPriority=15;
+			Description="漫反射 Ramp 横向偏移图, 0.5 = 不偏移, 小于 0.5 更容易进暗部, 大于 0.5 更容易进亮部. \r\nDiffuse ramp offset map: 0.5 = no offset, below 0.5 leans into shadow, above 0.5 into light. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.";
 		];
 		TextureObjectParameter Specular_Color_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
 			ParameterName="Specular Color Map";
 			Group="11 - Specular";
-			SortPriority=4;
+			SortPriority=8;
+			Description="高光颜色贴图, 乘 Specular Color. 需要打开 Enable Specular Color Map. \r\nSpecular colour map, times Specular Color. Needs Enable Specular Color Map. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.";
 		];
 		TextureObjectParameter Specular_Ramp_Offset_Map = Path(Plugins.MoonToon, "Textures/T_Gray_Linear") [
 			ParameterName="Specular Ramp Offset Map";
 			Group="11 - Specular";
-			SortPriority=61;
+			SortPriority=23;
+			Description="高光 Ramp 横向偏移图, 0.5 = 不偏移. \r\nSpecular ramp offset map; 0.5 = no offset. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.";
 		];
 		// Feature selection used to be a runtime ScalarParameter with an enum dropdown, plus a
 		// second one for a dual-feature mask that was wired to the constant 1.0 and so could never
@@ -151,79 +168,104 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// of the global post-process intensity). 3-bit in the GBuffer -> 8 usable steps.
 		ScalarParameter Screen_Space_Hair_Shadow_Intensity = 1.0 [
 			ParameterName="Screen Space Hair Shadow Intensity";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=62;
-			Description="屏幕空间发影强度的每实例乘数(叠加在后处理体积的全局强度上). 0=关闭, 1=全强度. GBuffer中以3bit存储(8档).\r\n\r\nPer-instance multiplier on the screen-space depth-test hair shadow, applied on top of the post-process volume's global intensity. 0 = off, 1 = full strength. Stored as 3 bits (8 steps) in the GBuffer.";
+			Group="13 - Shadows";
+			SortPriority=9;
+			Description="屏幕空间发影强度的每实例乘数(叠加在后处理体积的全局强度上). 0=关闭, 1=全强度. GBuffer中以3bit存储(8档).\r\n\r\nPer-instance multiplier on the screen-space depth-test hair shadow, applied on top of the post-process volume's global intensity. 0 = off, 1 = full strength. Stored as 3 bits (8 steps) in the GBuffer. 挂了 MoonToon Profile 时由 Profile 决定. A bound MoonToon profile overrides this.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ChannelMaskParameter KajiyaSecondaryMaskChannel = float4(1.0, 0.0, 0.0, 0.0) [
 			ParameterName="Toon Kajiya Strand Shift Channel";
-			Group="35 - Feature: Hair Toon Kajiya Kay";
-			SortPriority=21;
-			MaskChannel=Red
+			Group="34 - Feature: Hair Toon Kajiya";
+			SortPriority=101;
+			MaskChannel=Red;
+			Description="Toon Kajiya 发丝偏移读打包遮罩图的哪个通道. \r\nWhich packed-mask channel the Toon Kajiya strand shift reads.";
 		];
 		VectorParameter Global_Mask_Map_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
 			ParameterName="Global Mask Map UV Scale/Offset";
-			Group="01 - Global Mask Map";
-			SortPriority=33;
-			Description="xy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
+			Group="00 - Global|Global Mask Map";
+			SortPriority=5;
+			Description="打包遮罩图 UV 的缩放(xy)与偏移(zw). \r\nxy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
 		];
 		ScalarParameter Global_Mask_Map_UV_Channel = 0.0 [
 			ParameterName="Global Mask Map UV Channel";
-			Group="01 - Global Mask Map";
+			Group="00 - Global|Global Mask Map";
+			SortPriority=9;
+			SliderMin=0;
+			SliderMax=3;
+			Description="打包遮罩图使用的 UV 通道, 0~3. \r\nUV channel the packed mask maps uses, 0-3.";
 		];
 		ScalarParameter Inner_Outline_Mask_Source = 1.0 [
 			ParameterName="Inner Outline Mask Source";
-			Group="22 - Inner Outline";
-			SortPriority=33;
+			Group="60 - Inner Outline";
+			SortPriority=2;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Inner Outline Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Inner Outline From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Inner Outline Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Inner Outline From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter Metallic_Mask_Source = 1.0 [
 			ParameterName="Metallic Mask Source";
 			Group="11 - Specular";
-			SortPriority=51;
+			SortPriority=19;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Metallic Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Metallic From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Metallic Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Metallic From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter Roughness_Mask_Source = 1.0 [
 			ParameterName="Roughness Mask Source";
 			Group="11 - Specular";
-			SortPriority=41;
+			SortPriority=13;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Roughness Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Roughness From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Roughness Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Roughness From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter AO_Mask_Source = 1.0 [
 			ParameterName="AO Mask Source";
 			Group="10 - Diffuse";
-			SortPriority=32;
+			SortPriority=11;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`AO Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`AO From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `AO Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `AO From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter Shadow_Group_ID_Mask_Source = 1.0 [
 			ParameterName="Shadow Group ID Mask Source";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=32;
+			Group="13 - Shadows";
+			SortPriority=3;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Shadow Group ID Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Shadow Group ID From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Shadow Group ID Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Shadow Group ID From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter Diffuse_Ramp_Offset_Mask_Source = 0.0 [
 			ParameterName="Diffuse Ramp Offset Mask Source";
 			Group="10 - Diffuse";
-			SortPriority=36;
+			SortPriority=16;
 			Description="读哪张打包遮罩图: 0 = 不读, 偏移为中性值 0.5(默认), 1/2/3 = Global Mask Map 1/2/3, 通道由`Diffuse Ramp Offset Channel`决定.\r\n只在`Diffuse Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图(默认灰 = 中性).\r\n以前默认读 Global Mask Map 1: 白色默认图是满偏移, 照说明把强度调到 1 时整面变亮 / 高光顶满. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 0 = none, a neutral 0.5 offset (the default), 1/2/3 = Global Mask Map 1/2/3, with the channel picked by `Diffuse Ramp Offset Channel`.\r\nOnly used while `Diffuse Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture (grey = neutral by default).\r\nIt used to read Global Mask Map 1 by default: the white default map is a full offset, so raising the intensity to 1 as the description advises brightened the whole surface. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter Specular_Ramp_Offset_Mask_Source = 0.0 [
 			ParameterName="Specular Ramp Offset Mask Source";
 			Group="11 - Specular";
-			SortPriority=61;
+			SortPriority=24;
 			Description="读哪张打包遮罩图: 0 = 不读, 偏移为中性值 0.5(默认), 1/2/3 = Global Mask Map 1/2/3, 通道由`Specular Ramp Offset Channel`决定.\r\n只在`Specular Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图(默认灰 = 中性).\r\n以前默认读 Global Mask Map 1: 白色默认图是满偏移, 照说明把强度调到 1 时整面变亮 / 高光顶满. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 0 = none, a neutral 0.5 offset (the default), 1/2/3 = Global Mask Map 1/2/3, with the channel picked by `Specular Ramp Offset Channel`.\r\nOnly used while `Specular Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture (grey = neutral by default).\r\nIt used to read Global Mask Map 1 by default: the white default map is a full offset, so raising the intensity to 1 as the description advises brightened the whole surface. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter Rim_Light_Width_Mask_Source = 1.0 [
 			ParameterName="Rim Light Width Mask Source";
 			Group="12 - Rim Light";
-			SortPriority=35;
+			SortPriority=3;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Rim Light Width Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Rim Light Width From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Rim Light Width Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Rim Light Width From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		ScalarParameter Kajiya_Secondary_Mask_Source = 0.0 [
 			ParameterName="Toon Kajiya Strand Shift Mask Source";
-			Group="35 - Feature: Hair Toon Kajiya Kay";
-			SortPriority=20;
+			Group="34 - Feature: Hair Toon Kajiya";
+			SortPriority=100;
 			Description="发丝偏移遮罩读哪张打包遮罩图: 0 = 不读(默认, 偏移只由两个 Strand Shift 滑条决定), 1/2/3 = Global Mask Map 1/2/3, 通道由`Toon Kajiya Strand Shift Channel`决定. 遮罩值直接加到主 / 次高光的偏移上.\r\n以前默认读 Global Mask Map 1 的 R(也是粗糙度通道): 白色默认图把偏移顶满, 两个滑条都不起作用.\r\n选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map the strand-shift mask comes from: 0 = none (the default; the two Strand Shift sliders alone set the shift), 1/2/3 = Global Mask Map 1/2/3, with the channel picked by `Toon Kajiya Strand Shift Channel`. The mask value is added to the primary and secondary shift.\r\nIt used to read Global Mask Map 1's R (also the roughness channel) by default: the white default map pinned the shift at its maximum and both sliders did nothing.\r\nPicking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			SliderMin=0;
+			SliderMax=3;
 		];
 		// The SKIN under the stocking, not the stocking itself -- the fabric's own colour is the
 		// material's Base Color. Both stocking features interpolate between the two by Density.
@@ -233,8 +275,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		TextureSampleParameter2D BodyBaseColor = Path(Engine, "EngineResources/Black") [
 			ParameterName="Stockings Skin Color Map";
 			SamplerType="SAMPLERTYPE_Color";
-			Group="05 - Stockings";
-			SortPriority=0;
+			Group="38 - Feature: Stockings";
+			SortPriority=100;
 			Description="丝袜下面透出来的腿部皮肤颜色(sRGB). 丝袜自身的颜色走材质的 Base Color, 两者由 Density 混合.\r\n默认全黑 = 没设置, 回退到布料色.\r\n\r\n\r\nThe leg skin showing through the stocking (sRGB). The stocking's own colour is the material's Base Color; Density blends the two.\r\nBlack (the default) means not set, and the fabric colour is used instead.";
 		];
 		// Where the knit is stretched thin and where it piles up. Multiplied into In_Stockings_Density,
@@ -253,284 +295,372 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			ParameterName="Stockings Thickness Map";
 			SamplerType="SAMPLERTYPE_LinearColor";
 			SamplerSource="SSM_Wrap_WorldGroupSettings";
-			Group="05 - Stockings";
-			SortPriority=1;
-			Description="逐像素厚度倍率(拉伸图), 乘在旦数上再过遮蔽曲线 —— 不是直接乘遮蔽率, 所以 0.5 的含义是'这里只有一半的纤维', 和被撑薄的膝盖对得上. 白 = 就是滑条那个旦数. 0.5 = 折半(30D 处按 15D 算). 黑 = 该处没有丝袜, 完全透出肤色.";
+			Group="38 - Feature: Stockings";
+			SortPriority=101;
+			Description="逐像素厚度倍率(拉伸图), 乘在旦数上再过遮蔽曲线 —— 不是直接乘遮蔽率, 所以 0.5 的含义是'这里只有一半的纤维', 和被撑薄的膝盖对得上. 白 = 就是滑条那个旦数. 0.5 = 折半(30D 处按 15D 算). 黑 = 该处没有丝袜, 完全透出肤色. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.\r\nPer-pixel thickness multiplier on the denier, before the coverage curve: 0.5 means half the fibres here (a stretched knee). White = the slider's denier, black = no stocking here.";
 		];
 		// See Through Overlay (眉透/瞳透): when enabled, the renderer re-draws this material after
 		// lighting wherever it is occluded by same-actor toon hair, blending
 		// BaseColor * Tint at Through Hair Opacity over the lit hair (Moon_MeshPass_FaceOverlay).
 		VectorParameter Inner_Outline_Color = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="Inner Outline Color";
-			Group="22 - Inner Outline";
-			SortPriority=40;
+			Group="60 - Inner Outline";
+			SortPriority=5;
+			Description="内描边颜色. \r\nColour of the inner outline.";
 		];
 		ChannelMaskParameter Inner_Outline_Channel = float4(0.0, 1.0, 0.0, 0.0) [
 			ParameterName="Inner Outline Channel";
-			Group="22 - Inner Outline";
-			SortPriority=34;
-			MaskChannel=Green
+			Group="60 - Inner Outline";
+			SortPriority=4;
+			MaskChannel=Green;
+			Description="内描边遮罩用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Inner_Outline_Map_UV_Channel = 0.0 [
 			ParameterName="Inner Outline Map UV Channel";
-			Group="22 - Inner Outline";
-			SortPriority=33;
+			Group="60 - Inner Outline";
+			SortPriority=3;
+			SliderMin=0;
+			SliderMax=3;
+			Description="内描边贴图使用的 UV 通道, 0~3. \r\nUV channel the inner outline map uses, 0-3.";
 		];
 		VectorParameter Global_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
 			ParameterName="Global UV Scale/Offset";
-			Group="00 - Global Settings";
-			SortPriority=101;
-			Description="xy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
+			Group="00 - Global";
+			SortPriority=2;
+			Description="主 UV 的缩放(xy)与偏移(zw). \r\nxy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
 		];
 		ScalarParameter Global_UV_Channel = 0.0 [
 			ParameterName="Global UV Channel";
-			Group="00 - Global Settings";
-			SortPriority=100;
+			Group="00 - Global";
+			SortPriority=1;
+			SliderMin=0;
+			SliderMax=3;
+			Description="大多数贴图使用的 UV 通道, 0~3. \r\nUV channel the most maps uses, 0-3.";
 		];
 		VectorParameter Base_Color = float4(1.0, 1.0, 1.0, 1.0) [
 			ParameterName="Base Color";
-			Group="10 - Diffuse";
-			SortPriority=4;
+			Group="01 - Base Color";
+			SortPriority=0;
+			Description="底色, 乘底色贴图. \r\nBase colour, times the base colour map.";
 		];
 		ScalarParameter Metallic = 0.0 [
 			Group="11 - Specular";
-			SortPriority=53;
+			SortPriority=21;
+			SliderMin=0;
+			SliderMax=1;
+			Description="金属度, 乘金属度贴图. 0 = 非金属, 1 = 金属. \r\nMetallic, times the metallic map. 0 = dielectric, 1 = metal.";
 		];
 		ChannelMaskParameter Metallic_Channel = float4(0.0, 1.0, 0.0, 0.0) [
 			ParameterName="Metallic Channel";
 			Group="11 - Specular";
-			SortPriority=52;
-			MaskChannel=Green
+			SortPriority=20;
+			MaskChannel=Green;
+			Description="金属度用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Specular = 0.0 [
 			Group="11 - Specular";
 			SortPriority=1;
+			SliderMin=0;
+			SliderMax=1;
+			Description="高光强度(PBR Specular). 0 = 没有 toon 高光; 新建实例要调上来才看得到高光. \r\nSpecular amount. 0 = no toon highlight; raise it on a new instance to see one.";
 		];
 		ScalarParameter Roughness = 1.0 [
 			Group="11 - Specular";
-			SortPriority=44;
+			SortPriority=16;
+			SliderMin=0;
+			SliderMax=1;
+			Description="粗糙度, 乘粗糙度贴图. 1 时 toon 高光为 0. \r\nRoughness, times the roughness map. The toon highlight is zero at 1.";
 		];
 		ChannelMaskParameter Roughness_Channel = float4(1.0, 0.0, 0.0, 0.0) [
 			ParameterName="Roughness Channel";
 			Group="11 - Specular";
-			SortPriority=42;
-			MaskChannel=Red
+			SortPriority=14;
+			MaskChannel=Red;
+			Description="粗糙度用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Anisotropy = 0.0 [
 			Group="11 - Specular";
-			SortPriority=3;
+			SortPriority=6;
+			SliderMin=-1;
+			SliderMax=1;
+			Description="各向异性强度, -1~1. 需要 Use Anisotropy. \r\nAnisotropy, -1 to 1. Needs Use Anisotropy.";
 		];
 		ScalarParameter Emissive_Intensity = 1.0 [
 			ParameterName="Emissive Intensity";
-			Group="23 - Emissive";
-			SortPriority=40;
+			Group="14 - Emissive";
+			SortPriority=1;
+			SliderMin=0;
+			SliderMax=20;
+			Description="自发光强度, 乘自发光贴图. \r\nEmissive strength, times the emissive map.";
 		];
 		ChannelMaskParameter Opacity_Channel = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="Opacity Channel";
-			Group="21 - Translucency";
-			SortPriority=33;
-			MaskChannel=Alpha
+			Group="03 - Opacity & Translucency";
+			SortPriority=2;
+			MaskChannel=Alpha;
+			Description="不透明度用哪个通道(默认 A). 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Opacity = 1.0 [
-			Group="21 - Translucency";
-			SortPriority=40;
+			Group="03 - Opacity & Translucency";
+			SortPriority=3;
 			Description="不透明度\r\n当材质混合模式为已遮罩时, 使用Dither模拟半透明, 不会有排序问题.\r\n当材质混合模式为半透明时, 使用透明度混合半透明, 可能出现排序问题.\r\n\r\nOpacity\r\nWhen the material Blend Mode is Masked, Dither is used to simulate translucency, and there will be no ordering problems.\r\nWhen the material Blend Mode is Translucent, use Alpha Blend transparency, and there may be ordering problems.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Shadow_Opacity = 1.0 [
 			ParameterName="Shadow Opacity";
-			Group="21 - Translucency";
-			SortPriority=41;
+			Group="03 - Opacity & Translucency";
+			SortPriority=5;
 			Description="只作用于阴影图, 不影响画面上的裁剪. 缩放写进阴影深度Pass的不透明度: >1 让阴影比本体更实, <1 更透, 0 等于不投影.\r\n需要 Masked: 只有实例的 Blend Mode 覆盖为 Masked(已遮罩)时阴影 pass 才按它裁剪; 母材质是 Opaque, 不覆盖混合模式时它没有任何效果.\r\n\r\nShadow Opacity\r\nShadow map only -- it does not affect the visible cutout. Scales the opacity written into the shadow depth pass: >1 makes the shadow more solid than the surface, <1 more transparent, 0 removes it.\r\nNeeds Masked: the shadow pass clips against it only when the instance's Blend Mode is overridden to Masked. The parent material is Opaque; without that override it does nothing.";
+			SliderMin=0;
+			SliderMax=2;
 		];
 		ScalarParameter Apply_Opacity_to_Shadow = 1.0 [
 			ParameterName="Apply Opacity to Shadow";
-			Group="21 - Translucency";
-			SortPriority=42;
+			Group="03 - Opacity & Translucency";
+			SortPriority=7;
 			Description="阴影是否跟随不透明度. 1 = 阴影按 Opacity 一起变透, 0 = 阴影按全不透明算. 同样只作用于阴影图.\r\n需要 Masked: 母材质是 Opaque, 实例不把 Blend Mode 覆盖为 Masked 时它没有任何效果.\r\n\r\nApply Opacity to Shadow\r\n1 = the shadow fades with Opacity, 0 = the shadow is cast as if fully opaque. Shadow map only.\r\nNeeds Masked: the parent material is Opaque, and unless the instance's Blend Mode is overridden to Masked it does nothing.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ChannelMaskParameter AO_Channel = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="AO Channel";
 			Group="10 - Diffuse";
-			SortPriority=34;
-			MaskChannel=Alpha
+			SortPriority=12;
+			MaskChannel=Alpha;
+			Description="AO 用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter AO_Intensity = 1.0 [
 			ParameterName="AO Intensity";
 			Group="10 - Diffuse";
-			SortPriority=35;
+			SortPriority=13;
 			Description="通过AO可以使某些区域始终处于阴影中.\r\n\r\nAO Map: 0为被遮挡, 1为被照亮. 默认为1.\r\n颜色空间: 线性.\r\n\r\n\r\nAO allows certain areas to be always in shadow.\r\n\r\nAO Map: 0 means occluded, 1 means illuminated. Default is 1.\r\nColor space: linear.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		VectorParameter Normal_Map_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
 			ParameterName="Normal Map UV Scale/Offset";
-			Group="20 - Normal";
-			SortPriority=101;
-			Description="xy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
+			Group="02 - Normal";
+			SortPriority=2;
+			Description="法线贴图 UV 的缩放(xy)与偏移(zw). \r\nxy scales the UV, zw is added afterwards. Replaces the four separate Scale X/Y and Offset X/Y scalars.";
 		];
 		ScalarParameter Normal_Map_UV_Channel = 0.0 [
 			ParameterName="Normal Map UV Channel";
-			Group="20 - Normal";
-			SortPriority=100;
+			Group="02 - Normal";
+			SortPriority=1;
+			SliderMin=0;
+			SliderMax=3;
+			Description="法线贴图使用的 UV 通道, 0~3. \r\nUV channel the normal map uses, 0-3.";
 		];
 		ScalarParameter Normal_Scale = 1.0 [
 			ParameterName="Normal Scale";
-			Group="20 - Normal";
+			Group="02 - Normal";
+			SortPriority=4;
+			SliderMin=0;
+			SliderMax=2;
+			Description="法线强度. 0 = 平, 1 = 原样. \r\nStrength of the normal map: 0 = flat, 1 = as authored.";
 		];
 		ScalarParameter ID_Offset = 0.0 [
 			ParameterName="Shadow Group ID Offset";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=50;
+			Group="13 - Shadows";
+			SortPriority=6;
 			Description="可以在没有ID Map或顶点色输入的情况下使用ID偏移来指定整个材质的ID.\r\n\r\nMooaToon使用ID来区分同角色的不同部位, 以精确控制每个部位是否投射阴影.\r\n或者用不同ID区分不同角色, 以实现同角色的模型之间没有自阴影, 但不同角色之间可以相互投影.\r\n\r\n\r\nID offsets can be used to specify IDs for the entire material without ID Map or vertex color input.\r\n\r\nMooaToon uses ID to distinguish different parts of the same character to precisely control whether each part casts a shadow.\r\nOr use different IDs to distinguish different characters, so that there is no self-shadowing between models of the same character, but different characters can cast shadows each other.";
+			SliderMin=0;
+			SliderMax=255;
 		];
 		ChannelMaskParameter ID_Channel = float4(1.0, 0.0, 0.0, 0.0) [
 			ParameterName="Shadow Group ID Channel";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=34;
-			MaskChannel=Red
+			Group="13 - Shadows";
+			SortPriority=5;
+			MaskChannel=Red;
+			Description="阴影分组 ID 用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter ID_Map_UV_Channel = 0.0 [
 			ParameterName="Shadow Group ID Map UV Channel";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=33;
+			Group="13 - Shadows";
+			SortPriority=4;
+			SliderMin=0;
+			SliderMax=3;
+			Description="阴影分组 ID 图使用的 UV 通道, 0~3. \r\nUV channel the shadow group ID map uses, 0-3.";
 		];
 		VectorParameter Shadow_Color = float4(0.5, 0.5, 0.5, 1.0) [
 			ParameterName="Shadow Color";
 			Group="10 - Diffuse";
-			SortPriority=10;
+			SortPriority=0;
+			Description="暗部颜色, 乘暗部颜色贴图. \r\nShadow colour, times the shadow colour map.";
 		];
 		ScalarParameter Diffuse_Color_Ramp_Index = 1.0 [
 			ParameterName="Diffuse Color Ramp Index";
 			Group="10 - Diffuse";
-			SortPriority=0;
+			SortPriority=1;
 			Description="选择使用那个Diffuse Color Ramp.\r\nRamp的横轴是光照方向和表面法线的角度(N dot L), 0为背光面, 0.5为明暗交界线, 1为正光面.\r\nRGB通道为漫反射颜色.\r\nA通道为阴影衰减, 1为被照亮, 0为被遮挡. 用于区分Base Color和Shadow Color.\r\n\r\n现在MooaToon使用Global Diffuse/Specular Color Ramps来描述表面的多光源着色结果, 这意味着使用同一套输入你既可以实现基于物理的着色, 也可以实现完全自定义的风格化着色.\r\n你可以在Project Settings > Engine > MooaToon中找到默认的Ramp Atlas, 其中存放了所有可供选择的Ramp, 要使用某个Ramp你需要在这里输入其Index.\r\n如果要添加新的Ramp, 请先将默认的Ramp Atlas复制一份, 然后在Project Settings中修改Ramp Atlas为复制的, 以避免在更新MooaToon的时候产生冲突.\r\n\r\n\r\nChoose which Diffuse Color Ramp to use.\r\nThe horizontal axis of Ramp is the angle between light direction and surface normal (N dot L), 0 is the backlight surface, 0.5 is the boundary between light and dark, and 1 is the front light surface.\r\nThe RGB channel is the diffuse color.\r\nThe A channel is shadow attenuation, 1 means illuminated, 0 means occluded. Used to distinguish Base Color and Shadow Color.\r\n\r\nMooaToon now uses Global Diffuse/Specular Color Ramps to describe the multi-light shading results of the surface, which means that using the same set of inputs you can achieve both physically based shading and completely customized stylized shading.\r\nYou can find the default Ramp Atlas in Project Settings > Engine > MooaToon, which stores all available Ramps. To use a Ramp, you need to enter its Index here.\r\nIf you want to add a new Ramp, please first copy the default Ramp Atlas, and then modify the Ramp Atlas to be copied in Project Settings to avoid conflicts when updating MooaToon.";
+			SliderMin=0;
+			SliderMax=63;
 		];
 		TextureObjectParameter Custom_Diffuse_Ramp = Path(Plugins.MoonToon, "Assets/Textures/T_White_Linear") [
 			ParameterName="Custom Diffuse Ramp";
 			Group="10 - Diffuse";
-			SortPriority=2;
+			SortPriority=3;
 			Description="材质自带的Diffuse Ramp贴图, 需要打开`Use Custom Diffuse Ramp`才生效.\r\n引擎会自动把它注册进动态Ramp图集并分配Index, 不需要再手填`Diffuse Color Ramp Index`, 也不需要事先合进全局Ramp Atlas资产.\r\n横轴与全局Ramp一致(N dot L), A通道是明暗遮罩, RGB是漫反射颜色着色(受`Diffuse Color Ramp Tint Strength`控制).\r\n建议: 256x1, 无Mipmap, Clamp寻址, 线性色彩空间. 多行图集请用`Custom Diffuse Ramp Row`选行.\r\n\r\n\r\nA ramp texture supplied by the material itself; requires `Use Custom Diffuse Ramp`.\r\nThe engine registers it into the dynamic ramp atlas and assigns the index automatically, so neither `Diffuse Color Ramp Index` nor merging the ramp into the global atlas asset is needed.\r\nSame horizontal axis as the global ramps (N dot L); alpha is the lit/shadow mask, RGB tints the diffuse.\r\nRecommended: 256x1, no mipmaps, clamped, linear color space. For a multi-row atlas pick the row with `Custom Diffuse Ramp Row`.";
 		];
 		ScalarParameter Custom_Diffuse_Ramp_Row = -1.0 [
 			ParameterName="Custom Diffuse Ramp Row";
 			Group="10 - Diffuse";
-			SortPriority=3;
+			SortPriority=4;
 			Description="当`Custom Diffuse Ramp`是多行图集时, 选择使用第几行(0为最上面一行).\r\n负数表示取贴图的垂直中心行, 也就是单条Ramp贴图的默认行为.\r\n每个被用到的(贴图, 行)组合各占一个图集slice, 没用到的行不占预算.\r\n\r\n\r\nSelects which row of a multi-row `Custom Diffuse Ramp` atlas to use (0 = top row).\r\nA negative value samples the texture's vertical center, which is the behaviour for single-strip ramps.\r\nEach (texture, row) pair actually used takes one atlas slice; unused rows cost nothing.";
+			SliderMin=-1;
+			SliderMax=63;
 		];
 		ChannelMaskParameter Diffuse_Ramp_Offset_Channel = float4(0.0, 0.0, 1.0, 0.0) [
 			ParameterName="Diffuse Ramp Offset Channel";
 			Group="10 - Diffuse";
-			SortPriority=37;
-			MaskChannel=Blue
+			SortPriority=17;
+			MaskChannel=Blue;
+			Description="漫反射 Ramp 偏移用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Diffuse_Ramp_Offset_Intensity = 0.0 [
 			ParameterName="Diffuse Ramp Offset Intensity";
 			Group="10 - Diffuse";
-			SortPriority=38;
+			SortPriority=18;
 			Description="Diffuse Ramp Offset Map通过偏移Diffuse Ramp A通道的横轴来精细控制法线阴影的形状.\r\n贴图的值:\r\n  - 越接近0越容易进入暗面范围\r\n  - 为0.5时没有影响\r\n  - 越接近1越容易进入亮面范围\r\n颜色空间: 线性.\r\n\r\n受限于GBuffer位深, 在`Diffuse Ramp Offset Intensity`较小时阴影边缘可能出现锯齿.\r\n建议将`Diffuse Ramp Offset Intensity`设为1, 然后以下方式之一:\r\n  - 控制台变量`r.Mooa.DiffuseColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Diffuse Ramp UV Offset Max Range`\r\n调整最大偏移范围.\r\n\r\n\r\nThe Diffuse Ramp Offset Map provides fine control over the shape of the normal shadow by offsetting the horizontal axis of the Diffuse Ramp A channel.\r\nThe value of the map:\r\n  - The closer it is to 0, the easier it is to enter the dark side range\r\n  - It has no effect when it is 0.5\r\n  - The closer it is to 1, the easier it is to enter the light side range\r\nColor space: linear.\r\n\r\nLimited by the GBuffer bit depth, the shadow edges may appear jagged when `Diffuse Ramp Offset Intensity` is small.\r\nIt is recommended to set `Diffuse Ramp Offset Intensity` to 1, and then use one of the following methods:\r\n  - Console variable `r.Mooa.DiffuseColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Diffuse Ramp UV Offset Max Range`\r\nto adjust the maximum offset range.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		VectorParameter Specular_Color = float4(1.0, 1.0, 1.0, 1.0) [
 			ParameterName="Specular Color";
 			Group="11 - Specular";
-			SortPriority=4;
+			SortPriority=9;
+			Description="高光颜色, 乘高光颜色贴图. \r\nSpecular colour, times the specular colour map.";
 		];
 		ScalarParameter Specular_Color_Ramp_Index = 0.0 [
 			ParameterName="Specular Color Ramp Index";
 			Group="11 - Specular";
 			SortPriority=0;
 			Description="选择使用哪个Specular Color Ramp.\r\n横坐标是根据经验归一化后的高光强度:\r\n\t- 0对应高光点边缘\r\n\t- 1对应高光点中心\r\nRGB通道的值为Specular Color.\r\n\r\n现在MooaToon使用Global Diffuse/Specular Color Ramps来描述表面的多光源着色结果, 这意味着使用同一套输入你既可以实现基于物理的着色, 也可以实现完全自定义的风格化着色.\r\n你可以在Project Settings > Engine > MooaToon中找到默认的Ramp Atlas, 其中存放了所有可供选择的Ramp, 要使用某个Ramp你需要在这里输入其Index.\r\n如果要添加新的Ramp, 请先将默认的Ramp Atlas复制一份, 然后在Project Settings中修改Ramp Atlas为复制的, 以避免在更新MooaToon的时候产生冲突.\r\n\r\n\r\nChoose which Specular Color Ramp to use.\r\nThe horizontal coordinate is the empirically normalized highlight intensity.\r\n\t- 0 is the edge of the highlight point.\r\n\t- 1 is the center of the highlight.\r\nThe value of the RGB channel is Specular Color.\r\n\r\nMooaToon now uses Global Diffuse/Specular Color Ramps to describe the multi-light shading results of the surface, which means that using the same set of inputs you can achieve both physically based shading and completely customized stylized shading.\r\nYou can find the default Ramp Atlas in Project Settings > Engine > MooaToon, which stores all available Ramps. To use a Ramp, you need to enter its Index here.\r\nIf you want to add a new Ramp, please first copy the default Ramp Atlas, and then modify the Ramp Atlas to be copied in Project Settings to avoid conflicts when updating MooaToon.";
+			SliderMin=0;
+			SliderMax=31;
 		];
 		TextureObjectParameter Custom_Specular_Ramp = Path(Plugins.MoonToon, "Assets/Textures/T_White_Linear") [
 			ParameterName="Custom Specular Ramp";
 			Group="11 - Specular";
-			SortPriority=2;
+			SortPriority=3;
 			Description="材质自带的Specular Ramp贴图, 需要打开`Use Custom Specular Ramp`才生效.\r\n引擎会自动把它注册进动态Specular Ramp图集并分配Index, 不需要再手填`Specular Color Ramp Index`.\r\n横轴与全局Ramp一致(归一化高光强度), RGB通道是Specular Color.\r\n建议: 256x1, 无Mipmap, Clamp寻址, 线性色彩空间. 多行图集请用`Custom Specular Ramp Row`选行.\r\n注意: Specular图集只有32个slice(比Diffuse的64个少), 因为GBuffer里的Index只有5位.\r\n\r\n\r\nA specular ramp texture supplied by the material itself; requires `Use Custom Specular Ramp`.\r\nThe engine registers it into the dynamic specular ramp atlas and assigns the index automatically, so `Specular Color Ramp Index` is not needed.\r\nSame horizontal axis as the global ramps (normalized highlight intensity); RGB is the specular color.\r\nRecommended: 256x1, no mipmaps, clamped, linear color space. For a multi-row atlas pick the row with `Custom Specular Ramp Row`.\r\nNote: the specular atlas holds 32 slices (fewer than diffuse's 64) because its GBuffer index is only 5 bits.";
 		];
 		ScalarParameter Custom_Specular_Ramp_Row = -1.0 [
 			ParameterName="Custom Specular Ramp Row";
 			Group="11 - Specular";
-			SortPriority=3;
+			SortPriority=7;
 			Description="当`Custom Specular Ramp`是多行图集时, 选择使用第几行(0为最上面一行).\r\n负数表示取贴图的垂直中心行, 也就是单条Ramp贴图的默认行为.\r\n\r\n\r\nSelects which row of a multi-row `Custom Specular Ramp` atlas to use (0 = top row).\r\nA negative value samples the texture's vertical center, which is the behaviour for single-strip ramps.";
+			SliderMin=-1;
+			SliderMax=63;
 		];
 		ChannelMaskParameter Specular_Ramp_Offset_Channel = float4(0.0, 0.0, 1.0, 0.0) [
 			ParameterName="Specular Ramp Offset Channel";
 			Group="11 - Specular";
-			SortPriority=62;
-			MaskChannel=Blue
+			SortPriority=25;
+			MaskChannel=Blue;
+			Description="高光 Ramp 偏移用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Specular_Ramp_Offset_Intensity = 0.0 [
 			ParameterName="Specular Ramp Offset Intensity";
 			Group="11 - Specular";
-			SortPriority=63;
+			SortPriority=26;
 			Description="Specular Ramp Offset Map通过偏移Specular Ramp RGB通道的横轴来精细控制Specular的形状.\r\n贴图的值:\r\n\t- 越接近0越难以进入Specular范围\r\n\t- 为0.5时没有影响\r\n\t- 越接近1越容易进入Specular范围\r\n颜色空间: 线性.\r\n\r\n受限于GBuffer位深, 在`Specular Ramp Offset Intensity`较小时Specular边缘可能出现锯齿.\r\n建议将`Specular Ramp Offset Intensity`设为1, 然后以下方式之一:\r\n  - 控制台变量`r.Mooa.SpecularColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Specular Ramp UV Offset Max Range`\r\n调整最大偏移范围.\r\n\r\n\r\nThe Specular Ramp Offset Map provides fine control over the shape of the Specular by offsetting the horizontal axis of the Specular Ramp RGB channel.\r\nTexture value:\r\n\t- The closer it is to 0, the harder it is to enter the Specular range\r\n\t- has no effect at 0.5\r\n\t- the closer to 1, the easier it is to enter the Specular range\r\nColor space: linear.\r\n\r\nLimited by the GBuffer bit depth, Specular edges may appear jagged when `Specular Ramp Offset Intensity` is small.\r\nIt is recommended to set `Specular Ramp Offset Intensity` to 1, and then use one of the following methods:\r\n  - console variable `r.Mooa.SpecularColorRamp.UVOffsetMaxRange`\r\n  - `BP_MooaLookDevTool > Shading Settings > Specular Ramp UV Offset Max Range`\r\nto adjust the maximum offset range.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Reflection = 0.0 [
 			Group="11 - Specular";
-			SortPriority=2;
+			SortPriority=4;
+			SliderMin=0;
+			SliderMax=1;
+			Description="环境反射强度. 0 = 不反射. \r\nEnvironment reflection strength. 0 = none.";
 		];
 		ScalarParameter Rim_Light_Intensity = 0.5 [
 			ParameterName="Rim Light Intensity";
 			Group="12 - Rim Light";
-			SortPriority=40;
-			Description="屏幕空间深度测试边缘光强度.\r\n与传统的基于法线方向与视线方向的角度(N dot V)的边缘光不同, 屏幕空间边缘光的宽度与表面曲率无关, 看起来更加扁平化.\r\n可以用控制台命令调整更多全局参数.\r\n\r\n\r\nScreen Space Depth Test Rim Light Intensity.\r\nDifferent from the traditional rim light based on the angle between the normal direction and the view direction (N dot V), the width of the screen space rim light has nothing to do with the surface curvature and looks flatter.\r\nMore global parameters can be adjusted using console variables.";
+			SortPriority=5;
+			Description="屏幕空间深度测试边缘光强度.\r\n与传统的基于法线方向与视线方向的角度(N dot V)的边缘光不同, 屏幕空间边缘光的宽度与表面曲率无关, 看起来更加扁平化.\r\n可以用控制台命令调整更多全局参数.\r\n\r\n\r\nScreen Space Depth Test Rim Light Intensity.\r\nDifferent from the traditional rim light based on the angle between the normal direction and the view direction (N dot V), the width of the screen space rim light has nothing to do with the surface curvature and looks flatter.\r\nMore global parameters can be adjusted using console variables. 挂了 MoonToon Profile 时由 Profile 决定. A bound MoonToon profile overrides this.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ChannelMaskParameter Rim_Light_Width_Channel = float4(0.0, 0.0, 1.0, 0.0) [
 			ParameterName="Rim Light Width Channel";
 			Group="12 - Rim Light";
-			SortPriority=34;
-			MaskChannel=Blue
+			SortPriority=2;
+			MaskChannel=Blue;
+			Description="边缘光宽度用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ChannelMaskParameter Rim_Light_Width_Channel_1 = float4(0.0, 0.0, 1.0, 0.0) [
 			ParameterName="Rim Light Width Channel";
 			Group="12 - Rim Light";
-			SortPriority=34;
-			MaskChannel=Blue
+			SortPriority=2;
+			MaskChannel=Blue;
+			Description="边缘光宽度用哪个通道. 选通道(R/G/B/A). Picks the channel (R/G/B/A). ";
 		];
 		ScalarParameter Rim_Light_Width = 0.5 [
 			ParameterName="Rim Light Width";
 			Group="12 - Rim Light";
-			SortPriority=35;
-			Description="屏幕空间深度测试边缘光宽度.\r\n与传统的基于法线方向与视线方向的角度(N dot V)的边缘光不同, 屏幕空间边缘光的宽度与表面曲率无关, 看起来更加扁平化.\r\n可以用控制台命令调整更多全局参数.\r\n\r\n\r\nScreen Space Depth Test Rim Light Width.\r\nDifferent from the traditional rim light based on the angle between the normal direction and the view direction (N dot V), the width of the screen space rim light has nothing to do with the surface curvature and looks flatter.\r\nMore global parameters can be adjusted using console variables.";
+			SortPriority=4;
+			Description="屏幕空间深度测试边缘光宽度.\r\n与传统的基于法线方向与视线方向的角度(N dot V)的边缘光不同, 屏幕空间边缘光的宽度与表面曲率无关, 看起来更加扁平化.\r\n可以用控制台命令调整更多全局参数.\r\n\r\n\r\nScreen Space Depth Test Rim Light Width.\r\nDifferent from the traditional rim light based on the angle between the normal direction and the view direction (N dot V), the width of the screen space rim light has nothing to do with the surface curvature and looks flatter.\r\nMore global parameters can be adjusted using console variables. 挂了 MoonToon Profile 时由 Profile 决定. A bound MoonToon profile overrides this.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Face_ID = 250.0 [
 			ParameterName="Face ID";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=82;
+			Group="13 - Shadows";
+			SortPriority=13;
 			Description="在有ID Map或顶点色输入的情况下指定脸或头发的ID, 适用于脸和头发使用同一个材质的情况.\r\n\r\n如果要使用发影(头发在脸上的投影)功能, 则必须正确设置脸和头发的ID.\r\n\r\n\r\nSpecifying the ID of the face or hair with ID Map or vertex color input, suitable for face and hair using the same material.\r\n\r\nIf you want to use the hair shadow (shadows of hair on the face) feature, the face and hair IDs must be set correctly.";
+			SliderMin=0;
+			SliderMax=255;
 		];
 		ScalarParameter Hair_ID = 240.0 [
 			ParameterName="Hair ID";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=82;
+			Group="13 - Shadows";
+			SortPriority=14;
 			Description="在有ID Map或顶点色输入的情况下指定脸或头发的ID, 适用于脸和头发使用同一个材质的情况.\r\n\r\n如果要使用发影(头发在脸上的投影)功能, 则必须正确设置脸和头发的ID.\r\n\r\n\r\nSpecifying the ID of the face or hair with ID Map or vertex color input, suitable for face and hair using the same material.\r\n\r\nIf you want to use the hair shadow (shadows of hair on the face) feature, the face and hair IDs must be set correctly.";
+			SliderMin=0;
+			SliderMax=255;
 		];
 		ScalarParameter Use_Anisotropy_Flag = 0.0 [
 			ParameterName="Use Anisotropy";
 			Group="11 - Specular";
-			SortPriority=2;
+			SortPriority=5;
 			Description="1 = 使用 Anisotropy(以及子材质表的各向异性列), 0 = 各向同性.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = use Anisotropy (and the sub-material table's anisotropy column), 0 = isotropic.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Invert_Roughness_Channel_Flag = 0.0 [
 			ParameterName="Invert Roughness Channel";
 			Group="11 - Specular";
-			SortPriority=43;
+			SortPriority=15;
 			Description="1 = 粗糙度通道按 1 - 值 读(存的是光滑度时用).\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = read the roughness channel as 1 - value (for a map that stores smoothness).\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Is_Face_Flag = 0.0 [
 			ParameterName="Is Face";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=81;
+			Group="13 - Shadows";
+			SortPriority=11;
 			Description="1 = 整个材质按脸算(发影的接收方), 0 = 只有 ID 等于 Face ID 的像素算脸.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the whole material counts as face (the hair-shadow receiver), 0 = only pixels whose ID equals Face ID do.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Is_Hair_Flag = 0.0 [
 			ParameterName="Is Hair";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=81;
+			Group="13 - Shadows";
+			SortPriority=12;
 			Description="1 = 整个材质按头发算(发影的投射方), 0 = 只有 ID 等于 Hair ID 的像素算头发.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the whole material counts as hair (the hair-shadow caster), 0 = only pixels whose ID equals Hair ID do.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Use_Screen_Space_Depth_Test_Hair_Shadow_Flag = 0.0 [
 			ParameterName="Use Screen Space Depth Test Hair Shadow";
-			Group="13 - Ray Tracing Shadow";
-			SortPriority=80;
+			Group="13 - Shadows";
+			SortPriority=10;
 			Description="1 = 脸上的发影用屏幕空间深度测试, 0 = 用光追 / 阴影图.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the hair shadow on the face uses the screen-space depth test, 0 = ray traced / shadow map.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 	}
 
@@ -655,8 +785,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=float4(pow(AppendMany_1, 2.2), (UE.Expression(Class="VertexColor", OutputType="float4")).a),
 				False=AppendMany,
-				Group="01 - Global Mask Map",
-				SortPriority=41,
+				Group="00 - Global|Global Mask Map",
+				SortPriority=7,
 				ParameterName="Decode Vertex Color From sRGB",
 				DefaultValue=false,
 				Desc="顶点色 RGB 先按 sRGB 解码(pow 2.2)再用. 默认关 = 按原值读, 适合存数据(阴影组 ID、rim 宽度、不透明度、代替遮罩图). 只有顶点色是按 sRGB 画的颜色时才打开. A 通道始终按原值.\r\n替代旧开关`Use Vertex Color In sRGB Space`(名字和行为相反: 不勾时反而做 pow 2.2).\r\n\r\n\r\nDecode the vertex colour RGB from sRGB (pow 2.2) before use. Off (the default) reads it as stored, which is what data needs (shadow group ID, rim width, opacity, the mask-map stand-in). Tick it only for vertex colour painted as an sRGB colour. Alpha is always read as stored.\r\nReplaces `Use Vertex Color In sRGB Space`, whose name said the opposite of what it did (unticked meant pow 2.2)."
@@ -679,8 +809,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=MF_ToonSampleLinear(Global_Mask_Map, Global_Mask_Map_UV).rgba,
 				False=float4(1.0, 1.0, 1.0, 1.0),
-				Group="01 - Global Mask Map",
-				SortPriority=1,
+				Group="00 - Global|Global Mask Map",
+				SortPriority=0,
 				ParameterName="Enable Global Mask Map",
 				DefaultValue=false,
 				Desc="采样 Global Mask Map(第一张打包遮罩图). 关 = 一次都不采样, 所有读它的地方读到全白(1), 和默认白图完全一样. 指定了贴图就要打开.\r\n\r\n\r\nSample Global Mask Map (the first packed mask map). Off = no fetch at all; everything that reads it gets white (1), exactly what the default white map gave. Tick it when you assign a map."
@@ -691,9 +821,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=Sampled_Vertex_Color,
 				False=StaticSwitchParameter_1,
-				Group="01 - Global Mask Map",
-				SortPriority=40,
-				ParameterName="Use Vertex Color Instead Mask Map"
+				Group="00 - Global|Global Mask Map",
+				SortPriority=6,
+				ParameterName="Use Vertex Color Instead Mask Map",
+				Desc="开 = 用顶点色代替打包遮罩图 1(四个通道一一对应). \r\nOn = vertex colour stands in for Global Mask Map 1, channel for channel."
 			);
 		#EndRegion
 
@@ -709,10 +840,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=MF_ToonSampleLinear(Global_Mask_Map_2, Global_Mask_Map_UV).rgba,
 				False=float4(1.0, 1.0, 1.0, 1.0),
-				Group="01 - Global Mask Map",
-				SortPriority=11,
+				Group="00 - Global|Global Mask Map",
+				SortPriority=2,
 				ParameterName="Enable Global Mask Map 2",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 采样第二张打包遮罩图; 关 = 不采样, 读它的地方得白(1). \r\nOn = sample Global Mask Map 2; off = no fetch, readers get white (1)."
 			);
 		float4 Sampled_Global_Mask_Map_3 =
 			UE.Expression(
@@ -720,10 +852,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=MF_ToonSampleLinear(Global_Mask_Map_3, Global_Mask_Map_UV).rgba,
 				False=float4(1.0, 1.0, 1.0, 1.0),
-				Group="01 - Global Mask Map",
-				SortPriority=13,
+				Group="00 - Global|Global Mask Map",
+				SortPriority=4,
 				ParameterName="Enable Global Mask Map 3",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 采样第三张打包遮罩图; 关 = 不采样, 读它的地方得白(1). \r\nOn = sample Global Mask Map 3; off = no fetch, readers get white (1)."
 			);
 		#EndRegion
 
@@ -772,14 +905,15 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				OutputIndex=5,
 				ParameterName="Inner Outline Map",
-				Group="22 - Inner Outline",
-				Desc="0: 无影响 1: 内描边\r\n\r\n0: No effect 1: Inner Outline",
+				Group="60 - Inner Outline",
+				Desc="内描边贴图: 0 = 无影响, 1 = 内描边. \r\nInner outline map: 0 no effect, 1 inner outline. 颜色空间: 线性, 导入时关闭 sRGB(Default / BC7 压缩). Colour space: linear, import with sRGB off.",
 				Coordinates=MF_UVChannelSwitch_1,
 				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
 				SamplerType="SAMPLERTYPE_LinearColor",
 				MipValueMode="TMVM_MipLevel",
 				AutomaticViewMipBias=false,
-				ConstMipValue=0
+				ConstMipValue=0,
+				SortPriority=6
 			);
 		float4 StaticSwitchParameter_3 =
 			UE.Expression(
@@ -787,9 +921,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=Inner_Outline_Global_Mask,
 				False=Inner_Outline_Map.rgba,
-				Group="22 - Inner Outline",
-				SortPriority=32,
-				ParameterName="Inner Outline From Global Mask Map"
+				Group="60 - Inner Outline",
+				SortPriority=1,
+				ParameterName="Inner Outline From Global Mask Map",
+				Desc="开 = 内描边遮罩取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the inner outline mask comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		#EndRegion
 
@@ -803,9 +938,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=LinearInterpolate,
 				False=1.0,
-				Group="22 - Inner Outline",
+				Group="60 - Inner Outline",
 				SortPriority=0,
-				ParameterName="Enable Inner Outline"
+				ParameterName="Enable Inner Outline",
+				Desc="开 = 画内描边(由内描边贴图或打包遮罩决定位置). \r\nOn = draw the inner outline, placed by its map or the packed mask."
 			);
 		#EndRegion
 
@@ -823,10 +959,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float2",
 				True=Eye_Parallax_UV,
 				False=Add_2,
-				Group="06 - Eye Parallax",
+				Group="22 - Eye|Parallax",
 				SortPriority=0,
 				ParameterName="Enable Eye Parallax",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 虹膜视差(眼睛). \r\nOn = iris parallax, for eyes."
 			);
 		// Highlight anchoring runs downstream of the parallax so the two compose: the highlight
 		// sheet can sit at its own (usually small, usually negative) parallax depth AND follow the
@@ -839,10 +976,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float2",
 				True=Eye_Highlight_UV,
 				False=Global_UV_Selected,
-				Group="07 - Eye Highlight",
+				Group="22 - Eye|Highlight",
 				SortPriority=0,
 				ParameterName="Enable Eye Highlight Anchor",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 眼睛高光层跟着光源/视线移动(Eye Highlight 组的参数); 关 = 钉在 UV 上. \r\nOn = the eye highlight layer follows the light / view (the Eye Highlight parameters); off = pinned to the UV."
 			);
 		#EndRegion
 
@@ -876,10 +1014,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=lerp(Eye_Debug_Over_Art, Eye_Highlight_Debug.rgb, Eye_Highlight_Debug.a),
 				False=Base_Color_1,
-				Group="06 - Eye Parallax",
-				SortPriority=9,
+				Group="22 - Eye|Parallax",
+				SortPriority=7,
 				ParameterName="Enable Eye Parallax Debug",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 显示眼睛视差与高光的调试图(Debug View 参数选哪张). \r\nOn = show the eye parallax / highlight debug views (their Debug View parameters pick which)."
 			);
 		#EndRegion
 
@@ -889,9 +1028,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=ShadingFeatureColor,
 				False=Base_Color_Debugged,
-				Group="00 - Global Settings",
-				SortPriority=70,
-				ParameterName="Debug Shading Feature"
+				Group="90 - Debug",
+				SortPriority=0,
+				ParameterName="Debug Shading Feature",
+				Desc="调试: 开 = 底色换成当前着色特征的颜色. \r\nDebug: on = the base colour shows which shading feature is active."
 			);
 		float4 StaticSwitchParameter_7 =
 			UE.Expression(
@@ -899,9 +1039,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=Add,
 				False=StaticSwitchParameter_6,
-				Group="00 - Global Settings",
-				SortPriority=70,
-				ParameterName="Debug Tangent"
+				Group="90 - Debug",
+				SortPriority=1,
+				ParameterName="Debug Tangent",
+				Desc="调试: 开 = 把切线方向画成颜色. \r\nDebug: on = draws the tangent direction as a colour."
 			);
 		Attributes.BaseColor = StaticSwitchParameter_7;
 		#Region "Texture Sample"
@@ -913,9 +1054,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Metallic_Global_Mask,
 				False=StaticSwitchParameter_8,
 				Group="11 - Specular",
-				SortPriority=50,
+				SortPriority=17,
 				ParameterName="Metallic From Global Mask Map",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = 金属度取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the metallic comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		#EndRegion
 
@@ -938,7 +1080,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=lerp(Metallic, SubMat_C1.x, SubMat_W1.x),
 				False=Metallic,
-				Group="15 - SubMaterial",
+				Group="15 - Sub Material",
 				SortPriority=0,
 				Desc="子材质表(T22): 打开后按子材质 ID 读 SubMaterial Table 的一行, 覆盖行里勾选的参数. 关 = 和以前完全一样.\r\nSub-material table: reads the row of SubMaterial Table for the pixel's sub-material ID and overrides the parameters it ticks. Off = exactly as before.",
 				ParameterName="Use SubMaterial Table"
@@ -949,7 +1091,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=lerp(Specular, SubMat_C1.y, SubMat_W1.y),
 				False=Specular,
-				Group="15 - SubMaterial",
+				Group="15 - Sub Material",
 				SortPriority=0,
 				ParameterName="Use SubMaterial Table"
 			);
@@ -959,7 +1101,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=lerp(Roughness, SubMat_C1.z, SubMat_W1.z),
 				False=Roughness,
-				Group="15 - SubMaterial",
+				Group="15 - Sub Material",
 				SortPriority=0,
 				ParameterName="Use SubMaterial Table"
 			);
@@ -969,7 +1111,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=lerp(Reflection, SubMat_C1.w, SubMat_W1.w),
 				False=Reflection,
-				Group="15 - SubMaterial",
+				Group="15 - Sub Material",
 				SortPriority=0,
 				ParameterName="Use SubMaterial Table"
 			);
@@ -979,7 +1121,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=lerp(Anisotropy, SubMat_C2.x, SubMat_W2.x),
 				False=Anisotropy,
-				Group="15 - SubMaterial",
+				Group="15 - Sub Material",
 				SortPriority=0,
 				ParameterName="Use SubMaterial Table"
 			);
@@ -989,7 +1131,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=lerp(Emissive_Intensity, (Emissive_Intensity * SubMat_C2.w), SubMat_W2.w),
 				False=Emissive_Intensity,
-				Group="15 - SubMaterial",
+				Group="15 - Sub Material",
 				SortPriority=0,
 				ParameterName="Use SubMaterial Table"
 			);
@@ -999,7 +1141,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=lerp(Shadow_Color.rgb, SubMat_C0.rgb, SubMat_W0.rgb),
 				False=Shadow_Color.rgb,
-				Group="15 - SubMaterial",
+				Group="15 - Sub Material",
 				SortPriority=0,
 				ParameterName="Use SubMaterial Table"
 			);
@@ -1023,9 +1165,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Roughness_Global_Mask,
 				False=StaticSwitchParameter_10,
 				Group="11 - Specular",
-				SortPriority=40,
+				SortPriority=11,
 				ParameterName="Roughness From Global Mask Map",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = 粗糙度取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the roughness comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		#EndRegion
 
@@ -1057,9 +1200,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=Multiply_7,
 				False=0.0,
-				Group="23 - Emissive",
+				Group="14 - Emissive",
 				SortPriority=0,
-				ParameterName="Enable Emission"
+				ParameterName="Enable Emission",
+				Desc="开 = 自发光(自发光贴图 x 强度). \r\nOn = emissive (emissive map times intensity)."
 			);
 		#EndRegion
 
@@ -1073,10 +1217,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=(StaticSwitchParameter_15 + Eye_Sparkle),
 				False=StaticSwitchParameter_15,
-				Group="08 - Eye Sparkle",
+				Group="22 - Eye|Sparkle",
 				SortPriority=0,
 				ParameterName="Enable Eye Sparkle",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 眼睛里加程序化的闪光点(Eye Sparkle 组). \r\nOn = procedural sparkle dots in the eye (the Eye Sparkle parameters)."
 			);
 		Attributes.EmissiveColor = Emission;
 		#Region "Texture Sample"
@@ -1087,10 +1232,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=Sampled_Base_Color,
 				False=StaticSwitchParameter_16,
-				Group="21 - Translucency",
-				SortPriority=31,
+				Group="03 - Opacity & Translucency",
+				SortPriority=0,
 				ParameterName="Opacity From Base Color Map",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = 不透明度取底色贴图的通道(Opacity Channel); 关 = 用 Opacity Map. \r\nOn = opacity comes from the base colour map (Opacity Channel); off = from the Opacity Map."
 			);
 		float4 StaticSwitchParameter_18 =
 			UE.Expression(
@@ -1098,9 +1244,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=Sampled_Vertex_Color,
 				False=StaticSwitchParameter_17,
-				Group="21 - Translucency",
-				SortPriority=31,
-				ParameterName="Opacity From Vertex Color"
+				Group="03 - Opacity & Translucency",
+				SortPriority=1,
+				ParameterName="Opacity From Vertex Color",
+				Desc="开 = 不透明度取顶点色. \r\nOn = opacity comes from the vertex colour."
 			);
 		#EndRegion
 
@@ -1157,9 +1304,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=AO_Global_Mask,
 				False=StaticSwitchParameter_20,
 				Group="10 - Diffuse",
-				SortPriority=31,
+				SortPriority=9,
 				ParameterName="AO From Global Mask Map",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = AO取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the AO comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		#EndRegion
 
@@ -1172,8 +1320,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=SA_Map_2.g,
 				False=AO_Channel_Masked,
 				Group="10 - Diffuse",
-				SortPriority=31,
-				ParameterName="AO From SA Map"
+				SortPriority=10,
+				ParameterName="AO From SA Map",
+				Desc="开 = AO 取 SA Map 的 G 通道. \r\nOn = AO comes from the SA Map's green channel."
 			);
 		#EndRegion
 
@@ -1202,9 +1351,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=FlattenNormal,
 				False=float3(0.0, 0.0, 1.0),
-				Group="20 - Normal",
-				SortPriority=32,
-				ParameterName="Enable Normal Map"
+				Group="02 - Normal",
+				SortPriority=0,
+				ParameterName="Enable Normal Map",
+				Desc="开 = 采样法线贴图. \r\nOn = sample the normal map."
 			);
 		#EndRegion
 
@@ -1243,10 +1393,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=normalize(float3(MaterialExpressionTextureCoordinate_4.rg, MaterialExpressionTextureCoordinate_5.r)),
 				False=0.0,
-				Group="00 - Global Settings",
-				SortPriority=61,
+				Group="33 - Feature: Hair Kajiya",
+				SortPriority=100,
 				ParameterName="Use Highlight Tangent baked in Houdini UV23",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = Kajiya 发丝切线取 UV2/UV3 里烘焙的方向(Houdini 导出), 不用网格切线. \r\nOn = the Kajiya strand tangent comes from the direction baked into UV2 / UV3 (Houdini), not the mesh tangent."
 			);
 		// A13 (R11): Kajiya outranks the SDF face here, as it does in M_MoonToon's closure chain (earlier wins), so a
 		// material with both ticked gets the strand tangent its Kajiya closure reads, not the face-forward vector.
@@ -1266,10 +1417,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float2",
 				True=normalize(Transform).rg,
 				False=MaterialExpressionTextureCoordinate_6,
-				Group="00 - Global Settings",
-				SortPriority=61,
+				Group="33 - Feature: Hair Kajiya",
+				SortPriority=100,
 				ParameterName="Use Highlight Tangent baked in Houdini UV23",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = Kajiya 发丝切线取 UV2/UV3 里烘焙的方向(Houdini 导出), 不用网格切线. \r\nOn = the Kajiya strand tangent comes from the direction baked into UV2 / UV3 (Houdini), not the mesh tangent."
 			);
 		#EndRegion
 
@@ -1293,10 +1445,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float2",
 				True=float2(normalize(Transform).b, MaterialExpressionTextureCoordinate_5_4.g),
 				False=MaterialExpressionTextureCoordinate_7,
-				Group="00 - Global Settings",
-				SortPriority=61,
+				Group="33 - Feature: Hair Kajiya",
+				SortPriority=100,
 				ParameterName="Use Highlight Tangent baked in Houdini UV23",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = Kajiya 发丝切线取 UV2/UV3 里烘焙的方向(Houdini 导出), 不用网格切线. \r\nOn = the Kajiya strand tangent comes from the direction baked into UV2 / UV3 (Houdini), not the mesh tangent."
 			);
 		#EndRegion
 
@@ -1317,10 +1470,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=1.0,
 				False=0.0,
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=60,
+				Group="13 - Shadows",
+				SortPriority=7,
 				ParameterName="Disable Self Shadow",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = 不接受本角色自己的投影(只接受场景和别的角色的). 投影方和接收方都按这个开关; 挂了 MoonToon Profile 时由 Profile 决定. \r\nOn = ignore this character's own shadow casters (scene and other characters still shadow it). Casters and receivers both follow it; a bound MoonToon profile overrides it."
 			);
 		float StaticSwitchParameter_35 =
 			UE.Expression(
@@ -1328,10 +1482,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=1.0,
 				False=0.0,
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=61,
+				Group="13 - Shadows",
+				SortPriority=8,
 				ParameterName="Disable Cast Shadow On Toon",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = 这个部件(光追)不向别的 toon 组投影, 只在本角色内投. \r\nOn = this part casts no ray-traced shadow on other toon groups, only within its own character."
 			);
 		#EndRegion
 
@@ -1345,8 +1500,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=MF_ToonSampleLinearMip0(ID_Map_R_, MF_UVChannelSwitch_4).rgba,
 				False=float4(0.0, 0.0, 0.0, 0.0),
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=29,
+				Group="13 - Shadows",
+				SortPriority=0,
 				ParameterName="Enable Shadow Group ID Map",
 				DefaultValue=false,
 				Desc="采样 Shadow Group ID Map. 关 = 不采样, ID 为 0(和默认黑图完全一样), 光追 any-hit 和阴影深度 pass 也省掉这次采样. 指定了贴图就要打开.\r\n\r\n\r\nSample Shadow Group ID Map. Off = no fetch; the ID is 0, exactly what the default black map gave, and the ray-tracing any-hit and shadow-depth passes skip the fetch too. Tick it when you assign a map."
@@ -1357,9 +1512,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=Shadow_Group_ID_Global_Mask,
 				False=StaticSwitchParameter_36,
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=31,
-				ParameterName="Shadow Group ID From Global Mask Map"
+				Group="13 - Shadows",
+				SortPriority=2,
+				ParameterName="Shadow Group ID From Global Mask Map",
+				Desc="开 = 阴影分组 ID取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the shadow group ID comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		float4 StaticSwitchParameter_38 =
 			UE.Expression(
@@ -1367,9 +1523,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				True=Sampled_Vertex_Color,
 				False=StaticSwitchParameter_37,
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=30,
-				ParameterName="Shadow Group ID From Vertex Color"
+				Group="13 - Shadows",
+				SortPriority=1,
+				ParameterName="Shadow Group ID From Vertex Color",
+				Desc="开 = 阴影分组 ID 取顶点色. \r\nOn = the shadow group ID comes from the vertex colour."
 			);
 		#EndRegion
 
@@ -1417,7 +1574,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Sampled_Base_Color.rgb,
 				False=MF_ToonSampleColor(Shadow_Color_Map, Global_UV).rgb,
 				Group="10 - Diffuse",
-				SortPriority=14,
+				SortPriority=7,
 				ParameterName="Shadow Color From Base Color Map",
 				DefaultValue=false,
 				Desc="阴影色贴图直接用 Base Color Map 的采样结果(再乘 Shadow Color). 两张图本来就是同一张时打开: 画面完全一样, 每像素少一次采样. 打开后 Shadow Color Map 不再使用.\r\n\r\n\r\nUse the Base Color Map sample as the shadow colour map (still times Shadow Color). Tick it when both are the same texture: the image is identical and each pixel saves a fetch. With it on, Shadow Color Map is not used."
@@ -1437,9 +1594,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=Add,
 				False=Shadow_Color_1,
-				Group="00 - Global Settings",
-				SortPriority=70,
-				ParameterName="Debug Tangent"
+				Group="90 - Debug",
+				SortPriority=1,
+				ParameterName="Debug Tangent",
+				Desc="调试: 开 = 把切线方向画成颜色. \r\nDebug: on = draws the tangent direction as a colour."
 			);
 		#Region "Diffuse Ramp Index"
 		// Custom ramp: ToonRampAtlas registers the (texture, row) pair into the dynamic ramp atlas at
@@ -1497,7 +1655,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Custom_Diffuse_Ramp_Slice_TimeOfDay,
 				False=Custom_Diffuse_Ramp_Slice_Plain,
 				Group="10 - Diffuse",
-				SortPriority=3,
+				SortPriority=5,
 				ParameterName="Custom Ramp Time Of Day Rows",
 				DefaultValue=false,
 				Desc="(配合 Use Custom Diffuse Ramp) 自定义 ramp 从 Row 起连续三行是 日/夜/晨昏(异环), 按风格预设的时段插值.\r\n(With Use Custom Diffuse Ramp) rows Row, Row+1, Row+2 are day / night / dusk (NTE), blended by the style preset's time of day."
@@ -1509,9 +1667,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Custom_Diffuse_Ramp_Slice_Both,
 				False=Custom_Diffuse_Ramp_Slice_Components,
 				Group="10 - Diffuse",
-				SortPriority=3,
+				SortPriority=5,
 				ParameterName="Custom Ramp Time Of Day Rows",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="(配合 Use Custom Diffuse Ramp) 自定义 ramp 从 Row 起连续三行是 日/夜/晨昏(异环), 按风格预设的时段插值.\r\n(With Use Custom Diffuse Ramp) rows Row, Row+1, Row+2 are day / night / dusk (NTE), blended by the style preset's time of day."
 			);
 		float Custom_Diffuse_Ramp_Slice =
 			UE.Expression(
@@ -1520,7 +1679,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Custom_Diffuse_Ramp_Slice_WithComponents,
 				False=Custom_Diffuse_Ramp_Slice_NoComponents,
 				Group="10 - Diffuse",
-				SortPriority=4,
+				SortPriority=6,
 				ParameterName="Custom Ramp Component Rows",
 				DefaultValue=false,
 				Desc="(配合 Use Custom Diffuse Ramp) 自定义 ramp 的 Row、Row+4、Row+8、Row+12 行分别是 漫反射/高光/边缘/附加光(少前2 的 256x16 图集, Row = 2). 和时段同开时六段依次相邻.\r\n(With Use Custom Diffuse Ramp) rows Row, Row+4, Row+8, Row+12 are diffuse / specular / rim / secondary (the GF2 256x16 atlas, Row = 2). With the time-of-day rows as well, the six segments are consecutive."
@@ -1532,9 +1691,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Custom_Diffuse_Ramp_Slice,
 				False=Diffuse_Color_Ramp_Index,
 				Group="10 - Diffuse",
-				SortPriority=1,
+				SortPriority=2,
 				ParameterName="Use Custom Diffuse Ramp",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 用自己的 Diffuse Ramp 贴图(注册进动态图集), 不用全局 Ramp 的 Index. \r\nOn = use this material's own diffuse ramp texture (registered in the dynamic atlas) instead of a global ramp index."
 			);
 		#EndRegion
 
@@ -1547,9 +1707,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Diffuse_Ramp_Offset_Selected,
 				False=StaticSwitchParameter_47,
 				Group="10 - Diffuse",
-				SortPriority=35,
+				SortPriority=14,
 				ParameterName="Diffuse Ramp Offset From Global Mask Map",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = 漫反射 Ramp 偏移取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the diffuse ramp offset comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		#EndRegion
 
@@ -1569,7 +1730,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=MF_ToonSampleColor(Specular_Color_Map, Global_UV).rgb,
 				False=float3(1.0, 1.0, 1.0),
 				Group="11 - Specular",
-				SortPriority=5,
+				SortPriority=10,
 				ParameterName="Enable Specular Color Map",
 				DefaultValue=false,
 				Desc="采样 Specular Color Map. 关 = 不采样, 高光色只取 Specular Color(和默认白图完全一样). 指定了贴图就要打开.\r\n\r\n\r\nSample Specular Color Map. Off = no fetch; the specular colour is Specular Color alone, exactly what the default white map gave. Tick it when you assign a map."
@@ -1599,9 +1760,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Custom_Specular_Ramp_Slice,
 				False=Specular_Color_Ramp_Index,
 				Group="11 - Specular",
-				SortPriority=1,
+				SortPriority=2,
 				ParameterName="Use Custom Specular Ramp",
-				DefaultValue=false
+				DefaultValue=false,
+				Desc="开 = 用自己的 Specular Ramp 贴图(注册进动态图集). \r\nOn = use this material's own specular ramp texture (registered in the dynamic atlas)."
 			);
 		#EndRegion
 
@@ -1614,9 +1776,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Specular_Ramp_Offset_Selected,
 				False=StaticSwitchParameter_50,
 				Group="11 - Specular",
-				SortPriority=60,
+				SortPriority=22,
 				ParameterName="Specular Ramp Offset From Global Mask Map",
-				DefaultValue=true
+				DefaultValue=true,
+				Desc="开 = 高光 Ramp 偏移取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the specular ramp offset comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		#EndRegion
 
@@ -1640,8 +1803,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Rim_Light_Width_Channel_1_Masked,
 				False=1.0,
 				Group="12 - Rim Light",
-				SortPriority=32,
-				ParameterName="Rim Light Width From Vertex Color"
+				SortPriority=0,
+				ParameterName="Rim Light Width From Vertex Color",
+				Desc="开 = 边缘光宽度取顶点色. \r\nOn = the rim width comes from the vertex colour."
 			);
 		float StaticSwitchParameter_53 =
 			UE.Expression(
@@ -1650,8 +1814,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				True=Rim_Light_Width_Channel_Masked,
 				False=StaticSwitchParameter_52,
 				Group="12 - Rim Light",
-				SortPriority=33,
-				ParameterName="Rim Light Width From Global Mask Map"
+				SortPriority=1,
+				ParameterName="Rim Light Width From Global Mask Map",
+				Desc="开 = 边缘光宽度取自打包遮罩图(Global Mask Map, 由对应的 Mask Source 选第几张), 关 = 读它自己的贴图. \r\nOn = the rim width comes from the packed Global Mask Map (the matching Mask Source picks which); off = its own map."
 			);
 		#EndRegion
 
@@ -1668,11 +1833,13 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				OutputIndex=5,
 				ParameterName="SA Map",
-				Group="00 - Global Settings",
+				Group="20 - Face: SDF Shadow",
 				Coordinates=MaterialExpressionTextureCoordinate_0,
 				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
 				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
+				SamplerSource="SSM_Wrap_WorldGroupSettings",
+				SortPriority=1,
+				Desc="SDF 脸阴影 / AO 打包图(R = 左半 SDF, G = AO). 颜色空间: 线性(导入时关闭 sRGB, 压缩用 Default / BC7).\r\nSDF face shadow / AO pack (R = left-half SDF, G = AO). Color space: linear (import with sRGB off, Default or BC7 compression)."
 			);
 		float SA_SDF_Left = SA_Map_3.r;
 		#Region "Distance Field Facial Shadow"
@@ -1690,9 +1857,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float",
 				True=SA_SDF_Left,
 				False=FacialShadowSdfLeft,
-				Group="00 - Global Settings",
-				SortPriority=70,
-				ParameterName="SDF Face Shadow From SA Map"
+				Group="20 - Face: SDF Shadow",
+				SortPriority=0,
+				ParameterName="SDF Face Shadow From SA Map",
+				Desc="开 = SDF 脸阴影取 SA Map 的 R 通道(左半, 右半镜像). \r\nOn = the face SDF comes from the SA Map's red channel (left half, mirrored for the right)."
 			);
 		float2 MaterialExpressionTextureCoordinate_0_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
 		#Region "Texture Sample"
@@ -1703,11 +1871,13 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float4",
 				OutputIndex=5,
 				ParameterName="SA Map",
-				Group="00 - Global Settings",
+				Group="20 - Face: SDF Shadow",
 				Coordinates=Multiply_20,
 				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
 				SamplerType="SAMPLERTYPE_LinearColor",
-				SamplerSource="SSM_Wrap_WorldGroupSettings"
+				SamplerSource="SSM_Wrap_WorldGroupSettings",
+				SortPriority=1,
+				Desc="SDF 脸阴影 / AO 打包图(R = 左半 SDF, G = AO). 颜色空间: 线性(导入时关闭 sRGB, 压缩用 Default / BC7).\r\nSDF face shadow / AO pack (R = left-half SDF, G = AO). Color space: linear (import with sRGB off, Default or BC7 compression)."
 			);
 		#EndRegion
 
@@ -1723,9 +1893,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				OutputType="float3",
 				True=SA_SDF_Right,
 				False=FacialShadowSdfRight,
-				Group="00 - Global Settings",
-				SortPriority=70,
-				ParameterName="SDF Face Shadow From SA Map"
+				Group="20 - Face: SDF Shadow",
+				SortPriority=0,
+				ParameterName="SDF Face Shadow From SA Map",
+				Desc="开 = SDF 脸阴影取 SA Map 的 R 通道(左半, 右半镜像). \r\nOn = the face SDF comes from the SA Map's red channel (left half, mirrored for the right)."
 			);
 		#Region "RayTracing Shadow"
 		float If =

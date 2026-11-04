@@ -15,16 +15,16 @@
 // The mask is read with UV0 in both the vertex and the pixel shader, so it must not depend on
 // anything pixel-only -- which is why it is its own texture and not one of the Global Mask Maps.
 
-/// @name Hair Tip Mask   @group 21 - Translucency|Hair Tip   @sort 51   @sampler LinearColor
+/// @name Hair Tip Mask   @group 03 - Opacity & Translucency|Hair Tip   @sort 1   @sampler LinearColor
 /// @default /MoonToon/Textures/T_Black_Linear
-/// @desc 发梢遮罩(UV0): 大于等于 Hair Tip Threshold 的地方是发梢 —— 不透明 pass 裁掉, 半透明重画补上. 默认全黑 = 没有发梢. Tip mask on UV0: at or above Hair Tip Threshold is tip.
+/// @desc 发梢遮罩(UV0): 大于等于 Hair Tip Threshold 的地方是发梢 —— 不透明 pass 裁掉, 半透明重画补上. 默认全黑 = 没有发梢. Tip mask on UV0: at or above Hair Tip Threshold is tip. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 uniform Texture2D Hair_Tip_Mask;
 
-/// @name Hair Tip Mask Channel   @group 21 - Translucency|Hair Tip   @sort 52   @slider 0 3
+/// @name Hair Tip Mask Channel   @group 03 - Opacity & Translucency|Hair Tip   @sort 2   @slider 0 3
 /// @desc 遮罩读哪个通道: 0 R, 1 G, 2 B, 3 A. Channel of Hair Tip Mask: 0 R, 1 G, 2 B, 3 A.
 uniform float Hair_Tip_Mask_Channel = 0.0;
 
-/// @name Hair Tip Threshold   @group 21 - Translucency|Hair Tip   @sort 53   @slider 0.01 1
+/// @name Hair Tip Threshold   @group 03 - Opacity & Translucency|Hair Tip   @sort 3   @slider 0.01 1
 /// @desc 遮罩值达到多少算发梢(终末地: 0.5). Mask value at which a texel counts as tip.
 uniform float Hair_Tip_Threshold = 0.5;
 

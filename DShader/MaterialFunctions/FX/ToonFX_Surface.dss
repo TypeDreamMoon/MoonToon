@@ -11,32 +11,37 @@
 
 // --------------------------------------------------------------------------------------- dissolve
 
-/// @name FX Dissolve Noise   @group 55 - FX: Dissolve   @sort 0   @sampler LinearColor
+/// @name FX Dissolve Noise   @group 56 - FX: Dissolve   @sort 0   @sampler LinearColor
+/// @desc 溶解噪声(R). Dissolve noise in the red channel. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 /// @default /MoonToon/Textures/FX/T_ToonFX_Noise
 uniform Texture2D FX_Dissolve_Noise;
 
-/// @name FX Dissolve Progress   @group 55 - FX: Dissolve   @sort 1   @slider 0 1
+/// @name FX Dissolve Progress   @group 56 - FX: Dissolve   @sort 1   @slider 0 1
 /// @desc 溶解进度: 0 = 完整, 1 = 全部溶掉. 溶掉的部分要实例 Blend Mode 覆盖为 Masked 才切得掉. 0 = intact, 1 = gone. The dissolved part is only cut when the instance's Blend Mode is overridden to Masked.
 uniform float FX_Dissolve_Progress = 0.0;
 
-/// @name FX Dissolve Noise Tiling   @group 55 - FX: Dissolve   @sort 2   @slider 0.1 16
+/// @name FX Dissolve Noise Tiling   @group 56 - FX: Dissolve   @sort 2   @slider 0.1 16
+/// @desc 溶解噪声平铺. Tiling of the dissolve noise.
 uniform float FX_Dissolve_Noise_Tiling = 2.0;
 
-/// @name FX Dissolve Height Weight   @group 55 - FX: Dissolve   @sort 3   @slider 0 1
-/// @desc 0 = 纯噪声溶解, 1 = 从下往上按高度溶解(噪声只扰动边缘). 0 noise only, 1 a bottom-up sweep.
+/// @name FX Dissolve Height Weight   @group 56 - FX: Dissolve   @sort 3   @slider 0 1
+/// @desc 0 = 纯噪声溶解, 1 = 从下往上按高度溶解(噪声只扰动边缘). 0 is noise only, 1 a bottom-up sweep with noise on the edge.
 uniform float FX_Dissolve_Height_Weight = 0.0;
 
-/// @name FX Dissolve Height   @group 55 - FX: Dissolve   @sort 4   @slider 10 400
+/// @name FX Dissolve Height   @group 56 - FX: Dissolve   @sort 4   @slider 10 400
 /// @desc 高度溶解覆盖的高度, cm(从物体原点向上). Height the sweep covers above the object origin, cm.
 uniform float FX_Dissolve_Height = 180.0;
 
-/// @name FX Dissolve Edge Width   @group 55 - FX: Dissolve   @sort 5   @slider 0 0.5
+/// @name FX Dissolve Edge Width   @group 56 - FX: Dissolve   @sort 5   @slider 0 0.5
+/// @desc 溶解边缘宽度. Width of the dissolve edge.
 uniform float FX_Dissolve_Edge_Width = 0.05;
 
-/// @name FX Dissolve Edge Color   @group 55 - FX: Dissolve   @sort 6
+/// @name FX Dissolve Edge Color   @group 56 - FX: Dissolve   @sort 6
+/// @desc 溶解边缘颜色. Colour of the dissolve edge.
 uniform float4 FX_Dissolve_Edge_Color = float4(0.4, 0.8, 1.0, 1.0);
 
-/// @name FX Dissolve Edge Intensity   @group 55 - FX: Dissolve   @sort 7   @slider 0 50
+/// @name FX Dissolve Edge Intensity   @group 56 - FX: Dissolve   @sort 7   @slider 0 50
+/// @desc 溶解边缘亮度. Brightness of the dissolve edge.
 uniform float FX_Dissolve_Edge_Intensity = 6.0;
 
 /// @library MoonToon|FX
@@ -56,35 +61,37 @@ export float3 MF_ToonFX_Dissolve(float2 UV, float Mask = 1.0, out float Coverage
 
 // -------------------------------------------------------------------------------------------- wet
 
-/// @name FX Wetness   @group 56 - FX: Wet   @sort 0   @slider 0 1
-/// @desc 湿润程度. 0 = 干. Wetness, 0 = dry.
+/// @name FX Wetness   @group 57 - FX: Wet   @sort 0   @slider 0 1
+/// @desc 湿润程度, 0 = 干. How wet the surface is; 0 is dry.
 uniform float FX_Wetness = 0.0;
 
-/// @name FX Wet Darken   @group 56 - FX: Wet   @sort 1   @slider 0 1
+/// @name FX Wet Darken   @group 57 - FX: Wet   @sort 1   @slider 0 1
 /// @desc 全湿时底色变暗多少. How much a fully wet surface darkens.
 uniform float FX_Wet_Darken = 0.35;
 
-/// @name FX Wet Roughness Scale   @group 56 - FX: Wet   @sort 2   @slider 0 1
+/// @name FX Wet Roughness Scale   @group 57 - FX: Wet   @sort 2   @slider 0 1
 /// @desc 全湿时粗糙度乘多少(越小越亮滑). Roughness multiplier when fully wet.
 uniform float FX_Wet_Roughness_Scale = 0.35;
 
-/// @name FX Wet Specular Boost   @group 56 - FX: Wet   @sort 3   @slider 1 4
+/// @name FX Wet Specular Boost   @group 57 - FX: Wet   @sort 3   @slider 1 4
+/// @desc 湿润时高光增强倍数. Highlight boost when wet.
 uniform float FX_Wet_Specular_Boost = 1.6;
 
-/// @name FX Wet Streaks   @group 56 - FX: Wet   @sort 4   @sampler LinearColor
+/// @name FX Wet Streaks   @group 57 - FX: Wet   @sort 4   @sampler LinearColor
 /// @default /MoonToon/Textures/FX/T_ToonFX_RainStreaks
-/// @desc 雨痕(R 流痕, G 水珠头). Rain streaks (R) and droplet heads (G).
+/// @desc 雨痕(R 流痕, G 水珠头). Rain streaks (R) and droplet heads (G). 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 uniform Texture2D FX_Wet_Streaks;
 
-/// @name FX Wet Streak Tiling   @group 56 - FX: Wet   @sort 5   @slider 1 200
+/// @name FX Wet Streak Tiling   @group 57 - FX: Wet   @sort 5   @slider 1 200
 /// @desc 世界空间雨痕尺度, cm/每张. World size of one streak tile, cm.
 uniform float FX_Wet_Streak_Tiling = 40.0;
 
-/// @name FX Wet Streak Speed   @group 56 - FX: Wet   @sort 6   @slider 0 2
+/// @name FX Wet Streak Speed   @group 57 - FX: Wet   @sort 6   @slider 0 2
 /// @desc 雨痕下流速度(张/秒). Streak flow speed, tiles per second.
 uniform float FX_Wet_Streak_Speed = 0.25;
 
-/// @name FX Wet Streak Strength   @group 56 - FX: Wet   @sort 7   @slider 0 1
+/// @name FX Wet Streak Strength   @group 57 - FX: Wet   @sort 7   @slider 0 1
+/// @desc 雨痕强度. Strength of the rain streaks.
 uniform float FX_Wet_Streak_Strength = 0.6;
 
 /// @library MoonToon|FX
@@ -113,31 +120,35 @@ export float3 MF_ToonFX_Wet(float3 BaseColor, float Roughness, float Specular, f
 
 // --------------------------------------------------------------------------------------- hologram
 
-/// @name FX Hologram Color   @group 57 - FX: Hologram   @sort 0
+/// @name FX Hologram Color   @group 58 - FX: Hologram   @sort 0
+/// @desc 全息颜色. Colour of the hologram.
 uniform float4 FX_Hologram_Color = float4(0.3, 0.8, 1.0, 1.0);
 
-/// @name FX Hologram Intensity   @group 57 - FX: Hologram   @sort 1   @slider 0 20
+/// @name FX Hologram Intensity   @group 58 - FX: Hologram   @sort 1   @slider 0 20
+/// @desc 全息亮度. Brightness of the hologram.
 uniform float FX_Hologram_Intensity = 2.0;
 
-/// @name FX Hologram Line Density   @group 57 - FX: Hologram   @sort 2   @slider 0.1 20
+/// @name FX Hologram Line Density   @group 58 - FX: Hologram   @sort 2   @slider 0.1 20
 /// @desc 扫描线密度, 条/厘米(世界 Z). Scan lines per cm along world Z.
 uniform float FX_Hologram_Line_Density = 1.5;
 
-/// @name FX Hologram Line Speed   @group 57 - FX: Hologram   @sort 3   @slider -10 10
+/// @name FX Hologram Line Speed   @group 58 - FX: Hologram   @sort 3   @slider -10 10
+/// @desc 扫描线速度, 负数反向. Scan line speed; negative runs backwards.
 uniform float FX_Hologram_Line_Speed = 2.0;
 
-/// @name FX Hologram Rim Power   @group 57 - FX: Hologram   @sort 4   @slider 0.5 8
+/// @name FX Hologram Rim Power   @group 58 - FX: Hologram   @sort 4   @slider 0.5 8
+/// @desc 全息边缘光的幂. Power of the hologram rim glow.
 uniform float FX_Hologram_Rim_Power = 2.5;
 
-/// @name FX Hologram Flicker   @group 57 - FX: Hologram   @sort 5   @slider 0 1
+/// @name FX Hologram Flicker   @group 58 - FX: Hologram   @sort 5   @slider 0 1
 /// @desc 整体闪烁幅度. Overall flicker amount.
 uniform float FX_Hologram_Flicker = 0.15;
 
-/// @name FX Hologram Base Darken   @group 57 - FX: Hologram   @sort 6   @slider 0 1
+/// @name FX Hologram Base Darken   @group 58 - FX: Hologram   @sort 6   @slider 0 1
 /// @desc 底色压暗多少(只剩全息的光). How much the base colour is pressed down.
 uniform float FX_Hologram_Base_Darken = 0.7;
 
-/// @name FX Hologram Coverage   @group 57 - FX: Hologram   @sort 7   @slider 0 1
+/// @name FX Hologram Coverage   @group 58 - FX: Hologram   @sort 7   @slider 0 1
 /// @desc 扫描线之间的覆盖率(配合薄纱镂空 / 半透明; 不透明的实例要把 Blend Mode 覆盖为 Masked 才有效). Coverage between the lines (for sheer dither / translucency; an opaque instance needs its Blend Mode overridden to Masked).
 uniform float FX_Hologram_Coverage = 0.6;
 
@@ -161,23 +172,24 @@ export float3 MF_ToonFX_Hologram(float3 BaseColor, float3 NormalWS, float Mask =
 
 // ---------------------------------------------------------------------------------------- flicker
 
-/// @name FX Flicker Speed   @group 58 - FX: Flicker   @sort 0   @slider 0 60
+/// @name FX Flicker Speed   @group 59 - FX: Flicker   @sort 0   @slider 0 60
 /// @desc 闪烁频率(次/秒). Flicker rate per second.
 uniform float FX_Flicker_Speed = 10.0;
 
-/// @name FX Flicker Depth   @group 58 - FX: Flicker   @sort 1   @slider 0 1
+/// @name FX Flicker Depth   @group 59 - FX: Flicker   @sort 1   @slider 0 1
 /// @desc 自发光最暗时剩多少的反面: 1 = 会完全灭. How deep the emissive dips (1 = goes fully dark).
 uniform float FX_Flicker_Depth = 0.5;
 
-/// @name FX Sparkle Cells   @group 58 - FX: Flicker   @sort 2   @slider 1 256
+/// @name FX Sparkle Cells   @group 59 - FX: Flicker   @sort 2   @slider 1 256
 /// @desc 随机亮点的 UV 网格密度(鸣潮顶点闪烁). Random sparkle cells across UV.
 uniform float FX_Sparkle_Cells = 64.0;
 
-/// @name FX Sparkle Power   @group 58 - FX: Flicker   @sort 3   @slider 1 64
+/// @name FX Sparkle Power   @group 59 - FX: Flicker   @sort 3   @slider 1 64
 /// @desc 亮点稀疏度(鸣潮 16). Sparkle sparseness exponent.
 uniform float FX_Sparkle_Power = 16.0;
 
-/// @name FX Sparkle Color   @group 58 - FX: Flicker   @sort 4
+/// @name FX Sparkle Color   @group 59 - FX: Flicker   @sort 4
+/// @desc 闪烁点颜色. Colour of the sparkle cells.
 uniform float4 FX_Sparkle_Color = float4(0.0, 0.0, 0.0, 1.0);
 
 /// @library MoonToon|FX

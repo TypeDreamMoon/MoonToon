@@ -63,67 +63,83 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonOilFilm", Root="Plugin.Moon
 			ParameterName="Oil Film Ramp";
 			Group="45 - Oil Film";
 			SortPriority=1;
-			Description="油膜的高光 ramp: 横轴 0 = 高光斑边缘, 1 = 中心(和 Specular Color Ramp 同一个轴), 左端要黑(斑外没有高光). 默认是终末地 T4831 的取色: 外圈红->黄, 内圈粉->青. 自动注册进动态 Specular 图集, 不用手填 Index.\r\nThe film's specular ramp: U 0 = the highlight's edge, 1 = its centre (the Specular Color Ramp axis); keep the left end black. Default: Endfield T4831's colours, warm outer ring, cool inner ring. Registered into the dynamic specular atlas automatically.";
+			Description="油膜的高光 ramp: 横轴 0 = 高光斑边缘, 1 = 中心(和 Specular Color Ramp 同一个轴), 左端要黑(斑外没有高光). 默认是终末地 T4831 的取色: 外圈红->黄, 内圈粉->青. 自动注册进动态 Specular 图集, 不用手填 Index.\r\nThe film's specular ramp: U 0 = the highlight's edge, 1 = its centre (the Specular Color Ramp axis); keep the left end black. Default: Endfield T4831's colours, warm outer ring, cool inner ring. Registered into the dynamic specular atlas automatically. 颜色空间: 按贴图自身的 sRGB 设置解码后进动态图集(颜色 ramp, 通常 sRGB). Colour space: decoded per the texture's own sRGB setting before it enters the ramp atlas (a colour ramp, usually sRGB).";
 		];
 		ScalarParameter Oil_Film_Ramp_Row = -1.0 [
 			ParameterName="Oil Film Ramp Row";
 			Group="45 - Oil Film";
 			SortPriority=2;
 			Description="Oil Film Ramp 是多行图集时选第几行, 负数 = 垂直中心.\r\nRow of a multi-row Oil Film Ramp; negative = the vertical centre.";
+			SliderMin=-1;
+			SliderMax=63;
 		];
 		ScalarParameter Oil_Film_View_Shift = 0.6 [
 			ParameterName="Oil Film View Shift";
 			Group="45 - Oil Film";
 			SortPriority=3;
 			Description="色圈随视角滑动的幅度: 正视时 ramp 往一边偏, 掠射时往另一边偏, 镜头一动色圈就流动. 1 = 用满后处理体积的 Specular Ramp UV Offset Max Range(默认 U 的 0.25). 0 = 不随视角.\r\nHow far the rings slide with the view angle: face-on shifts the ramp one way, grazing the other, so the rings flow as the camera moves. 1 = the volume's full Specular Ramp UV Offset Max Range (0.25 of U by default). 0 = no view dependence.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 		ScalarParameter Oil_Film_View_Power = 1.0 [
 			ParameterName="Oil Film View Power";
 			Group="45 - Oil Film";
 			SortPriority=4;
 			Description="视角项的幂: (1 - N.V)^Power. >1 让变化集中在边缘.\r\nPower on the view term (1 - N.V)^Power; above 1 the change gathers at the silhouette.";
+			SliderMin=0.25;
+			SliderMax=8;
 		];
 		ScalarParameter Oil_Film_Hue_Shift = 0.0 [
 			ParameterName="Oil Film Hue Shift";
 			Group="45 - Oil Film";
 			SortPriority=5;
 			Description="整体平移色圈, -1..1, 单位同 View Shift.\r\nShifts the rings as a whole, -1..1, in View Shift's units.";
+			SliderMin=-1;
+			SliderMax=1;
 		];
 		StaticSwitchParameter Use_Oil_Film_Thin_Film = false [
 			ParameterName="Use Oil Film Thin Film";
 			Group="45 - Oil Film|Thin Film";
-			SortPriority=10;
+			SortPriority=0;
 			Description="再叠一层真实薄膜干涉(UE 的 F_ThinFilm): 按厚度贴图算出颜色, 乘到 toon 高光颜色上. 只改色相不改亮度.\r\nAdd real thin-film interference (UE's F_ThinFilm): a colour from the thickness map, multiplied into the toon specular colour. Hue only, not level.";
 		];
 		TextureObjectParameter Oil_Film_Thickness_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Oil Film Thickness Map";
 			Group="45 - Oil Film|Thin Film";
-			SortPriority=11;
+			SortPriority=1;
 			Description="膜厚贴图(R 通道, 关 sRGB), 0..1 映射到 Thickness Min..Max.\r\nFilm thickness (R, sRGB off), 0..1 -> Thickness Min..Max.";
 		];
 		ScalarParameter Oil_Film_Thickness_Min = 0.04 [
 			ParameterName="Oil Film Thickness Min";
 			Group="45 - Oil Film|Thin Film";
-			SortPriority=12;
+			SortPriority=2;
 			Description="最薄处的膜厚, 用 F_ThinFilm 的单位(乘 10 才是光程, 微米). 0.03~0.15 是彩色区间, 再厚颜色会被冲淡成白.\r\nThinnest film in F_ThinFilm's unit (x10 = optical path, micrometres). 0.03-0.15 is the colourful range; thicker washes out to white.";
+			SliderMin=0;
+			SliderMax=0.3;
 		];
 		ScalarParameter Oil_Film_Thickness_Max = 0.12 [
 			ParameterName="Oil Film Thickness Max";
 			Group="45 - Oil Film|Thin Film";
-			SortPriority=13;
+			SortPriority=3;
 			Description="最厚处的膜厚, 单位同上.\r\nThickest film, same unit.";
+			SliderMin=0;
+			SliderMax=0.3;
 		];
 		ScalarParameter Oil_Film_IOR = 1.45 [
 			ParameterName="Oil Film IOR";
 			Group="45 - Oil Film|Thin Film";
-			SortPriority=14;
+			SortPriority=4;
 			Description="膜的折射率(油约 1.45).\r\nThe film's index of refraction (oil is about 1.45).";
+			SliderMin=1;
+			SliderMax=2.5;
 		];
 		ScalarParameter Oil_Film_Thin_Film_Strength = 1.0 [
 			ParameterName="Oil Film Thin Film Strength";
 			Group="45 - Oil Film|Thin Film";
-			SortPriority=15;
+			SortPriority=5;
 			Description="薄膜色调的强度, 0 = 白(不改色).\r\nStrength of the thin-film tint; 0 = white.";
+			SliderMin=0;
+			SliderMax=1;
 		];
 	}
 

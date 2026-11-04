@@ -54,7 +54,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_PBRSpecular", Roo
 	}
 
 	Properties = {
-		ScalarParameter In_PBRSpecular_BloomWeight = 0.0 [Group="32 - Feature: PBR Specular"; SortPriority=0; Description="该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理)."];
+		ScalarParameter In_PBRSpecular_BloomWeight = 0.0 [Group="32 - Feature: PBR Specular"; SortPriority=0; SliderMin=0; SliderMax=1; Description="该材质的 Bloom 权重, 0 = 未授权(按 1.0 处理). 取值 0~1, 默认 0.0.\r\nThis material's bloom weight; 0 = unset (treated as 1.0). Range 0 to 1, default 0.0."];
 	}
 
 	Graph = {
@@ -64,7 +64,7 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_PBRSpecular", Roo
 		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
 
 		float Slot_BloomWeight_Authored = In_PBRSpecular_BloomWeight;
-		float Slot_BloomWeight = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_BloomWeight_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_BloomWeight_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_BloomWeight = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_BloomWeight_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_BloomWeight_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_PBRSpecular(
 			Slot_BloomWeight,

@@ -58,7 +58,7 @@ extern float3 MF_MoonMainLightDirection();
 // ---------------------------------------------------------------------------------------------------
 // Mode
 
-/// @group 33 - Feature: Angel Ring   @sort 0   @static
+/// @group 36 - Feature: Angel Ring   @sort 0   @static
 /// @desc 关 = 模式 A(鸣潮式: 沿发丝坐标 + 视角滑动 + LUT); 开 = 模式 B(终末地式: 相机方位 + 关键光仰角的假光 + Kajiya + 2D LUT). Off = mode A, on = mode B.
 /// @name Angel Ring Mode B
 uniform bool Angel_Ring_Mode_B = false;
@@ -66,60 +66,60 @@ uniform bool Angel_Ring_Mode_B = false;
 // ---------------------------------------------------------------------------------------------------
 // Common look
 
-/// @group 33 - Feature: Angel Ring   @sort 10   @desc 亮环颜色(线性). Ring colour (linear).
+/// @group 36 - Feature: Angel Ring   @sort 1   @desc 亮环颜色(线性). Ring colour (linear).
 /// @name Angel Ring Color
 uniform float4 Angel_Ring_Color = float4(1.0, 0.97, 0.92, 1.0);
 
-/// @group 33 - Feature: Angel Ring   @sort 11   @slider 0 8
-/// @desc 亮环强度, 0 = 关. 引擎侧解码范围 0-8. Ring intensity; 0 = off. Range 0-8.
+/// @group 36 - Feature: Angel Ring   @sort 2   @slider 0 8
+/// @desc 亮环强度, 0 = 关. 引擎侧解码范围 0-8. Ring intensity; 0 is off. The engine decodes 0 to 8.
 /// @name Angel Ring Intensity
 uniform float Angel_Ring_Intensity = 1.0;
 
-/// @group 33 - Feature: Angel Ring   @sort 12   @slider 0 1
+/// @group 36 - Feature: Angel Ring   @sort 3   @slider 0 1
 /// @desc 阴影里保留多少: 强度 = lerp(下限, 1, 受光). 少前2 0.1, 终末地 0.35. How much survives in shadow.
 /// @name Angel Ring Shadow Floor
 uniform float Angel_Ring_Shadow_Floor = 0.35;
 
-/// @group 33 - Feature: Angel Ring   @sort 13   @slider 0 1
+/// @group 36 - Feature: Angel Ring   @sort 4   @slider 0 1
 /// @desc 0 = 乘关键光颜色, 1 = 固定颜色(不随光变色), 中间值混合. 0 = times the key light colour, 1 = fixed colour.
 /// @name Angel Ring Color Mode
 uniform float Angel_Ring_Color_Mode = 0.0;
 
-/// @group 33 - Feature: Angel Ring   @sort 20   @slider 0 1
+/// @group 36 - Feature: Angel Ring   @sort 5   @slider 0 1
 /// @desc 暗带强度: 亮环旁边压暗漫反射(乘法). Dark band strength (multiplies the diffuse down next to the ring).
 /// @name Angel Ring Dark Band Strength
 uniform float Angel_Ring_Dark_Band_Strength = 0.0;
 
-/// @group 33 - Feature: Angel Ring   @sort 30   @slider 0 0.5
+/// @group 36 - Feature: Angel Ring   @sort 6   @slider 0 0.5
 /// @desc 逐缕抖动: 用 flow 图 R(或噪声图 R)让每一缕的环位置错开. Per-strand jitter of the ring position.
 /// @name Angel Ring Strand Jitter
 uniform float Angel_Ring_Strand_Jitter = 0.0;
 
-/// @group 33 - Feature: Angel Ring   @sort 40   @slider 0 3.1416
+/// @group 36 - Feature: Angel Ring   @sort 7   @slider 0 3.1416
 /// @desc 色相漂移: 按 1-N.V 旋转色相的弧度. Hue drift by 1 - N.V, radians.
 /// @name Angel Ring Hue Drift
 uniform float Angel_Ring_Hue_Drift = 0.0;
 
-/// @group 33 - Feature: Angel Ring   @sort 41   @slider 0 3.1416
+/// @group 36 - Feature: Angel Ring   @sort 8   @slider 0 3.1416
 /// @desc 色相漂移: 按 UV.x 旋转色相的弧度. Hue drift along UV.x, radians.
 /// @name Angel Ring Hue Drift UV
 uniform float Angel_Ring_Hue_Drift_UV = 0.0;
 
-/// @group 33 - Feature: Angel Ring   @sort 50   @desc 细色线颜色(线性). Thin colour line colour (linear).
+/// @group 36 - Feature: Angel Ring   @sort 9   @desc 细色线颜色(线性). Thin colour line colour (linear).
 /// @name Angel Ring Line Color
 uniform float4 Angel_Ring_Line_Color = float4(1.0, 0.55, 0.65, 1.0);
 
-/// @group 33 - Feature: Angel Ring   @sort 51   @slider 0 4
+/// @group 36 - Feature: Angel Ring   @sort 10   @slider 0 4
 /// @desc 细色线强度, 0 = 关. Thin colour line intensity; 0 = off.
 /// @name Angel Ring Line Intensity
 uniform float Angel_Ring_Line_Intensity = 0.0;
 
-/// @group 33 - Feature: Angel Ring   @sort 60   @slider 0 1
+/// @group 36 - Feature: Angel Ring   @sort 11   @slider 0 1
 /// @desc 朝向淡出起点(N.V): 低于它环完全消失. Facing fade: N.V where the ring is gone.
 /// @name Angel Ring Facing Fade Start
 uniform float Angel_Ring_Facing_Fade_Start = 0.05;
 
-/// @group 33 - Feature: Angel Ring   @sort 61   @slider 0 1
+/// @group 36 - Feature: Angel Ring   @sort 12   @slider 0 1
 /// @desc 朝向淡出终点(N.V): 高于它环完整. Facing fade: N.V where the ring is whole.
 /// @name Angel Ring Facing Fade End
 uniform float Angel_Ring_Facing_Fade_End = 0.35;
@@ -127,50 +127,50 @@ uniform float Angel_Ring_Facing_Fade_End = 0.35;
 // ---------------------------------------------------------------------------------------------------
 // Mode A
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 100   @static
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 0   @static
 /// @desc 沿发丝坐标取自 flow 图 G 通道(否则取 UV1.y). Strand coordinate from the flow map's G (else UV1.y).
 /// @name Angel Ring Strand From Flow Map
 uniform bool Angel_Ring_Strand_From_Flow_Map = false;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 101   @static
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 1   @static
 /// @desc 旧遮罩模式: 直接采样画好的遮罩, 只加视角滑动(给 HairHighlightMask 迁移用). Legacy painted mask + view slide.
 /// @name Angel Ring Legacy Mask
 uniform bool Angel_Ring_Legacy_Mask = false;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 102   @sampler LinearColor
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 2   @sampler LinearColor
 /// @default /MoonToon/Textures/T_Black_Linear
-/// @desc Flow 图: G = 沿发丝坐标, R = 逐缕抖动. Flow map: G along the strand, R per-strand jitter.
+/// @desc Flow 图: G = 沿发丝坐标, R = 逐缕抖动. Flow map: G along the strand, R per-strand jitter. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 /// @name Angel Ring Flow Map
 uniform Texture2D Angel_Ring_Flow_Map;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 103   @sampler LinearColor
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 3   @sampler LinearColor
 /// @default /MoonToon/Textures/AngelRing/T_AngelRing_LUT_A
-/// @desc 1D LUT(256x4): 行 0 亮环, 行 1 暗带, 行 2 细色线. Rows: 0 ring, 1 dark band, 2 thin line.
+/// @desc 1D LUT(256x4): 行 0 亮环, 行 1 暗带, 行 2 细色线. Rows: 0 the ring, 1 the dark band, 2 the thin line. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 /// @name Angel Ring LUT A
 uniform Texture2D Angel_Ring_LUT_A;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 104   @sampler Color
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 4   @sampler Color
 /// @default /Engine/EngineResources/Black
-/// @desc 旧遮罩模式的遮罩贴图(R). The legacy painted mask (R).
+/// @desc 旧遮罩模式的遮罩贴图(R). The legacy painted mask (R). 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 /// @name Angel Ring Legacy Mask Map
 uniform Texture2D Angel_Ring_Legacy_Mask_Map;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 110   @slider 0 1
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 5   @slider 0 1
 /// @desc 环中心在发丝坐标上的位置. Ring centre on the strand coordinate.
 /// @name Angel Ring Center
 uniform float Angel_Ring_Center = 0.35;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 111   @slider 0.01 1
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 6   @slider 0.01 1
 /// @desc 环的宽度(LUT 覆盖的发丝坐标跨度). Band width (span of the strand coordinate the LUT covers).
 /// @name Angel Ring Width
 uniform float Angel_Ring_Width = 0.25;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 112   @slider -0.5 0.5
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 7   @slider -0.5 0.5
 /// @desc 视角滑动 k1 · dot(V, 头部上方向)(相机俯仰). View slide k1 * dot(V, head up).
 /// @name Angel Ring View Slide Up
 uniform float Angel_Ring_View_Slide_Up = 0.12;
 
-/// @group 33 - Feature: Angel Ring|Mode A   @sort 113   @slider -0.5 0.5
+/// @group 36 - Feature: Angel Ring|Mode A   @sort 8   @slider -0.5 0.5
 /// @desc 视角滑动 k2 · (1 - N.V)(边缘处). View slide k2 * (1 - N.V).
 /// @name Angel Ring View Slide Edge
 uniform float Angel_Ring_View_Slide_Edge = 0.05;
@@ -178,45 +178,45 @@ uniform float Angel_Ring_View_Slide_Edge = 0.05;
 // ---------------------------------------------------------------------------------------------------
 // Mode B
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 200   @sampler LinearColor
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 0   @sampler LinearColor
 /// @default /MoonToon/Textures/AngelRing/T_AngelRing_LUT_B
-/// @desc 2D LUT: x = 主瓣 x 遮罩, y = 朝向 x 光在哪一侧. x = lobe x mask, y = facing x light side.
+/// @desc 2D LUT: x = 主瓣 x 遮罩, y = 朝向 x 光在哪一侧. x = lobe x mask, y = facing x light side. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 /// @name Angel Ring LUT B
 uniform Texture2D Angel_Ring_LUT_B;
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 201   @slider 1 400
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 1   @slider 1 400
 /// @desc 主瓣 Kajiya 指数(终末地 200). Main lobe exponent.
 /// @name Angel Ring Lobe Exponent
 uniform float Angel_Ring_Lobe_Exponent = 200.0;
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 202   @slider 1 400
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 2   @slider 1 400
 /// @desc 细色线瓣指数(终末地 204). Thin line lobe exponent.
 /// @name Angel Ring Line Exponent
 uniform float Angel_Ring_Line_Exponent = 204.0;
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 203   @slider -0.5 0.5
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 3   @slider -0.5 0.5
 /// @desc 细色线沿高光法线的偏移(终末地 0.1). Thin line shift along the highlight normal.
 /// @name Angel Ring Line Shift
 uniform float Angel_Ring_Line_Shift = 0.1;
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 204   @slider 1 100
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 4   @slider 1 100
 /// @desc 暗化瓣指数(终末地 29). Dark lobe exponent.
 /// @name Angel Ring Dark Exponent
 uniform float Angel_Ring_Dark_Exponent = 29.0;
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 205   @slider -0.5 0.5
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 5   @slider -0.5 0.5
 /// @desc 暗化瓣偏移. Dark lobe shift.
 /// @name Angel Ring Dark Shift
 uniform float Angel_Ring_Dark_Shift = 0.1;
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 206   @slider 0 1
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 6   @slider 0 1
 /// @desc 假光高度跟随关键光仰角的程度(0 = 固定在 0.5). How much the fake light's height follows the key light's elevation.
 /// @name Angel Ring Fake Light Elevation
 uniform float Angel_Ring_Fake_Light_Elevation = 1.0;
 
-/// @group 33 - Feature: Angel Ring|Mode B   @sort 207   @sampler LinearColor
+/// @group 36 - Feature: Angel Ring|Mode B   @sort 7   @sampler LinearColor
 /// @default /MoonToon/Textures/T_White_Linear
-/// @desc 发丝噪声(R), 调制暗化瓣与逐缕抖动. Strand noise (R) for the dark lobe and jitter.
+/// @desc 发丝噪声(R), 调制暗化瓣与逐缕抖动. Strand noise (R) for the dark lobe and jitter. 颜色空间: sRGB(颜色贴图). Colour space: sRGB, a colour texture.
 /// @name Angel Ring Strand Noise
 uniform Texture2D Angel_Ring_Strand_Noise;
 

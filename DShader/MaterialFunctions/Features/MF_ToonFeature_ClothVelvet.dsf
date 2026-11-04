@@ -78,15 +78,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ClothVelvet", Roo
 	}
 
 	Properties = {
-		ScalarParameter In_ClothVelvet_DiffuseWrapStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=0; Description="布料漫反射的 wrap 强度."];
-		ScalarParameter In_ClothVelvet_SheenPower = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=1; Description="绒光的幂次. 越大, 绒光越集中在轮廓边缘."];
-		ScalarParameter In_ClothVelvet_SheenShadowStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=2; Description="绒光受阴影影响的程度."];
-		ScalarParameter In_ClothVelvet_RoughnessScale = 1.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=3; Description="高光粗糙度倍数."];
-		ScalarParameter In_ClothVelvet_SheenIntensity = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=4; Description="绒光强度. 0 = 没有绒感."];
-		ScalarParameter In_ClothVelvet_RetroDiffuseStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=5; Description="逆反射强度 —— 光从相机方向来时的额外提亮, 天鹅绒的典型特征."];
-		ScalarParameter In_ClothVelvet_GrazingDarkenStrength = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=6; Description="掠射角变暗强度."];
-		VectorParameter In_ClothVelvet_SheenTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="40 - Feature: Cloth Velvet"; SortPriority=7; Description="绒光颜色."];
-		ScalarParameter In_ClothVelvet_RimBias = 0.0 [Group="40 - Feature: Cloth Velvet"; SortPriority=8; Description="绒光在背光面的保底值. 0 = 背光面没有绒光."];
+		ScalarParameter In_ClothVelvet_DiffuseWrapStrength = 0.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=0; SliderMin=0; SliderMax=1; Description="布料漫反射的 wrap 强度. 取值 0~1, 默认 0.0.\r\nWrap of the cloth's diffuse. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ClothVelvet_SheenPower = 0.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=1; SliderMin=0; SliderMax=15.9; Description="绒光的幂次. 越大, 绒光越集中在轮廓边缘. 取值 0~15.9, 默认 0.0.\r\nSheen power. Larger keeps the sheen closer to the silhouette. Range 0 to 15.9, default 0.0."];
+		ScalarParameter In_ClothVelvet_SheenShadowStrength = 0.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=2; SliderMin=0; SliderMax=1; Description="绒光受阴影影响的程度. 取值 0~1, 默认 0.0.\r\nHow much shadow dims the sheen. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ClothVelvet_RoughnessScale = 1.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=3; SliderMin=0; SliderMax=1; Description="高光粗糙度倍数. 取值 0~1, 默认 1.0.\r\nHighlight roughness multiplier. Range 0 to 1, default 1.0."];
+		ScalarParameter In_ClothVelvet_SheenIntensity = 0.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=4; SliderMin=0; SliderMax=1; Description="绒光强度. 0 = 没有绒感. 取值 0~1, 默认 0.0.\r\nSheen strength. 0 = no velvet look. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ClothVelvet_RetroDiffuseStrength = 0.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=5; SliderMin=0; SliderMax=1; Description="逆反射强度 —— 光从相机方向来时的额外提亮, 天鹅绒的典型特征. 取值 0~1, 默认 0.0.\r\nRetro-reflection: extra brightening when the light comes from the camera, typical of velvet. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ClothVelvet_GrazingDarkenStrength = 0.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=6; SliderMin=0; SliderMax=1; Description="掠射角变暗强度. 取值 0~1, 默认 0.0.\r\nGrazing-angle darkening. Range 0 to 1, default 0.0."];
+		VectorParameter In_ClothVelvet_SheenTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="39 - Feature: Cloth Velvet"; SortPriority=7; Description="绒光颜色.\r\nColour of the velvet sheen."];
+		ScalarParameter In_ClothVelvet_RimBias = 0.0 [Group="39 - Feature: Cloth Velvet"; SortPriority=8; SliderMin=0; SliderMax=1; Description="绒光在背光面的保底值. 0 = 背光面没有绒光. 取值 0~1, 默认 0.0.\r\nSheen floor on the side away from the light. 0 = no sheen there. Range 0 to 1, default 0.0."];
 	}
 
 	Graph = {
@@ -100,23 +100,23 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ClothVelvet", Roo
 		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
 
 		float Slot_WrapStrength_Authored = In_ClothVelvet_DiffuseWrapStrength;
-		float Slot_WrapStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_WrapStrength_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_WrapStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_WrapStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_WrapStrength_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_WrapStrength_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SheenPower_Authored = In_ClothVelvet_SheenPower;
-		float Slot_SheenPower = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenPower_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_SheenPower_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SheenPower = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenPower_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_SheenPower_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SheenShadowStrength_Authored = In_ClothVelvet_SheenShadowStrength;
-		float Slot_SheenShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenShadowStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_SheenShadowStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SheenShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenShadowStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_SheenShadowStrength_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_RoughnessScale_Authored = In_ClothVelvet_RoughnessScale;
-		float Slot_RoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_RoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_RoughnessScale_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SheenIntensity_Authored = In_ClothVelvet_SheenIntensity;
-		float Slot_SheenIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SheenIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SheenIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SheenIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SheenIntensity_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_RetroDiffuseStrength_Authored = In_ClothVelvet_RetroDiffuseStrength;
-		float Slot_RetroDiffuseStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RetroDiffuseStrength_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_RetroDiffuseStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RetroDiffuseStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RetroDiffuseStrength_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_RetroDiffuseStrength_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_GrazingDarkenStrength_Authored = In_ClothVelvet_GrazingDarkenStrength;
-		float Slot_GrazingDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_GrazingDarkenStrength_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_GrazingDarkenStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_GrazingDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_GrazingDarkenStrength_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_GrazingDarkenStrength_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float3 Slot_SheenTint_Authored = In_ClothVelvet_SheenTintRGB.rgb;
-		float3 Slot_SheenTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_SheenTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_SheenTint_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_SheenTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_SheenTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_SheenTint_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_RimBias_Authored = In_ClothVelvet_RimBias;
-		float Slot_RimBias = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RimBias_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_RimBias_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RimBias = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RimBias_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_RimBias_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_ClothVelvet(
 			Slot_WrapStrength,

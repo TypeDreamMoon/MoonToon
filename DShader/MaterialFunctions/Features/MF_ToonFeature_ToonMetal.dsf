@@ -75,14 +75,14 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonMetal", Root=
 	}
 
 	Properties = {
-		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [Group="41 - Feature: Metal"; SortPriority=0; Description="金属漫反射强度. 金属通常很低."];
-		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [Group="41 - Feature: Metal"; SortPriority=1; Description="阴影中高光的保底值. 0 = 阴影里高光全灭."];
-		ScalarParameter In_ToonMetal_RampOffset = 0.0 [Group="41 - Feature: Metal"; SortPriority=2; Description="高光在 Specular Ramp 上的横向偏移, 用来整体调亮或调暗."];
-		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [Group="41 - Feature: Metal"; SortPriority=3; Description="高光粗糙度倍数."];
-		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [Group="41 - Feature: Metal"; SortPriority=4; Description="高光总强度."];
-		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [Group="41 - Feature: Metal"; SortPriority=5; Description="掠射角高光增益, 做出金属边缘的亮边."];
-		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [Group="41 - Feature: Metal"; SortPriority=6; Description="高光对比度(Ramp 的幂次). 越大高光越硬、越集中."];
-		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="41 - Feature: Metal"; SortPriority=7; Description="金属高光染色."];
+		ScalarParameter In_ToonMetal_DiffuseIntensity = 0.0 [Group="40 - Feature: Metal"; SortPriority=0; SliderMin=0; SliderMax=1; Description="金属漫反射强度. 金属通常很低. 取值 0~1, 默认 0.0.\r\nMetal diffuse strength; usually low for metal. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_ShadowSpecularFloor = 0.0 [Group="40 - Feature: Metal"; SortPriority=1; SliderMin=0; SliderMax=1; Description="阴影中高光的保底值. 0 = 阴影里高光全灭. 取值 0~1, 默认 0.0.\r\nHighlight floor in shadow. 0 = the highlight vanishes in shadow. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_RampOffset = 0.0 [Group="40 - Feature: Metal"; SortPriority=2; SliderMin=-1; SliderMax=0.99; Description="高光在 Specular Ramp 上的横向偏移, 用来整体调亮或调暗. 取值 -1~0.99, 默认 0.0.\r\nHorizontal offset of the highlight on the Specular Ramp, to brighten or darken it as a whole. Range -1 to 0.99, default 0.0."];
+		ScalarParameter In_ToonMetal_RoughnessScale = 1.0 [Group="40 - Feature: Metal"; SortPriority=3; SliderMin=0; SliderMax=1; Description="高光粗糙度倍数. 取值 0~1, 默认 1.0.\r\nHighlight roughness multiplier. Range 0 to 1, default 1.0."];
+		ScalarParameter In_ToonMetal_SpecularIntensity = 0.0 [Group="40 - Feature: Metal"; SortPriority=4; SliderMin=0; SliderMax=1; Description="高光总强度. 取值 0~1, 默认 0.0.\r\nOverall highlight strength. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_EdgeBoost = 0.0 [Group="40 - Feature: Metal"; SortPriority=5; SliderMin=0; SliderMax=1; Description="掠射角高光增益, 做出金属边缘的亮边. 取值 0~1, 默认 0.0.\r\nGrazing-angle highlight boost, for the bright rim of metal. Range 0 to 1, default 0.0."];
+		ScalarParameter In_ToonMetal_SpecularContrast = 1.0 [Group="40 - Feature: Metal"; SortPriority=6; SliderMin=1; SliderMax=16.9; Description="高光对比度(Ramp 的幂次). 越大高光越硬、越集中. 取值 1~16.9, 默认 1.0.\r\nHighlight contrast (a power on the ramp). Larger is harder and tighter. Range 1 to 16.9, default 1.0."];
+		VectorParameter In_ToonMetal_MetalTintRGB = float4(1.0, 1.0, 1.0, 1.0) [Group="40 - Feature: Metal"; SortPriority=7; Description="金属高光染色.\r\nMetal highlight tint."];
 	}
 
 	Graph = {
@@ -96,21 +96,21 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_ToonMetal", Root=
 		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
 
 		float Slot_DiffuseIntensity_Authored = In_ToonMetal_DiffuseIntensity;
-		float Slot_DiffuseIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_DiffuseIntensity_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_DiffuseIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_DiffuseIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_DiffuseIntensity_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_DiffuseIntensity_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_ShadowSpecularFloor_Authored = In_ToonMetal_ShadowSpecularFloor;
-		float Slot_ShadowSpecularFloor = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_ShadowSpecularFloor_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_ShadowSpecularFloor_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_ShadowSpecularFloor = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_ShadowSpecularFloor_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_ShadowSpecularFloor_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_RampOffset_Authored = In_ToonMetal_RampOffset;
-		float Slot_RampOffset = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RampOffset_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_RampOffset_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RampOffset = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RampOffset_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_RampOffset_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_RoughnessScale_Authored = In_ToonMetal_RoughnessScale;
-		float Slot_RoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_RoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_RoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_RoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_RoughnessScale_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SpecularIntensity_Authored = In_ToonMetal_SpecularIntensity;
-		float Slot_SpecularIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SpecularIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularIntensity_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SpecularIntensity_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_EdgeBoost_Authored = In_ToonMetal_EdgeBoost;
-		float Slot_EdgeBoost = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_EdgeBoost_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_EdgeBoost_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_EdgeBoost = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_EdgeBoost_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_EdgeBoost_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SpecularContrast_Authored = In_ToonMetal_SpecularContrast;
-		float Slot_SpecularContrast = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularContrast_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_SpecularContrast_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularContrast = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularContrast_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_SpecularContrast_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float3 Slot_MetalTint_Authored = In_ToonMetal_MetalTintRGB.rgb;
-		float3 Slot_MetalTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_MetalTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_MetalTint_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_MetalTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_MetalTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_MetalTint_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_ToonMetal(
 			Slot_DiffuseIntensity,

@@ -78,15 +78,15 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 	}
 
 	Properties = {
-		ScalarParameter In_Eye_DiffuseWrapStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=0; Description="眼球漫反射的 wrap 强度, 让受光过渡更柔和."];
-		ScalarParameter In_Eye_LimbalDarkenStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=1; Description="角膜缘变暗强度 —— 视角越偏, 眼球边缘越深."];
-		ScalarParameter In_Eye_SpecularShadowStrength = 0.0 [Group="39 - Feature: Eye"; SortPriority=2; Description="高光受阴影影响的程度."];
-		ScalarParameter In_Eye_PrimaryRoughnessScale = 1.0 [Group="39 - Feature: Eye"; SortPriority=3; Description="主高光(小而锐的那点)粗糙度倍数."];
-		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="39 - Feature: Eye"; SortPriority=4; Description="次高光(大而柔的那片)粗糙度倍数."];
-		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=5; Description="主高光强度."];
-		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="39 - Feature: Eye"; SortPriority=6; Description="次高光强度."];
-		VectorParameter In_Eye_EyeTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="39 - Feature: Eye"; SortPriority=7; Description="眼球染色. 全黑 = 未授权, 此时用材质的 Base Color."];
-		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="39 - Feature: Eye"; SortPriority=8; Description="次高光在 Specular Ramp 上的横向偏移."];
+		ScalarParameter In_Eye_DiffuseWrapStrength = 0.0 [Group="22 - Eye|Shading"; SortPriority=0; SliderMin=0; SliderMax=1; Description="眼球漫反射的 wrap 强度, 让受光过渡更柔和. 取值 0~1, 默认 0.0.\r\nWrap of the eye's diffuse, for a softer light falloff. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Eye_LimbalDarkenStrength = 0.0 [Group="22 - Eye|Shading"; SortPriority=1; SliderMin=0; SliderMax=1; Description="角膜缘变暗强度 —— 视角越偏, 眼球边缘越深. 取值 0~1, 默认 0.0.\r\nLimbal darkening: the eye's edge deepens as the view turns away. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Eye_SpecularShadowStrength = 0.0 [Group="22 - Eye|Shading"; SortPriority=2; SliderMin=0; SliderMax=1; Description="高光受阴影影响的程度. 取值 0~1, 默认 0.0.\r\nHow much shadow dims the highlight. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Eye_PrimaryRoughnessScale = 1.0 [Group="22 - Eye|Shading"; SortPriority=3; SliderMin=0; SliderMax=1; Description="主高光(小而锐的那点)粗糙度倍数. 取值 0~1, 默认 1.0.\r\nRoughness multiplier of the primary highlight (the small sharp one). Range 0 to 1, default 1.0."];
+		ScalarParameter In_Eye_SecondaryRoughnessScale = 1.0 [Group="22 - Eye|Shading"; SortPriority=4; SliderMin=0; SliderMax=1; Description="次高光(大而柔的那片)粗糙度倍数. 取值 0~1, 默认 1.0.\r\nRoughness multiplier of the secondary highlight (the large soft one). Range 0 to 1, default 1.0."];
+		ScalarParameter In_Eye_PrimaryIntensity = 0.0 [Group="22 - Eye|Shading"; SortPriority=5; SliderMin=0; SliderMax=1; Description="主高光强度. 取值 0~1, 默认 0.0.\r\nPrimary highlight strength. Range 0 to 1, default 0.0."];
+		ScalarParameter In_Eye_SecondaryIntensity = 0.0 [Group="22 - Eye|Shading"; SortPriority=6; SliderMin=0; SliderMax=1; Description="次高光强度. 取值 0~1, 默认 0.0.\r\nSecondary highlight strength. Range 0 to 1, default 0.0."];
+		VectorParameter In_Eye_EyeTintRGB = float4(0.0, 0.0, 0.0, 0.0) [Group="22 - Eye|Shading"; SortPriority=7; Description="眼球染色. 全黑 = 未授权, 此时用材质的 Base Color.\r\nEye tint. Black = unset, then Base Color is used."];
+		ScalarParameter In_Eye_SecondaryRampOffset = 0.0 [Group="22 - Eye|Shading"; SortPriority=8; SliderMin=0; SliderMax=1; Description="次高光在 Specular Ramp 上的横向偏移. 取值 0~1, 默认 0.0.\r\nHorizontal offset of the secondary highlight on the Specular Ramp. Range 0 to 1, default 0.0."];
 	}
 
 	Graph = {
@@ -100,23 +100,23 @@ ShaderFunction(Name="MaterialFunctions/Features/MF_ToonFeature_Eye", Root="Plugi
 		float4 SubMat_W6 = MF_ToonSubMaterial(SubMat_ID, Output="W6");
 
 		float Slot_DiffuseWrapStrength_Authored = In_Eye_DiffuseWrapStrength;
-		float Slot_DiffuseWrapStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_DiffuseWrapStrength_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_DiffuseWrapStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_DiffuseWrapStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_DiffuseWrapStrength_Authored, SubMat_C4.x, SubMat_W4.x), False=Slot_DiffuseWrapStrength_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_LimbalDarkenStrength_Authored = In_Eye_LimbalDarkenStrength;
-		float Slot_LimbalDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_LimbalDarkenStrength_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_LimbalDarkenStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_LimbalDarkenStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_LimbalDarkenStrength_Authored, SubMat_C4.y, SubMat_W4.y), False=Slot_LimbalDarkenStrength_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SpecularShadowStrength_Authored = In_Eye_SpecularShadowStrength;
-		float Slot_SpecularShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularShadowStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_SpecularShadowStrength_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SpecularShadowStrength = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SpecularShadowStrength_Authored, SubMat_C4.z, SubMat_W4.z), False=Slot_SpecularShadowStrength_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_PrimaryRoughnessScale_Authored = In_Eye_PrimaryRoughnessScale;
-		float Slot_PrimaryRoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryRoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_PrimaryRoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_PrimaryRoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryRoughnessScale_Authored, SubMat_C4.w, SubMat_W4.w), False=Slot_PrimaryRoughnessScale_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SecondaryRoughnessScale_Authored = In_Eye_SecondaryRoughnessScale;
-		float Slot_SecondaryRoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryRoughnessScale_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SecondaryRoughnessScale_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryRoughnessScale = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryRoughnessScale_Authored, SubMat_C5.x, SubMat_W5.x), False=Slot_SecondaryRoughnessScale_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_PrimaryIntensity_Authored = In_Eye_PrimaryIntensity;
-		float Slot_PrimaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryIntensity_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_PrimaryIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_PrimaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_PrimaryIntensity_Authored, SubMat_C5.y, SubMat_W5.y), False=Slot_PrimaryIntensity_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SecondaryIntensity_Authored = In_Eye_SecondaryIntensity;
-		float Slot_SecondaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryIntensity_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_SecondaryIntensity_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryIntensity = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryIntensity_Authored, SubMat_C5.z, SubMat_W5.z), False=Slot_SecondaryIntensity_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float3 Slot_EyeTint_Authored = In_Eye_EyeTintRGB.rgb;
-		float3 Slot_EyeTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_EyeTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_EyeTint_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float3 Slot_EyeTint = UE.Expression(Class="StaticSwitchParameter", OutputType="float3", True=lerp(Slot_EyeTint_Authored, SubMat_C6.xyz, SubMat_W6.xyz), False=Slot_EyeTint_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 		float Slot_SecondaryRampOffset_Authored = In_Eye_SecondaryRampOffset;
-		float Slot_SecondaryRampOffset = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryRampOffset_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_SecondaryRampOffset_Authored, Group="15 - SubMaterial", SortPriority=0, ParameterName="Use SubMaterial Table");
+		float Slot_SecondaryRampOffset = UE.Expression(Class="StaticSwitchParameter", OutputType="float", True=lerp(Slot_SecondaryRampOffset_Authored, SubMat_C6.w, SubMat_W6.w), False=Slot_SecondaryRampOffset_Authored, Group="15 - Sub Material", SortPriority=0, ParameterName="Use SubMaterial Table");
 
 		ToonFeatureWrite_Eye(
 			Slot_DiffuseWrapStrength,
