@@ -1,4 +1,6 @@
-"""R11 batch 1: apply the migration plan (r11_plan.py) in the editor, AFTER the regen.
+"""R11: apply a migration plan (r11_plan.py, r11_a11_plan.py) in the editor, AFTER the regen.
+Op kinds: s scalar, w static switch, t texture, v vector, x clear a texture override (if it holds the given texture).
+The MaterialEditingLibrary setters return False even when they work: verify from disk, not from "failed".
 Prefix with PLAN = "<plan.json>", LOG = "<log.json>", SAVE = True/False.
 Paths come from the plan file (UTF-8) so this script stays ASCII (the bridge mangles non-ASCII source text).
 Only the instances the plan names are touched and saved; nothing else, no level."""
@@ -29,6 +31,19 @@ for path, ops in by_mi.items():
             ok = tex is not None and MEL.set_material_instance_texture_parameter_value(obj, name, tex)
         elif kind == "v":
             ok = MEL.set_material_instance_vector_parameter_value(obj, name, unreal.LinearColor(*value))
+        elif kind == "x":
+            # A11: clear a texture override, but only while it still holds the texture the plan expects.
+            vals = list(obj.get_editor_property("texture_parameter_values"))
+            keep = []
+            for tv in vals:
+                tex = tv.get_editor_property("parameter_value")
+                if (str(tv.get_editor_property("parameter_info").get_editor_property("name")) == name
+                        and tex is not None and tex.get_path_name().split(".")[0] == value):
+                    continue
+                keep.append(tv)
+            if len(keep) == len(vals) - 1:
+                obj.set_editor_property("texture_parameter_values", keep)
+                ok = True
         if ok:
             log["applied"] += 1
         else:

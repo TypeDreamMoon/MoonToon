@@ -99,13 +99,15 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			ParameterName="Emissive Map";
 			Group="23 - Emissive";
 		];
-		TextureObjectParameter Opacity_Map = Path(Engine, "EngineResources/WhiteSquareTexture") [
+		TextureObjectParameter Opacity_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="Opacity Map";
 			Group="21 - Translucency";
+			Description="不透明度遮罩, 通道由 Opacity Channel 选. 颜色空间: 线性(导入时关闭 sRGB, 压缩用 Default / BC7; Masks / Grayscale / Alpha 压缩和这个采样器不匹配).\r\nOpacity mask; Opacity Channel picks the channel. Color space: linear (import with sRGB off, Default or BC7 compression; Masks / Grayscale / Alpha compression does not match this sampler).";
 		];
-		TextureObjectParameter SA_Map = Path(Engine, "EngineResources/Black") [
+		TextureObjectParameter SA_Map = Path(Plugins.MoonToon, "Textures/T_Black_Linear") [
 			ParameterName="SA Map";
 			Group="00 - Global Settings";
+			Description="SDF 脸阴影 / AO 打包图(R = 左半 SDF, G = AO). 颜色空间: 线性(导入时关闭 sRGB, 压缩用 Default / BC7).\r\nSDF face shadow / AO pack (R = left-half SDF, G = AO). Color space: linear (import with sRGB off, Default or BC7 compression).";
 		];
 		TextureObjectParameter AO_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
 			ParameterName="AO Map";
@@ -1073,7 +1075,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		Attributes.EmissiveColor = Emission;
 		#Region "Texture Sample"
-		float4 StaticSwitchParameter_16 = MF_ToonSampleColor(Opacity_Map, Global_UV).rgba;
+		float4 StaticSwitchParameter_16 = MF_ToonSampleLinear(Opacity_Map, Global_UV).rgba;
 		float4 StaticSwitchParameter_17 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -1137,7 +1139,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		Attributes.OpacityMask = Opacity_Mask;
 		#Region "Texture Sample"
-		float3 StaticSwitchParameter_19 = MF_ToonSampleColor(SA_Map, Global_UV).rgb;
+		float3 StaticSwitchParameter_19 = MF_ToonSampleLinear(SA_Map, Global_UV).rgb;
 		#EndRegion
 
 		float3 SA_Map_2 = StaticSwitchParameter_19;
@@ -1663,8 +1665,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				ParameterName="SA Map",
 				Group="00 - Global Settings",
 				Coordinates=MaterialExpressionTextureCoordinate_0,
-				Texture=Path(Engine, "EngineResources/Black"),
-				SamplerType="SAMPLERTYPE_Color",
+				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
 				SamplerSource="SSM_Wrap_WorldGroupSettings"
 			);
 		float SA_SDF_Left = SA_Map_3.r;
@@ -1698,8 +1700,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				ParameterName="SA Map",
 				Group="00 - Global Settings",
 				Coordinates=Multiply_20,
-				Texture=Path(Engine, "EngineResources/Black"),
-				SamplerType="SAMPLERTYPE_Color",
+				Texture=Path(Plugins.MoonToon, "Textures/T_Black_Linear"),
+				SamplerType="SAMPLERTYPE_LinearColor",
 				SamplerSource="SSM_Wrap_WorldGroupSettings"
 			);
 		#EndRegion
