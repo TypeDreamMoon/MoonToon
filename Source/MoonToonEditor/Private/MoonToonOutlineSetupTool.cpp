@@ -51,7 +51,9 @@ namespace
 	const FName SwitchParams[] = {
 		TEXT("Opacity From Base Color Map"),
 		TEXT("Opacity From Vertex Color"),
-		TEXT("Use Vertex Color In sRGB Space"),
+		// R11 A7: replaced "Use Vertex Color In sRGB Space" (whose meaning was inverted). Both materials take
+		// it from MF_MoonToonBaseInput, so copying the new name keeps the hull's opacity decode = the surface's.
+		TEXT("Decode Vertex Color From sRGB"),
 	};
 
 	const TCHAR* KindName(EMoonToonOutlineSectionKind Kind)

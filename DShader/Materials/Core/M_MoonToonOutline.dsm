@@ -116,6 +116,8 @@ VirtualFunction(Name="MF_MoonToonBaseInput")
 		float  FaceOverlayThickness;
 		float  OutRimLightIntensity;
 		float  OutRimLightWidth;
+		float  OutDisableSelfShadow;
+		float  OutScreenSpaceHairShadowIntensity;
 	}
 }
 

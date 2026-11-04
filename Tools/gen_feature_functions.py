@@ -540,13 +540,16 @@ def collapsed_slot_warning(slot, perpixel):
 
 
 def parse_slot_defaults(path, prefix="MOON_TOON_SLOTS_"):
-    """table-macro -> {slot Name: default literal}, for the tables that HAVE a fourth column."""
+    """table-macro -> {slot Name: default literal}, for the tables that HAVE a fourth column.
+
+    R11 A5: rows carry a fifth column now (the record lane's encoding, e.g. Unorm / Signed); it is
+    skipped here -- the generated material side always works in decoded values."""
     src = open(path, encoding="utf-8").read()
     out, alias = {}, {}
     for m in re.finditer(r"#define\s+(%s\w+)\(X\)((?:[^\n]*\\\n)*[^\n]*)" % prefix, src):
         name, body = m.group(1), m.group(2)
         rows = re.findall(
-            r"X\(\s*\w+\s*,\s*[\w.]+\s*,\s*(\w+)\s*,\s*((?:[^,()]|\([^)]*\))+?)\s*\)", body)
+            r"X\(\s*\w+\s*,\s*[\w.]+\s*,\s*(\w+)\s*,\s*((?:[^,()]|\([^)]*\))+?)\s*(?:,\s*\w+\s*)?\)", body)
         if rows:
             out[name] = {n: d.strip() for n, d in rows}
         else:

@@ -631,6 +631,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// closure's rim pins. A bound UMoonToonProfile still overrides both. Appended last.
 		float  OutRimLightIntensity;
 		float  OutRimLightWidth;
+		// R11 A1 / A2: the other two profile-owned dials, for the Moon closure's pins (a bound
+		// UMoonToonProfile still overrides both). Disable Self Shadow is the same switch that rides
+		// CustomData0 to the casters, so the receiver and the casters read one value. Appended last.
+		float  OutDisableSelfShadow;
+		float  OutScreenSpaceHairShadowIntensity;
 	}
 
 	Graph = {
@@ -1956,6 +1961,8 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		FaceOverlayThickness = Face_Overlay_Thickness;
 		OutRimLightIntensity = Rim_Intensity;
 		OutRimLightWidth = Rim_Width;
+		OutDisableSelfShadow = StaticSwitchParameter_34;
+		OutScreenSpaceHairShadowIntensity = Screen_Space_Hair_Shadow_Intensity;
 		#EndRegion
 	}
 }

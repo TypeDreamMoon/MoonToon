@@ -224,7 +224,7 @@ namespace MoonToonDebugNames
 
 	static void AddModuleSlots(const FString& Module, TMap<FString, FString>& Out)
 	{
-#define MOONTOON_DEBUG_SLOT(Type, Slot, Name, Default) AddSlot(Out, TEXT(#Slot), TEXT(#Name));
+#define MOONTOON_DEBUG_SLOT(Type, Slot, Name, Default, Enc) AddSlot(Out, TEXT(#Slot), TEXT(#Name));
 #define MOONTOON_DEBUG_MODULE(ModuleName, SlotTable) if (Module == TEXT(#ModuleName)) { SlotTable(MOONTOON_DEBUG_SLOT) }
 		MOON_TOON_MODULE_LIST(MOONTOON_DEBUG_MODULE)
 #undef MOONTOON_DEBUG_MODULE
