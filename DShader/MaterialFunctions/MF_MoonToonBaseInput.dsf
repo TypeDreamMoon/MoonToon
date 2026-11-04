@@ -167,6 +167,59 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			ParameterName="Global Mask Map UV Channel";
 			Group="01 - Global Mask Map";
 		];
+		ScalarParameter Inner_Outline_Mask_Source = 1.0 [
+			ParameterName="Inner Outline Mask Source";
+			Group="22 - Inner Outline";
+			SortPriority=33;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Inner Outline Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Inner Outline From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Inner Outline Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Inner Outline From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter Metallic_Mask_Source = 1.0 [
+			ParameterName="Metallic Mask Source";
+			Group="11 - Specular";
+			SortPriority=51;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Metallic Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Metallic From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Metallic Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Metallic From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter Roughness_Mask_Source = 1.0 [
+			ParameterName="Roughness Mask Source";
+			Group="11 - Specular";
+			SortPriority=41;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Roughness Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Roughness From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Roughness Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Roughness From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter AO_Mask_Source = 1.0 [
+			ParameterName="AO Mask Source";
+			Group="10 - Diffuse";
+			SortPriority=32;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`AO Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`AO From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `AO Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `AO From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter Shadow_Group_ID_Mask_Source = 1.0 [
+			ParameterName="Shadow Group ID Mask Source";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=32;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Shadow Group ID Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Shadow Group ID From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Shadow Group ID Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Shadow Group ID From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter Diffuse_Ramp_Offset_Mask_Source = 1.0 [
+			ParameterName="Diffuse Ramp Offset Mask Source";
+			Group="10 - Diffuse";
+			SortPriority=36;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Diffuse Ramp Offset Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Diffuse Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Diffuse Ramp Offset Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Diffuse Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter Specular_Ramp_Offset_Mask_Source = 1.0 [
+			ParameterName="Specular Ramp Offset Mask Source";
+			Group="11 - Specular";
+			SortPriority=61;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Specular Ramp Offset Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Specular Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Specular Ramp Offset Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Specular Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter Rim_Light_Width_Mask_Source = 1.0 [
+			ParameterName="Rim Light Width Mask Source";
+			Group="12 - Rim Light";
+			SortPriority=35;
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Rim Light Width Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Rim Light Width From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Rim Light Width Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Rim Light Width From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
+		ScalarParameter Kajiya_Secondary_Mask_Source = 1.0 [
+			ParameterName="Kajiya Secondary Mask Source";
+			Group="04 - Kajiya Kay";
+			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`KajiyaSecondaryMaskChannel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\nToon Kajiya 头发的发丝偏移一直从这里读. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `KajiyaSecondaryMaskChannel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nThe Toon Kajiya hair strand shift always reads it. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		];
 		// The SKIN under the stocking, not the stocking itself -- the fabric's own colour is the
 		// material's Base Color. Both stocking features interpolate between the two by Density.
 		TextureSampleParameter2D BodyBaseColor = Path(Engine, "EngineResources/DefaultTexture") [
@@ -611,7 +664,29 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		#EndRegion
 
-		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Sampled_Global_Mask_Map);
+		// Which map each Global Mask consumer reads ("<X> Mask Source", default 1 = map 1, as before). Each map is
+		// still sampled once for the whole material; this only picks between the three results.
+		// SelectGlobalMaskMap: 0 = white, 1/2/3 = map 1/2/3; a map whose Enable switch is off is white already.
+		float4 Inner_Outline_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Inner_Outline_Mask_Source, Inner_Outline_Global_Mask);
+		float4 Metallic_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Metallic_Mask_Source, Metallic_Global_Mask);
+		float4 Roughness_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Roughness_Mask_Source, Roughness_Global_Mask);
+		float4 AO_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, AO_Mask_Source, AO_Global_Mask);
+		float4 Shadow_Group_ID_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Shadow_Group_ID_Mask_Source, Shadow_Group_ID_Global_Mask);
+		float4 Diffuse_Ramp_Offset_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Diffuse_Ramp_Offset_Mask_Source, Diffuse_Ramp_Offset_Global_Mask);
+		float4 Specular_Ramp_Offset_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Specular_Ramp_Offset_Mask_Source, Specular_Ramp_Offset_Global_Mask);
+		float4 Rim_Light_Width_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Rim_Light_Width_Mask_Source, Rim_Light_Width_Global_Mask);
+		float4 Kajiya_Secondary_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
+		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Kajiya_Secondary_Mask_Source, Kajiya_Secondary_Global_Mask);
+
+		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Kajiya_Secondary_Global_Mask);
 		// The hair highlight mask is NOT sampled here any more. MF_ToonFeature_HairHighlightMask
 		// calls MF_ToonHairHighlightMask itself, which puts the mask texture, its channel, its map
 		// selection and the nine light-elevation offsets behind the feature's own static switch --
@@ -640,7 +715,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Sampled_Global_Mask_Map,
+				True=Inner_Outline_Global_Mask,
 				False=Inner_Outline_Map.rgba,
 				Group="22 - Inner Outline",
 				SortPriority=32,
@@ -765,7 +840,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Sampled_Global_Mask_Map,
+				True=Metallic_Global_Mask,
 				False=StaticSwitchParameter_8,
 				Group="11 - Specular",
 				SortPriority=50,
@@ -875,7 +950,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Sampled_Global_Mask_Map,
+				True=Roughness_Global_Mask,
 				False=StaticSwitchParameter_10,
 				Group="11 - Specular",
 				SortPriority=40,
@@ -1027,7 +1102,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Sampled_Global_Mask_Map,
+				True=AO_Global_Mask,
 				False=StaticSwitchParameter_20,
 				Group="10 - Diffuse",
 				SortPriority=31,
@@ -1209,7 +1284,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Sampled_Global_Mask_Map,
+				True=Shadow_Group_ID_Global_Mask,
 				False=StaticSwitchParameter_36,
 				Group="13 - Ray Tracing Shadow",
 				SortPriority=31,
@@ -1380,7 +1455,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Sampled_Global_Mask_Map,
+				True=Diffuse_Ramp_Offset_Global_Mask,
 				False=StaticSwitchParameter_47,
 				Group="10 - Diffuse",
 				SortPriority=35,
@@ -1435,7 +1510,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Sampled_Global_Mask_Map,
+				True=Specular_Ramp_Offset_Global_Mask,
 				False=StaticSwitchParameter_50,
 				Group="11 - Specular",
 				SortPriority=60,
@@ -1454,7 +1529,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float Specular_Ramp_Offset = Add_6;
 		float Rim_Intensity = Rim_Light_Intensity;
-		float Rim_Light_Width_Channel_Masked = Rim_Light_Width_Channel(Input = Sampled_Global_Mask_Map);
+		float Rim_Light_Width_Channel_Masked = Rim_Light_Width_Channel(Input = Rim_Light_Width_Global_Mask);
 		float Rim_Light_Width_Channel_1_Masked = Rim_Light_Width_Channel_1(Input = Sampled_Vertex_Color);
 		#Region "Texture Sample"
 		float StaticSwitchParameter_52 =
