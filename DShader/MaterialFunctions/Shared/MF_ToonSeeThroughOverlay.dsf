@@ -60,6 +60,12 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 	}
 
 	Properties = {
+		ScalarParameter Head_Forward_From_Baked_Face_UV_Flag = 0.0 [
+			ParameterName="Head Forward From Baked Face UV";
+			Group="24 - See Through Overlay";
+			SortPriority=46;
+			Description="1 = 头朝前方向取自 MoonToon 烘焙的脸朝向(UV1.xy + UV2.x), 0 = 用 HeadForward 参数.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the head forward comes from the MoonToon face-forward bake (UV1.xy + UV2.x), 0 = the HeadForward parameter.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
 		ScalarParameter Through_Hair_Opacity = 0.5 [
 			ParameterName="Through Hair Opacity";
 			Group="24 - See Through Overlay";
@@ -240,15 +246,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonSeeThroughOverlay", Root="P
 		float2 FrontHair_BakeUV2 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
 		float3 FrontHair_BakedTS = (float3(FrontHair_BakeUV1.rg, FrontHair_BakeUV2.r) * 2.0) + -1.0;
 		float3 FrontHair_BakedWS = normalize(UE.Expression(Class="Transform", OutputType="float3", Input=FrontHair_BakedTS));
-		float3 FrontHair_HeadSource = UE.Expression(
-			Class="StaticSwitchParameter",
-			OutputType="float3",
-			True=FrontHair_BakedWS,
-			False=Head_Forward.rgb,
-			Group="24 - See Through Overlay",
-			SortPriority=46,
-			ParameterName="Head Forward From Baked Face UV"
-		);
+		float3 FrontHair_HeadSource = UE.Expression(Class="If", OutputType="float3", A=Head_Forward_From_Baked_Face_UV_Flag, B=0.5, AGreaterThanB=FrontHair_BakedWS, AEqualsB=FrontHair_BakedWS, ALessThanB=Head_Forward.rgb, EqualsThreshold=0.0);
 
 		float3 FrontHair_ViewDir = normalize(UE.CameraVectorWS());
 		float FrontHair_HeadLen = length(FrontHair_HeadSource);

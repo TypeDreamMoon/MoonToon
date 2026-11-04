@@ -414,7 +414,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 				ParameterName="Use FX Hologram",
 				Group="50 - FX",
 				SortPriority=30,
-				Desc="全息(少前2): 扫描线 + 边缘发光 + 闪烁, 底色压暗, 扫描线之间降低覆盖率.\r\nHologram: scan lines, rim glow, flicker; darker base, lower coverage between the lines."
+				Desc="全息(少前2): 扫描线 + 边缘发光 + 闪烁, 底色压暗, 扫描线之间降低覆盖率. 裁切走 OpacityMask: 只有实例的 Blend Mode 覆盖为 Masked(已遮罩)时才切得掉(母材质是 Opaque, 不覆盖时只看到发光边); 半透明实例走 Opacity.\r\nHologram: scan lines, rim glow, flicker; darker base, lower coverage between the lines. The cut goes through OpacityMask: it only removes pixels when the instance's Blend Mode is overridden to Masked (the parent is Opaque; without it you only see the glowing edge). A translucent instance uses Opacity instead."
 			);
 
 		float3 FX_Emissive_Glitter = UE.Expression(
@@ -445,7 +445,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 				ParameterName="Use FX Reveal",
 				Group="50 - FX",
 				SortPriority=60,
-				Desc="显现(鸣潮额饰): 按顺序图和进度显现, 边缘带噪声发光.\r\nReveal: appears along an order map by Progress, with a noisy glowing edge."
+				Desc="显现(鸣潮额饰): 按顺序图和进度显现, 边缘带噪声发光. 裁切走 OpacityMask: 只有实例的 Blend Mode 覆盖为 Masked(已遮罩)时才切得掉(母材质是 Opaque, 不覆盖时只看到发光边); 半透明实例走 Opacity.\r\nReveal: appears along an order map by Progress, with a noisy glowing edge. The cut goes through OpacityMask: it only removes pixels when the instance's Blend Mode is overridden to Masked (the parent is Opaque; without it you only see the glowing edge). A translucent instance uses Opacity instead."
 			);
 		float3 FX_Emissive_Pulse = UE.Expression(
 				Class="StaticSwitchParameter",
@@ -465,7 +465,7 @@ Shader(Name="Materials/Core/M_MoonToon", Root="Plugin.MoonToon")
 				ParameterName="Use FX Dissolve",
 				Group="50 - FX",
 				SortPriority=80,
-				Desc="溶解(异环): 噪声/高度溶解, 边缘发光, 溶掉的地方裁掉.\r\nDissolve: noise / height dissolve with a glowing edge; the dissolved part is cut."
+				Desc="溶解(异环): 噪声/高度溶解, 边缘发光, 溶掉的地方裁掉. 裁切走 OpacityMask: 只有实例的 Blend Mode 覆盖为 Masked(已遮罩)时才切得掉(母材质是 Opaque, 不覆盖时只看到发光边); 半透明实例走 Opacity.\r\nDissolve: noise / height dissolve with a glowing edge; the dissolved part is cut. The cut goes through OpacityMask: it only removes pixels when the instance's Blend Mode is overridden to Masked (the parent is Opaque; without it you only see the glowing edge). A translucent instance uses Opacity instead."
 			);
 		float3 FX_Emissive_Hologram = UE.Expression(
 				Class="StaticSwitchParameter",

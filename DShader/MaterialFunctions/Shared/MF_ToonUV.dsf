@@ -7,20 +7,10 @@
 // Scale and offset are one float4 rather than four scalars (xy = scale, zw = offset). No material
 // instance in the project overrode any of the twelve scalars, so nothing had to be migrated.
 
-VirtualFunction(Name="MF_UVChannelSwitch")
-{
-	Options = {
-		Asset = Path(Plugins.MoonToon, "MaterialFunctions/Utils/MF_UVChannelSwitch");
-	}
-
-	Inputs = {
-		float UVChannelIndex;
-	}
-
-	Outputs = {
-		float2 Result;
-	}
-}
+// B3 (R11): the channel is selected here with a chain of compares instead of MF_UVChannelSwitch, whose Custom
+// node indexed a local float2[4] with it -- six allocas in the DXIL, which can land in scratch memory. Same
+// result: the channel is clamped to [0, 3] and truncated, as the array index was. Every MoonToon caller goes
+// through here now; the old asset stays for anything else that references it.
 
 ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonUV", Root="Plugin.MoonToon")
 {
@@ -44,7 +34,12 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonUV", Root="Plugin.MoonToon"
 	}
 
 	Graph = {
-		float2 Selected = MF_UVChannelSwitch(UVChannel);
+		float Channel = clamp(UVChannel, 0.0, 3.0);
+		float2 UV0 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=0);
+		float2 UV1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
+		float2 UV2 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
+		float2 UV3 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=3);
+		float2 Selected = UE.Expression(Class="If", OutputType="float2", A=Channel, B=1.0, AGreaterThanB=UE.Expression(Class="If", OutputType="float2", A=Channel, B=2.0, AGreaterThanB=UE.Expression(Class="If", OutputType="float2", A=Channel, B=3.0, AGreaterThanB=UV3, AEqualsB=UV3, ALessThanB=UV2, EqualsThreshold=0.0), AEqualsB=UE.Expression(Class="If", OutputType="float2", A=Channel, B=3.0, AGreaterThanB=UV3, AEqualsB=UV3, ALessThanB=UV2, EqualsThreshold=0.0), ALessThanB=UV1, EqualsThreshold=0.0), AEqualsB=UE.Expression(Class="If", OutputType="float2", A=Channel, B=2.0, AGreaterThanB=UE.Expression(Class="If", OutputType="float2", A=Channel, B=3.0, AGreaterThanB=UV3, AEqualsB=UV3, ALessThanB=UV2, EqualsThreshold=0.0), AEqualsB=UE.Expression(Class="If", OutputType="float2", A=Channel, B=3.0, AGreaterThanB=UV3, AEqualsB=UV3, ALessThanB=UV2, EqualsThreshold=0.0), ALessThanB=UV1, EqualsThreshold=0.0), ALessThanB=UV0, EqualsThreshold=0.0);
 		UV = (Selected * ScaleOffset.rg) + ScaleOffset.ba;
 	}
 }

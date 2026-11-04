@@ -67,6 +67,19 @@ float MoonToonFacialSdfByte(float N)
 	return (clamp(N, 0.0, 255.0) + 0.25) / 255.0;
 }
 
+/// B7 (R11): one channel of a map, fetched only when Enable > 0. Enable is a material parameter, so the
+/// branch is uniform per draw (derivatives stay valid) and a disabled map costs no fetch.
+/// @custom
+float MoonToonFacialSdfSampleIf(Texture2D Map, float2 UV, float4 Pick, float Enable)
+{
+	float Value = 0.0;
+	[branch] if (Enable > 0.0)
+	{
+		Value = dot(Texture2DSample(Map, MapSampler, UV), Pick);
+	}
+	return Value;
+}
+
 /// @library MoonToon|Shared
 /// @param  SdfLeft   The left SDF value (MF_ToonDFFacialShadow), full precision.
 /// @param  SdfRight  The right one.
@@ -81,8 +94,11 @@ export float4 MF_ToonFacialSdfExt(float SdfLeft, float SdfRight, out float HiLef
 	HiRight = MoonToonFacialSdfByte(KR);
 
 	float2 UV = UE.TexCoord(Index = 0);
-	float Mask = saturate(dot(Facial_SDF_NoL_Mask.Sample(UV), MoonToonFacialSdfChannelPick(Facial_SDF_NoL_Mask_Channel)) * Facial_SDF_NoL_Mask_Strength);
-	float Soft = saturate(dot(Facial_SDF_Soft_Map.Sample(UV), MoonToonFacialSdfChannelPick(Facial_SDF_Soft_Map_Channel)));
+	// B7 (R11): the NoL mask is skipped at strength <= 0 and the soft map while Soft Ramp is off -- both then
+	// contribute exactly 0, which is what they did before (the mask is scaled by its strength, and SoftByte is
+	// step(0.5, Soft Ramp) * ...).
+	float Mask = saturate(MoonToonFacialSdfSampleIf(Facial_SDF_NoL_Mask, UV, MoonToonFacialSdfChannelPick(Facial_SDF_NoL_Mask_Channel), Facial_SDF_NoL_Mask_Strength) * Facial_SDF_NoL_Mask_Strength);
+	float Soft = saturate(MoonToonFacialSdfSampleIf(Facial_SDF_Soft_Map, UV, MoonToonFacialSdfChannelPick(Facial_SDF_Soft_Map_Channel), step(0.5, Facial_SDF_Soft_Ramp)));
 	float SoftU = saturate(lerp(Facial_SDF_Soft_Range.x, Facial_SDF_Soft_Range.y, pow(Soft, max(Facial_SDF_Soft_Power, 0.01))));
 	// Byte 0 is "off" (what a face without the extension leaves); on, 1 + the coordinate, which stops at
 	// 254 / 255 so the shadow side stays below the edge.

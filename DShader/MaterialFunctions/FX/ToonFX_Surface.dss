@@ -16,7 +16,7 @@
 uniform Texture2D FX_Dissolve_Noise;
 
 /// @name FX Dissolve Progress   @group 55 - FX: Dissolve   @sort 1   @slider 0 1
-/// @desc 溶解进度: 0 = 完整, 1 = 全部溶掉. 0 = intact, 1 = gone.
+/// @desc 溶解进度: 0 = 完整, 1 = 全部溶掉. 溶掉的部分要实例 Blend Mode 覆盖为 Masked 才切得掉. 0 = intact, 1 = gone. The dissolved part is only cut when the instance's Blend Mode is overridden to Masked.
 uniform float FX_Dissolve_Progress = 0.0;
 
 /// @name FX Dissolve Noise Tiling   @group 55 - FX: Dissolve   @sort 2   @slider 0.1 16
@@ -138,7 +138,7 @@ uniform float FX_Hologram_Flicker = 0.15;
 uniform float FX_Hologram_Base_Darken = 0.7;
 
 /// @name FX Hologram Coverage   @group 57 - FX: Hologram   @sort 7   @slider 0 1
-/// @desc 扫描线之间的覆盖率(配合薄纱镂空 / 半透明). Coverage between the lines (for sheer dither / translucency).
+/// @desc 扫描线之间的覆盖率(配合薄纱镂空 / 半透明; 不透明的实例要把 Blend Mode 覆盖为 Masked 才有效). Coverage between the lines (for sheer dither / translucency; an opaque instance needs its Blend Mode overridden to Masked).
 uniform float FX_Hologram_Coverage = 0.6;
 
 /// @library MoonToon|FX

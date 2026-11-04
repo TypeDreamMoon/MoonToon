@@ -135,7 +135,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Group="11 - Specular";
 			SortPriority=4;
 		];
-		TextureObjectParameter Specular_Ramp_Offset_Map = Path(Plugins.MoonToon, "Textures/T_White_Linear") [
+		TextureObjectParameter Specular_Ramp_Offset_Map = Path(Plugins.MoonToon, "Textures/T_Gray_Linear") [
 			ParameterName="Specular Ramp Offset Map";
 			Group="11 - Specular";
 			SortPriority=61;
@@ -154,7 +154,9 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			Description="屏幕空间发影强度的每实例乘数(叠加在后处理体积的全局强度上). 0=关闭, 1=全强度. GBuffer中以3bit存储(8档).\r\n\r\nPer-instance multiplier on the screen-space depth-test hair shadow, applied on top of the post-process volume's global intensity. 0 = off, 1 = full strength. Stored as 3 bits (8 steps) in the GBuffer.";
 		];
 		ChannelMaskParameter KajiyaSecondaryMaskChannel = float4(1.0, 0.0, 0.0, 0.0) [
-			Group="04 - Kajiya Kay";
+			ParameterName="Toon Kajiya Strand Shift Channel";
+			Group="35 - Feature: Hair Toon Kajiya Kay";
+			SortPriority=21;
 			MaskChannel=Red
 		];
 		VectorParameter Global_Mask_Map_UV_Scale_Offset = float4(1.0, 1.0, 0.0, 0.0) [
@@ -197,17 +199,17 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SortPriority=32;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Shadow Group ID Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Shadow Group ID From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Shadow Group ID Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Shadow Group ID From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
 		];
-		ScalarParameter Diffuse_Ramp_Offset_Mask_Source = 1.0 [
+		ScalarParameter Diffuse_Ramp_Offset_Mask_Source = 0.0 [
 			ParameterName="Diffuse Ramp Offset Mask Source";
 			Group="10 - Diffuse";
 			SortPriority=36;
-			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Diffuse Ramp Offset Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Diffuse Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Diffuse Ramp Offset Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Diffuse Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			Description="读哪张打包遮罩图: 0 = 不读, 偏移为中性值 0.5(默认), 1/2/3 = Global Mask Map 1/2/3, 通道由`Diffuse Ramp Offset Channel`决定.\r\n只在`Diffuse Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图(默认灰 = 中性).\r\n以前默认读 Global Mask Map 1: 白色默认图是满偏移, 照说明把强度调到 1 时整面变亮 / 高光顶满. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 0 = none, a neutral 0.5 offset (the default), 1/2/3 = Global Mask Map 1/2/3, with the channel picked by `Diffuse Ramp Offset Channel`.\r\nOnly used while `Diffuse Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture (grey = neutral by default).\r\nIt used to read Global Mask Map 1 by default: the white default map is a full offset, so raising the intensity to 1 as the description advises brightened the whole surface. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
 		];
-		ScalarParameter Specular_Ramp_Offset_Mask_Source = 1.0 [
+		ScalarParameter Specular_Ramp_Offset_Mask_Source = 0.0 [
 			ParameterName="Specular Ramp Offset Mask Source";
 			Group="11 - Specular";
 			SortPriority=61;
-			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Specular Ramp Offset Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Specular Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Specular Ramp Offset Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Specular Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+			Description="读哪张打包遮罩图: 0 = 不读, 偏移为中性值 0.5(默认), 1/2/3 = Global Mask Map 1/2/3, 通道由`Specular Ramp Offset Channel`决定.\r\n只在`Specular Ramp Offset From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图(默认灰 = 中性).\r\n以前默认读 Global Mask Map 1: 白色默认图是满偏移, 照说明把强度调到 1 时整面变亮 / 高光顶满. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 0 = none, a neutral 0.5 offset (the default), 1/2/3 = Global Mask Map 1/2/3, with the channel picked by `Specular Ramp Offset Channel`.\r\nOnly used while `Specular Ramp Offset From Global Mask Map` is on; with it off the parameter reads its own texture (grey = neutral by default).\r\nIt used to read Global Mask Map 1 by default: the white default map is a full offset, so raising the intensity to 1 as the description advises brightened the whole surface. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
 		];
 		ScalarParameter Rim_Light_Width_Mask_Source = 1.0 [
 			ParameterName="Rim Light Width Mask Source";
@@ -215,18 +217,23 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SortPriority=35;
 			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`Rim Light Width Channel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\n只在`Rim Light Width From Global Mask Map`打开时参与; 关着的时候读的是它自己的贴图. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `Rim Light Width Channel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nOnly used while `Rim Light Width From Global Mask Map` is on; with it off the parameter reads its own texture. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
 		];
-		ScalarParameter Kajiya_Secondary_Mask_Source = 1.0 [
-			ParameterName="Kajiya Secondary Mask Source";
-			Group="04 - Kajiya Kay";
-			Description="读哪张打包遮罩图: 1/2/3 = Global Mask Map 1/2/3, 通道由`KajiyaSecondaryMaskChannel`决定. 0 = 全白(1). 默认 1 = 和以前一样读 Global Mask Map 1.\r\nToon Kajiya 头发的发丝偏移一直从这里读. 选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map to read: 1/2/3 are Global Mask Map 1/2/3, with the channel picked by `KajiyaSecondaryMaskChannel`. 0 is white (1). The default 1 reads Global Mask Map 1, as before.\r\nThe Toon Kajiya hair strand shift always reads it. Picking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
+		ScalarParameter Kajiya_Secondary_Mask_Source = 0.0 [
+			ParameterName="Toon Kajiya Strand Shift Mask Source";
+			Group="35 - Feature: Hair Toon Kajiya Kay";
+			SortPriority=20;
+			Description="发丝偏移遮罩读哪张打包遮罩图: 0 = 不读(默认, 偏移只由两个 Strand Shift 滑条决定), 1/2/3 = Global Mask Map 1/2/3, 通道由`Toon Kajiya Strand Shift Channel`决定. 遮罩值直接加到主 / 次高光的偏移上.\r\n以前默认读 Global Mask Map 1 的 R(也是粗糙度通道): 白色默认图把偏移顶满, 两个滑条都不起作用.\r\n选 2/3 但对应的`Enable Global Mask Map 2/3`没开时, 读到的是全白(1).\r\n\r\n\r\nWhich packed mask map the strand-shift mask comes from: 0 = none (the default; the two Strand Shift sliders alone set the shift), 1/2/3 = Global Mask Map 1/2/3, with the channel picked by `Toon Kajiya Strand Shift Channel`. The mask value is added to the primary and secondary shift.\r\nIt used to read Global Mask Map 1's R (also the roughness channel) by default: the white default map pinned the shift at its maximum and both sliders did nothing.\r\nPicking 2 or 3 while that map's `Enable Global Mask Map 2/3` is off reads white (1).";
 		];
 		// The SKIN under the stocking, not the stocking itself -- the fabric's own colour is the
 		// material's Base Color. Both stocking features interpolate between the two by Density.
-		TextureSampleParameter2D BodyBaseColor = Path(Engine, "EngineResources/DefaultTexture") [
+		// A6 (R11): the default was the engine checker (DefaultTexture), so the stocking features' "black = not
+		// set, fall back to the fabric colour" never fired and Is Stockings without a map showed the checker.
+		// Renamed from the bare identifier "BodyBaseColor"; the migration moved the one override across.
+		TextureSampleParameter2D BodyBaseColor = Path(Engine, "EngineResources/Black") [
+			ParameterName="Stockings Skin Color Map";
 			SamplerType="SAMPLERTYPE_Color";
 			Group="05 - Stockings";
 			SortPriority=0;
-			Description="丝袜下面透出来的腿部皮肤颜色. 丝袜自身的颜色走材质的 Base Color, 两者由 Density 混合.";
+			Description="丝袜下面透出来的腿部皮肤颜色(sRGB). 丝袜自身的颜色走材质的 Base Color, 两者由 Density 混合.\r\n默认全黑 = 没设置, 回退到布料色.\r\n\r\n\r\nThe leg skin showing through the stocking (sRGB). The stocking's own colour is the material's Base Color; Density blends the two.\r\nBlack (the default) means not set, and the fabric colour is used instead.";
 		];
 		// Where the knit is stretched thin and where it piles up. Multiplied into In_Stockings_Density,
 		// so white (the default) leaves the slider in charge and the map only says where it varies.
@@ -331,13 +338,13 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			ParameterName="Shadow Opacity";
 			Group="21 - Translucency";
 			SortPriority=41;
-			Description="只作用于阴影图, 不影响画面上的裁剪. 缩放写进阴影深度Pass的不透明度: >1 让阴影比本体更实, <1 更透, 0 等于不投影.\r\n\r\nShadow Opacity\r\nShadow map only -- it does not affect the visible cutout. Scales the opacity written into the shadow depth pass: >1 makes the shadow more solid than the surface, <1 more transparent, 0 removes it.";
+			Description="只作用于阴影图, 不影响画面上的裁剪. 缩放写进阴影深度Pass的不透明度: >1 让阴影比本体更实, <1 更透, 0 等于不投影.\r\n需要 Masked: 只有实例的 Blend Mode 覆盖为 Masked(已遮罩)时阴影 pass 才按它裁剪; 母材质是 Opaque, 不覆盖混合模式时它没有任何效果.\r\n\r\nShadow Opacity\r\nShadow map only -- it does not affect the visible cutout. Scales the opacity written into the shadow depth pass: >1 makes the shadow more solid than the surface, <1 more transparent, 0 removes it.\r\nNeeds Masked: the shadow pass clips against it only when the instance's Blend Mode is overridden to Masked. The parent material is Opaque; without that override it does nothing.";
 		];
 		ScalarParameter Apply_Opacity_to_Shadow = 1.0 [
 			ParameterName="Apply Opacity to Shadow";
 			Group="21 - Translucency";
 			SortPriority=42;
-			Description="阴影是否跟随不透明度. 1 = 阴影按 Opacity 一起变透, 0 = 阴影按全不透明算. 同样只作用于阴影图.\r\n\r\nApply Opacity to Shadow\r\n1 = the shadow fades with Opacity, 0 = the shadow is cast as if fully opaque. Shadow map only.";
+			Description="阴影是否跟随不透明度. 1 = 阴影按 Opacity 一起变透, 0 = 阴影按全不透明算. 同样只作用于阴影图.\r\n需要 Masked: 母材质是 Opaque, 实例不把 Blend Mode 覆盖为 Masked 时它没有任何效果.\r\n\r\nApply Opacity to Shadow\r\n1 = the shadow fades with Opacity, 0 = the shadow is cast as if fully opaque. Shadow map only.\r\nNeeds Masked: the parent material is Opaque, and unless the instance's Blend Mode is overridden to Masked it does nothing.";
 		];
 		ChannelMaskParameter AO_Channel = float4(0.0, 0.0, 0.0, 1.0) [
 			ParameterName="AO Channel";
@@ -493,6 +500,36 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			SortPriority=82;
 			Description="在有ID Map或顶点色输入的情况下指定脸或头发的ID, 适用于脸和头发使用同一个材质的情况.\r\n\r\n如果要使用发影(头发在脸上的投影)功能, 则必须正确设置脸和头发的ID.\r\n\r\n\r\nSpecifying the ID of the face or hair with ID Map or vertex color input, suitable for face and hair using the same material.\r\n\r\nIf you want to use the hair shadow (shadows of hair on the face) feature, the face and hair IDs must be set correctly.";
 		];
+		ScalarParameter Use_Anisotropy_Flag = 0.0 [
+			ParameterName="Use Anisotropy";
+			Group="11 - Specular";
+			SortPriority=2;
+			Description="1 = 使用 Anisotropy(以及子材质表的各向异性列), 0 = 各向同性.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = use Anisotropy (and the sub-material table's anisotropy column), 0 = isotropic.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
+		ScalarParameter Invert_Roughness_Channel_Flag = 0.0 [
+			ParameterName="Invert Roughness Channel";
+			Group="11 - Specular";
+			SortPriority=43;
+			Description="1 = 粗糙度通道按 1 - 值 读(存的是光滑度时用).\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = read the roughness channel as 1 - value (for a map that stores smoothness).\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
+		ScalarParameter Is_Face_Flag = 0.0 [
+			ParameterName="Is Face";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=81;
+			Description="1 = 整个材质按脸算(发影的接收方), 0 = 只有 ID 等于 Face ID 的像素算脸.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the whole material counts as face (the hair-shadow receiver), 0 = only pixels whose ID equals Face ID do.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
+		ScalarParameter Is_Hair_Flag = 0.0 [
+			ParameterName="Is Hair";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=81;
+			Description="1 = 整个材质按头发算(发影的投射方), 0 = 只有 ID 等于 Hair ID 的像素算头发.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the whole material counts as hair (the hair-shadow caster), 0 = only pixels whose ID equals Hair ID do.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
+		ScalarParameter Use_Screen_Space_Depth_Test_Hair_Shadow_Flag = 0.0 [
+			ParameterName="Use Screen Space Depth Test Hair Shadow";
+			Group="13 - Ray Tracing Shadow";
+			SortPriority=80;
+			Description="1 = 脸上的发影用屏幕空间深度测试, 0 = 用光追 / 阴影图.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = the hair shadow on the face uses the screen-space depth test, 0 = ray traced / shadow map.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
 	}
 
 	Inputs = {
@@ -602,15 +639,20 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float4 AppendMany = AppendMany((UE.Expression(Class="VertexColor", OutputType="float4")).r, (UE.Expression(Class="VertexColor", OutputType="float4")).g, (UE.Expression(Class="VertexColor", OutputType="float4")).b, (UE.Expression(Class="VertexColor", OutputType="float4")).a, OutputIndex=2);
 		#Region "Texture Sample"
 		float3 AppendMany_1 = AppendMany((UE.Expression(Class="VertexColor", OutputType="float4")).r, (UE.Expression(Class="VertexColor", OutputType="float4")).g, (UE.Expression(Class="VertexColor", OutputType="float4")).b, (UE.Expression(Class="VertexColor", OutputType="float4")).a, OutputIndex=1);
+		// A7 (R11): vertex colour is DATA here (shadow group ID, rim width, opacity, the packed-mask stand-in), so
+		// it is read as stored. The old default ran it through pow(2.2) -- the switch "Use Vertex Color In sRGB
+		// Space" had to be TICKED to get the raw value -- which pushed small IDs to 0 and thinned every mask.
 		float4 StaticSwitchParameter =
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=AppendMany,
-				False=float4(pow(AppendMany_1, 2.2), (UE.Expression(Class="VertexColor", OutputType="float4")).a),
+				True=float4(pow(AppendMany_1, 2.2), (UE.Expression(Class="VertexColor", OutputType="float4")).a),
+				False=AppendMany,
 				Group="01 - Global Mask Map",
 				SortPriority=41,
-				ParameterName="Use Vertex Color In sRGB Space"
+				ParameterName="Decode Vertex Color From sRGB",
+				DefaultValue=false,
+				Desc="顶点色 RGB 先按 sRGB 解码(pow 2.2)再用. 默认关 = 按原值读, 适合存数据(阴影组 ID、rim 宽度、不透明度、代替遮罩图). 只有顶点色是按 sRGB 画的颜色时才打开. A 通道始终按原值.\r\n替代旧开关`Use Vertex Color In sRGB Space`(名字和行为相反: 不勾时反而做 pow 2.2).\r\n\r\n\r\nDecode the vertex colour RGB from sRGB (pow 2.2) before use. Off (the default) reads it as stored, which is what data needs (shadow group ID, rim width, opacity, the mask-map stand-in). Tick it only for vertex colour painted as an sRGB colour. Alpha is always read as stored.\r\nReplaces `Use Vertex Color In sRGB Space`, whose name said the opposite of what it did (unticked meant pow 2.2)."
 			);
 		#EndRegion
 
@@ -621,7 +663,21 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 Global_Mask_Map_UV = Add_1;
 		#Region "Texture Sample"
-		float4 StaticSwitchParameter_1 = MF_ToonSampleLinear(Global_Mask_Map, Global_Mask_Map_UV).rgba;
+		// B1 (R11): map 1 is sampled only when "Enable Global Mask Map" is on, the same shape as maps 2 and 3.
+		// Off reads white, which is exactly what the default T_White_Linear sampled to, so every instance without a
+		// map is unchanged; the migration turned the switch on wherever an instance assigns one.
+		float4 StaticSwitchParameter_1 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=MF_ToonSampleLinear(Global_Mask_Map, Global_Mask_Map_UV).rgba,
+				False=float4(1.0, 1.0, 1.0, 1.0),
+				Group="01 - Global Mask Map",
+				SortPriority=1,
+				ParameterName="Enable Global Mask Map",
+				DefaultValue=false,
+				Desc="采样 Global Mask Map(第一张打包遮罩图). 关 = 一次都不采样, 所有读它的地方读到全白(1), 和默认白图完全一样. 指定了贴图就要打开.\r\n\r\n\r\nSample Global Mask Map (the first packed mask map). Off = no fetch at all; everything that reads it gets white (1), exactly what the default white map gave. Tick it when you assign a map."
+			);
 		float4 StaticSwitchParameter_2 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -679,23 +735,30 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Shadow_Group_ID_Mask_Source, Shadow_Group_ID_Global_Mask);
 		float4 Diffuse_Ramp_Offset_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
 		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Diffuse_Ramp_Offset_Mask_Source, Diffuse_Ramp_Offset_Global_Mask);
+		// A12 (R11): for a ramp OFFSET the "none" value is the neutral 0.5, not white (a full offset).
+		float4 Diffuse_Ramp_Offset_Selected = UE.Expression(Class="If", OutputType="float4", A=Diffuse_Ramp_Offset_Mask_Source, B=0.5, AGreaterThanB=Diffuse_Ramp_Offset_Global_Mask, AEqualsB=Diffuse_Ramp_Offset_Global_Mask, ALessThanB=float4(0.5, 0.5, 0.5, 0.5), EqualsThreshold=0.0);
 		float4 Specular_Ramp_Offset_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
 		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Specular_Ramp_Offset_Mask_Source, Specular_Ramp_Offset_Global_Mask);
+		// A12 (R11): for a ramp OFFSET the "none" value is the neutral 0.5, not white (a full offset).
+		float4 Specular_Ramp_Offset_Selected = UE.Expression(Class="If", OutputType="float4", A=Specular_Ramp_Offset_Mask_Source, B=0.5, AGreaterThanB=Specular_Ramp_Offset_Global_Mask, AEqualsB=Specular_Ramp_Offset_Global_Mask, ALessThanB=float4(0.5, 0.5, 0.5, 0.5), EqualsThreshold=0.0);
 		float4 Rim_Light_Width_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
 		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Rim_Light_Width_Mask_Source, Rim_Light_Width_Global_Mask);
 		float4 Kajiya_Secondary_Global_Mask = float4(1.0, 1.0, 1.0, 1.0);
 		SelectGlobalMaskMap(Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Kajiya_Secondary_Mask_Source, Kajiya_Secondary_Global_Mask);
 
 		float KajiyaSecondaryMaskChannel_Masked = KajiyaSecondaryMaskChannel(Input = Kajiya_Secondary_Global_Mask);
+		// A4 (R11): the mask is ADDED to the strand shift, so its "none" is 0, not the white every other source
+		// falls back to -- white pinned every Toon Kajiya shift at 1 (the lane saturates) and made the sliders inert.
+		float Toon_Kajiya_Strand_Shift = UE.Expression(Class="If", OutputType="float", A=Kajiya_Secondary_Mask_Source, B=0.5, AGreaterThanB=KajiyaSecondaryMaskChannel_Masked, AEqualsB=KajiyaSecondaryMaskChannel_Masked, ALessThanB=0.0, EqualsThreshold=0.0);
 		// The hair highlight mask is NOT sampled here any more. MF_ToonFeature_HairHighlightMask
 		// calls MF_ToonHairHighlightMask itself, which puts the mask texture, its channel, its map
 		// selection and the nine light-elevation offsets behind the feature's own static switch --
 		// gone from the panel and out of the shader on every material that selected something else.
 		// All this passes is the three packed maps, which were sampled anyway.
-		float ShadingFeatureID = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=3);
-		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=4);
+		float ShadingFeatureID = MF_MoonToonFeatureSelect(Toon_Kajiya_Strand_Shift, Toon_Kajiya_Strand_Shift, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=3);
+		float4 ShadingFeatureColor = MF_MoonToonFeatureSelect(Toon_Kajiya_Strand_Shift, Toon_Kajiya_Strand_Shift, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=4);
 		#Region "Texture Sample"
-		float2 MF_UVChannelSwitch_1 = MF_UVChannelSwitch(Inner_Outline_Map_UV_Channel);
+		float2 MF_UVChannelSwitch_1 = MF_ToonUV(Inner_Outline_Map_UV_Channel);
 		float4 Inner_Outline_Map =
 			UE.Expression(
 				Class="TextureSampleParameter2D",
@@ -962,32 +1025,14 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float Roughness_Channel_Masked = Roughness_Channel(Input = StaticSwitchParameter_11);
 		float Sampled_Roughness = Roughness_Channel_Masked;
 		#Region "Specular"
-		float StaticSwitchParameter_12 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=(1.0 - Sampled_Roughness),
-				False=Sampled_Roughness,
-				Group="11 - Specular",
-				SortPriority=43,
-				ParameterName="Invert Roughness Channel"
-			);
+		float StaticSwitchParameter_12 = UE.Expression(Class="If", OutputType="float", A=Invert_Roughness_Channel_Flag, B=0.5, AGreaterThanB=(1.0 - Sampled_Roughness), AEqualsB=(1.0 - Sampled_Roughness), ALessThanB=Sampled_Roughness, EqualsThreshold=0.0);
 		float Multiply_6 = (StaticSwitchParameter_12 * Roughness_Sub);
 		#EndRegion
 
 		float Roughness_1 = Multiply_6;
 		Attributes.Roughness = Roughness_1;
 		#Region "Specular"
-		float StaticSwitchParameter_13 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=Anisotropy_Sub,
-				False=0.0,
-				Group="11 - Specular",
-				SortPriority=2,
-				ParameterName="Use Anisotropy"
-			);
+		float StaticSwitchParameter_13 = UE.Expression(Class="If", OutputType="float", A=Use_Anisotropy_Flag, B=0.5, AGreaterThanB=Anisotropy_Sub, AEqualsB=Anisotropy_Sub, ALessThanB=0.0, EqualsThreshold=0.0);
 		#EndRegion
 
 		float Anisotropy_Output = StaticSwitchParameter_13;
@@ -1181,21 +1226,27 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		// world vector ("baked in Houdini"); that convention had no baker in this project, broke
 		// under skinning, and read VRM-import UV residue as tangents. The Transform node below is the
 		// same decode the face-forward path uses, reused rather than duplicated.
+		// A3 (R11): ...in the VERTEX stage. This pin is read in the pixel stage, where TexCoord 1 / 2 ARE the
+		// customized UVs below, already decoded and in world space; decoding them a second time (*2-1, then
+		// tangent->world again) scrambled every baked strand direction. The pixel stage only renormalises, exactly
+		// like the face-forward branch.
 		float3 StaticSwitchParameter_25 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float3",
-				True=normalize(Transform),
+				True=normalize(float3(MaterialExpressionTextureCoordinate_4.rg, MaterialExpressionTextureCoordinate_5.r)),
 				False=0.0,
 				Group="00 - Global Settings",
 				SortPriority=61,
 				ParameterName="Use Highlight Tangent baked in Houdini UV23",
 				DefaultValue=true
 			);
-		float3 StaticSwitchParameter_26 = Is_KajiyaHair(
+		// A13 (R11): Kajiya outranks the SDF face here, as it does in M_MoonToon's closure chain (earlier wins), so a
+		// material with both ticked gets the strand tangent its Kajiya closure reads, not the face-forward vector.
+		float3 StaticSwitchParameter_26 = Is_DFFacialShadow(True = normalize(float3(MaterialExpressionTextureCoordinate_4.rg, MaterialExpressionTextureCoordinate_5.r)), False = float3(0.0, 0.0, 0.0));
+		float3 StaticSwitchParameter_27 = Is_KajiyaHair(
 			True = StaticSwitchParameter_25,
-			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_25, False = float3(0.0, 0.0, 0.0)));
-		float3 StaticSwitchParameter_27 = Is_DFFacialShadow(True = normalize(float3(MaterialExpressionTextureCoordinate_4.rg, MaterialExpressionTextureCoordinate_5.r)), False = StaticSwitchParameter_26);
+			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_25, False = StaticSwitchParameter_26));
 		#EndRegion
 
 		float3 TangentWS = StaticSwitchParameter_27;
@@ -1217,10 +1268,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 MaterialExpressionTextureCoordinate_6_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=1);
 		#Region "Decode Hightlight Tangent or Face Forward Dir"
-		float2 StaticSwitchParameter_29 = Is_KajiyaHair(
+		float2 StaticSwitchParameter_29 = Is_DFFacialShadow(True = normalize(Transform).rg, False = MaterialExpressionTextureCoordinate_6_1);
+		float2 StaticSwitchParameter_30 = Is_KajiyaHair(
 			True = StaticSwitchParameter_28,
-			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_28, False = MaterialExpressionTextureCoordinate_6_1));
-		float2 StaticSwitchParameter_30 = Is_DFFacialShadow(True = normalize(Transform).rg, False = StaticSwitchParameter_29);
+			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_28, False = StaticSwitchParameter_29));
 		#EndRegion
 
 		float2 Custom_Vertex_UV1 = StaticSwitchParameter_30;
@@ -1244,10 +1295,10 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float2 MaterialExpressionTextureCoordinate_7_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2", CoordinateIndex=2);
 		#Region "Decode Hightlight Tangent or Face Forward Dir"
-		float2 StaticSwitchParameter_32 = Is_KajiyaHair(
+		float2 StaticSwitchParameter_32 = Is_DFFacialShadow(True = float2(normalize(Transform).b, MaterialExpressionTextureCoordinate_5_3.g), False = MaterialExpressionTextureCoordinate_7_1);
+		float2 StaticSwitchParameter_33 = Is_KajiyaHair(
 			True = StaticSwitchParameter_31,
-			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_31, False = MaterialExpressionTextureCoordinate_7_1));
-		float2 StaticSwitchParameter_33 = Is_DFFacialShadow(True = float2(normalize(Transform).b, MaterialExpressionTextureCoordinate_5_3.g), False = StaticSwitchParameter_32);
+			False = Is_ToonKajiyaHair(True = StaticSwitchParameter_31, False = StaticSwitchParameter_32));
 		#EndRegion
 
 		float2 Custom_Vertex_UV2 = StaticSwitchParameter_33;
@@ -1278,8 +1329,21 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#EndRegion
 
 		#Region "Texture Sample"
-		float2 MF_UVChannelSwitch_4 = MF_UVChannelSwitch(ID_Map_UV_Channel);
-		float4 StaticSwitchParameter_36 = MF_ToonSampleLinearMip0(ID_Map_R_, MF_UVChannelSwitch_4).rgba;
+		float2 MF_UVChannelSwitch_4 = MF_ToonUV(ID_Map_UV_Channel);
+		// B1 (R11): behind "Enable Shadow Group ID Map"; off is 0, as the default T_Black_Linear was. The ID map
+		// also runs in the ray-tracing any-hit and shadow-depth shaders (CustomData0), so off saves it there too.
+		float4 StaticSwitchParameter_36 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float4",
+				True=MF_ToonSampleLinearMip0(ID_Map_R_, MF_UVChannelSwitch_4).rgba,
+				False=float4(0.0, 0.0, 0.0, 0.0),
+				Group="13 - Ray Tracing Shadow",
+				SortPriority=29,
+				ParameterName="Enable Shadow Group ID Map",
+				DefaultValue=false,
+				Desc="采样 Shadow Group ID Map. 关 = 不采样, ID 为 0(和默认黑图完全一样), 光追 any-hit 和阴影深度 pass 也省掉这次采样. 指定了贴图就要打开.\r\n\r\n\r\nSample Shadow Group ID Map. Off = no fetch; the ID is 0, exactly what the default black map gave, and the ray-tracing any-hit and shadow-depth passes skip the fetch too. Tick it when you assign a map."
+			);
 		float4 StaticSwitchParameter_37 =
 			UE.Expression(
 				Class="StaticSwitchParameter",
@@ -1312,7 +1376,11 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		#Region "RayTracing Shadow"
 		float Add_5 = (ID + floor(ID_Offset));
 		float Divide = (Add_5 / 255.0);
-		float Multiply_13 = (saturate(Divide) * 31.0);
+		// A8 (R11): the 5-bit group is floor(id / 8), so two IDs at least 8 apart -- the spacing the ID map's
+		// description asks for -- always land in different groups. It was floor(id / 255 * 31), one group per
+		// 8.23 IDs: IDs 0 and 8 shared group 0, and characters 8 apart never shadowed each other. Rounding that
+		// instead still merges 144 and 152. The payload (SetStencil takes a uint) and the closure take the integer.
+		float Multiply_13 = floor(saturate(Divide) * 255.0 / 8.0);
 		#EndRegion
 
 		float Encoded_Stencil = Multiply_13;
@@ -1332,7 +1400,21 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 		float Encoded_Ray_Tracing_Data = Encode_Mooa_Ray_Tracing_Data;
 		Attributes.CustomData0 = Encoded_Ray_Tracing_Data;
 		#Region "Texture Sample"
-		float3 StaticSwitchParameter_45 = MF_ToonSampleColor(Shadow_Color_Map, Global_UV).rgb;
+		// B2 (R11): most instances point Shadow Color Map at the Base Color Map texture; this reuses that sample
+		// (same function, same UV, so the same texel), one fetch per pixel fewer. The migration turned it on where
+		// both maps were the same texture.
+		float3 StaticSwitchParameter_45 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=Sampled_Base_Color.rgb,
+				False=MF_ToonSampleColor(Shadow_Color_Map, Global_UV).rgb,
+				Group="10 - Diffuse",
+				SortPriority=14,
+				ParameterName="Shadow Color From Base Color Map",
+				DefaultValue=false,
+				Desc="阴影色贴图直接用 Base Color Map 的采样结果(再乘 Shadow Color). 两张图本来就是同一张时打开: 画面完全一样, 每像素少一次采样. 打开后 Shadow Color Map 不再使用.\r\n\r\n\r\nUse the Base Color Map sample as the shadow colour map (still times Shadow Color). Tick it when both are the same texture: the image is identical and each pixel saves a fetch. With it on, Shadow Color Map is not used."
+			);
 		#EndRegion
 
 		float3 Sampled_Shadow_Color = StaticSwitchParameter_45;
@@ -1455,7 +1537,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Diffuse_Ramp_Offset_Global_Mask,
+				True=Diffuse_Ramp_Offset_Selected,
 				False=StaticSwitchParameter_47,
 				Group="10 - Diffuse",
 				SortPriority=35,
@@ -1472,7 +1554,19 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		float Diffuse_Ramp_UV_Offset = LinearInterpolate_3;
 		#Region "Texture Sample"
-		float3 StaticSwitchParameter_49 = MF_ToonSampleColor(Specular_Color_Map, Global_UV).rgb;
+		// B1 (R11): behind "Enable Specular Color Map"; off is white, as the default WhiteSquareTexture was.
+		float3 StaticSwitchParameter_49 =
+			UE.Expression(
+				Class="StaticSwitchParameter",
+				OutputType="float3",
+				True=MF_ToonSampleColor(Specular_Color_Map, Global_UV).rgb,
+				False=float3(1.0, 1.0, 1.0),
+				Group="11 - Specular",
+				SortPriority=5,
+				ParameterName="Enable Specular Color Map",
+				DefaultValue=false,
+				Desc="采样 Specular Color Map. 关 = 不采样, 高光色只取 Specular Color(和默认白图完全一样). 指定了贴图就要打开.\r\n\r\n\r\nSample Specular Color Map. Off = no fetch; the specular colour is Specular Color alone, exactly what the default white map gave. Tick it when you assign a map."
+			);
 		#EndRegion
 
 		float3 Sampled_Specular_Color = StaticSwitchParameter_49;
@@ -1510,7 +1604,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			UE.Expression(
 				Class="StaticSwitchParameter",
 				OutputType="float4",
-				True=Specular_Ramp_Offset_Global_Mask,
+				True=Specular_Ramp_Offset_Selected,
 				False=StaticSwitchParameter_50,
 				Group="11 - Specular",
 				SortPriority=60,
@@ -1637,30 +1731,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				AEqualsB=1.0,
 				ALessThanB=0.0
 			);
-		float StaticSwitchParameter_60 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=1.0,
-				False=If,
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=81,
-				ParameterName="Is Face"
-			);
+		float StaticSwitchParameter_60 = UE.Expression(Class="If", OutputType="float", A=Is_Face_Flag, B=0.5, AGreaterThanB=1.0, AEqualsB=1.0, ALessThanB=If, EqualsThreshold=0.0);
 		#EndRegion
 
 		float Is_Face = StaticSwitchParameter_60;
 		#Region "RayTracing Shadow"
-		float StaticSwitchParameter_61 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=2.0,
-				False=1.0,
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=80,
-				ParameterName="Use Screen Space Depth Test Hair Shadow"
-			);
+		float StaticSwitchParameter_61 = UE.Expression(Class="If", OutputType="float", A=Use_Screen_Space_Depth_Test_Hair_Shadow_Flag, B=0.5, AGreaterThanB=2.0, AEqualsB=2.0, ALessThanB=1.0, EqualsThreshold=0.0);
 		float If_1 =
 			UE.Expression(
 				Class="If",
@@ -1671,16 +1747,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 				AEqualsB=1.0,
 				ALessThanB=0.0
 			);
-		float StaticSwitchParameter_62 =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=1.0,
-				False=If_1,
-				Group="13 - Ray Tracing Shadow",
-				SortPriority=81,
-				ParameterName="Is Hair"
-			);
+		float StaticSwitchParameter_62 = UE.Expression(Class="If", OutputType="float", A=Is_Hair_Flag, B=0.5, AGreaterThanB=1.0, AEqualsB=1.0, ALessThanB=If_1, EqualsThreshold=0.0);
 		#EndRegion
 
 		float Is_Hair = StaticSwitchParameter_62;
@@ -1813,12 +1880,12 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 			);
 		Attributes.MoonEncodedAttribute4 = MoonEncodeToonAttributes_4.rgba;
 		Attributes.CustomData1 = 1.0;
-		float4 MF_MoonToonBufferInput_1 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=0);
+		float4 MF_MoonToonBufferInput_1 = MF_MoonToonFeatureSelect(Toon_Kajiya_Strand_Shift, Toon_Kajiya_Strand_Shift, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=0);
 		float4 ToonBufferA_1 = MF_MoonToonBufferInput_1;
-		float4 MF_MoonToonBufferInput_2 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=1);
+		float4 MF_MoonToonBufferInput_2 = MF_MoonToonFeatureSelect(Toon_Kajiya_Strand_Shift, Toon_Kajiya_Strand_Shift, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=1);
 		float4 ToonBufferB_1 = MF_MoonToonBufferInput_2;
 		#Region "Toon Buffer"
-		float4 MF_MoonToonBufferInput_3 = MF_MoonToonFeatureSelect(KajiyaSecondaryMaskChannel_Masked, KajiyaSecondaryMaskChannel_Masked, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=2);
+		float4 MF_MoonToonBufferInput_3 = MF_MoonToonFeatureSelect(Toon_Kajiya_Strand_Shift, Toon_Kajiya_Strand_Shift, Sampled_Global_Mask_Map, Sampled_Global_Mask_Map_2, Sampled_Global_Mask_Map_3, Stockings_Thickness_Map.r, BodyBaseColor.rgb, OutputIndex=2);
 		#EndRegion
 
 		float4 ToonBufferC_1 = MF_MoonToonBufferInput_3;
@@ -1876,7 +1943,7 @@ ShaderFunction(Name="MaterialFunctions/MF_MoonToonBaseInput", Root="Plugin.MoonT
 
 		// Exactly the argument list MF_MoonToonFeatureSelect is called with above, in the same order:
 		// the strand-shift mask goes to BOTH of the Toon Kajiya inputs, as it does there.
-		OutKajiyaStrandShift = KajiyaSecondaryMaskChannel_Masked;
+		OutKajiyaStrandShift = Toon_Kajiya_Strand_Shift;
 		OutGlobalMaskA = Sampled_Global_Mask_Map;
 		OutGlobalMaskB = Sampled_Global_Mask_Map_2;
 		OutGlobalMaskC = Sampled_Global_Mask_Map_3;

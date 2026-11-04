@@ -27,6 +27,31 @@
 // Until R1's light rig is in use the head frame is approximated: head up = the object's up axis
 // (ObjectOrientation) unless HeadUpWS is connected, and the key light = MF_MoonMainLightDirection.
 
+/// B7 (R11): the ring's texture fetches only when Active > 0 -- Active is 0 only when both Angel Ring
+/// Intensity and Angel Ring Dark Band Strength are <= 0, and then the engine multiplies the ring by 0 and the
+/// dark band is 0 anyway, so nothing on screen changes. Material parameters only: the branch is uniform.
+/// @custom
+float4 MoonToonAngelRingSampleLevel(Texture2D Map, float2 UV, float Active)
+{
+	float4 Value = float4(0.0, 0.0, 0.0, 0.0);
+	[branch] if (Active > 0.0)
+	{
+		Value = Texture2DSampleLevel(Map, MapSampler, UV, 0.0);
+	}
+	return Value;
+}
+
+/// @custom
+float4 MoonToonAngelRingSample(Texture2D Map, float2 UV, float Active)
+{
+	float4 Value = float4(0.0, 0.0, 0.0, 0.0);
+	[branch] if (Active > 0.0)
+	{
+		Value = Texture2DSample(Map, MapSampler, UV);
+	}
+	return Value;
+}
+
 /// @asset /MoonToon/MaterialFunctions/MF_MoonMainLightDirection
 extern float3 MF_MoonMainLightDirection();
 
@@ -249,6 +274,7 @@ export void MF_ToonAngelRing(
     float3 Up = AngelRingSafeNormalize(HeadUpWS, UE.Expression(Class = "ObjectOrientation"));
     float3 L = AngelRingSafeNormalize(KeyLightDirWS, MF_MoonMainLightDirection());
     float NoV = saturate(dot(N, V));
+    float Active = (Angel_Ring_Intensity > 0.0 || Angel_Ring_Dark_Band_Strength > 0.0) ? 1.0 : 0.0;
 
     float Ring = 0.0;
     float Line = 0.0;
@@ -266,11 +292,11 @@ export void MF_ToonAngelRing(
         float Height = lerp(0.5, dot(L, Up), Angel_Ring_Fake_Light_Elevation);
         float3 FakeL = AngelRingSafeNormalize(VFlat + Up * Height, Up);
         float3 H = normalize(normalize(2.0 * FakeL + L) + V);
-        float Noise = Angel_Ring_Strand_Noise.SampleLevel(UV0, 0.0).r;
+        float Noise = MoonToonAngelRingSampleLevel(Angel_Ring_Strand_Noise, UV0, Active).r;
 
         float Lobe = saturate(Mask * AngelRingKK(T, H, Angel_Ring_Lobe_Exponent));
         float Side = NoV * NoV * step(0.0, dot(T, H));
-        Ring = Angel_Ring_LUT_B.SampleLevel(float2(Lobe, Side), 0.0).r * Lobe * NoV;
+        Ring = MoonToonAngelRingSampleLevel(Angel_Ring_LUT_B, float2(Lobe, Side), Active).r * Lobe * NoV;
 
         float3 TLine = AngelRingSafeNormalize(T + Ns * Angel_Ring_Line_Shift, T);
         Line = AngelRingKK(TLine, H, Angel_Ring_Line_Exponent) * Mask;
@@ -281,14 +307,14 @@ export void MF_ToonAngelRing(
     else
     {
         // ---- mode A: strand coordinate + view slide + LUT (Wuthering Waves) ----
-        float4 Flow = Angel_Ring_Flow_Map.SampleLevel(UV0, 0.0);
+        float4 Flow = MoonToonAngelRingSampleLevel(Angel_Ring_Flow_Map, UV0, Active);
         float Slide = Angel_Ring_View_Slide_Up * dot(V, Up) + Angel_Ring_View_Slide_Edge * (1.0 - NoV);
         float Jitter = Angel_Ring_Strand_Jitter * (Flow.r - 0.5);
 
         if (Angel_Ring_Legacy_Mask)
         {
             // The old painted band, moved by the view only (no LUT, no dark band, no line).
-            Ring = Angel_Ring_Legacy_Mask_Map.Sample(UV0 + float2(0.0, Slide + Jitter)).r * Mask;
+            Ring = MoonToonAngelRingSample(Angel_Ring_Legacy_Mask_Map, UV0 + float2(0.0, Slide + Jitter), Active).r * Mask;
         }
         else
         {
@@ -298,9 +324,9 @@ export void MF_ToonAngelRing(
                 StrandCoord = Flow.g;
             }
             float U = (StrandCoord + Slide + Jitter - Angel_Ring_Center) / max(Angel_Ring_Width, 0.001) * 0.5 + 0.5;
-            Ring = Angel_Ring_LUT_A.SampleLevel(float2(U, 0.125), 0.0).r * Mask;
-            Dark = Angel_Ring_LUT_A.SampleLevel(float2(U, 0.375), 0.0).r * Mask;
-            Line = Angel_Ring_LUT_A.SampleLevel(float2(U, 0.625), 0.0).r * Mask;
+            Ring = MoonToonAngelRingSampleLevel(Angel_Ring_LUT_A, float2(U, 0.125), Active).r * Mask;
+            Dark = MoonToonAngelRingSampleLevel(Angel_Ring_LUT_A, float2(U, 0.375), Active).r * Mask;
+            Line = MoonToonAngelRingSampleLevel(Angel_Ring_LUT_A, float2(U, 0.625), Active).r * Mask;
         }
     }
 

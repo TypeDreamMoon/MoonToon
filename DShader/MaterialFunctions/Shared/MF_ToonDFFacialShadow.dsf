@@ -35,6 +35,18 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 			Group="02 - Distance Field Facial Shadow";
 			MaskChannel=Red
 		];
+		ScalarParameter Flip_Left_Right_Flag = 0.0 [
+			ParameterName="Flip Left Right";
+			Group="02 - Distance Field Facial Shadow";
+			SortPriority=32;
+			Description="1 = 左右两半的 SDF 互换(贴图按另一侧画的时候用).\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = swap the two halves' SDF values (for a map authored for the other side).\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
+		ScalarParameter RG_Average_Flag = 0.0 [
+			ParameterName="Distance Field Facial Shadow Map R+G Average";
+			Group="02 - Distance Field Facial Shadow";
+			SortPriority=33;
+			Description="1 = 距离场面影贴图按终末地式 R+G 分半格式读: 阈值 = (R + G) / 2, 约 9 位精度(Tools/FaceSDF 可输出). 0 = 按上面的通道读.\r\n以前是静态开关, 现在是标量(>= 0.5 算开): 不再多一套着色器排列. 现有实例的开关值已迁移过来.\r\n\r\n\r\n1 = read the map as an Endfield-style R+G split: threshold = (R + G) / 2, about 9 bits (Tools/FaceSDF writes it). 0 = the channel above.\r\nIt used to be a static switch; it is a scalar now (>= 0.5 counts as on), so it no longer costs a shader permutation. Existing instances' switch values were migrated.";
+		];
 	}
 
 	Graph = {
@@ -62,17 +74,7 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 		// read back as (R + G) / 2 -- 511 levels, about 9 bits, from an uncompressed RGBA8 texture
 		// (VectorDisplacementmap; any block compression mixes R and G and loses the extra bit). Tools/FaceSDF
 		// writes it. Off = the channel mask, exactly as before.
-		float SampledFacialShadowSdfRight =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=(Distance_Field_Facial_Shadow_Map.r + Distance_Field_Facial_Shadow_Map.g) * 0.5,
-				False=Distance_Field_Facial_Shadow_Map_Channel(Input = Distance_Field_Facial_Shadow_Map.rgba),
-				Group="02 - Distance Field Facial Shadow",
-				SortPriority=33,
-				Desc="距离场面影贴图按终末地式 R+G 分半格式读: 阈值 = (R + G) / 2, 约 9 位精度(Tools/FaceSDF 可输出). 关 = 按上面的通道读, 和以前一样.\r\nRead the map as an Endfield-style R+G split: threshold = (R + G) / 2, about 9 bits (Tools/FaceSDF writes it). Off = the channel above, as before.",
-				ParameterName="Distance Field Facial Shadow Map R+G Average"
-			);
+		float SampledFacialShadowSdfRight = UE.Expression(Class="If", OutputType="float", A=RG_Average_Flag, B=0.5, AGreaterThanB=((Distance_Field_Facial_Shadow_Map.r + Distance_Field_Facial_Shadow_Map.g) * 0.5), AEqualsB=((Distance_Field_Facial_Shadow_Map.r + Distance_Field_Facial_Shadow_Map.g) * 0.5), ALessThanB=Distance_Field_Facial_Shadow_Map_Channel(Input = Distance_Field_Facial_Shadow_Map.rgba), EqualsThreshold=0.0);
 		float2 MaterialExpressionTextureCoordinate_2_1 = UE.Expression(Class="TextureCoordinate", OutputType="float2");
 		#Region "Texture Sample"
 		float4 Distance_Field_Facial_Shadow_Map_1 =
@@ -92,38 +94,11 @@ ShaderFunction(Name="MaterialFunctions/Shared/MF_ToonDFFacialShadow", Root="Plug
 			);
 		#EndRegion
 
-		float SampledFacialShadowSdfLeft =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=(Distance_Field_Facial_Shadow_Map_1.r + Distance_Field_Facial_Shadow_Map_1.g) * 0.5,
-				False=Distance_Field_Facial_Shadow_Map_Channel_1(Input = Distance_Field_Facial_Shadow_Map_1.rgba),
-				Group="02 - Distance Field Facial Shadow",
-				SortPriority=33,
-				ParameterName="Distance Field Facial Shadow Map R+G Average"
-			);
+		float SampledFacialShadowSdfLeft = UE.Expression(Class="If", OutputType="float", A=RG_Average_Flag, B=0.5, AGreaterThanB=((Distance_Field_Facial_Shadow_Map_1.r + Distance_Field_Facial_Shadow_Map_1.g) * 0.5), AEqualsB=((Distance_Field_Facial_Shadow_Map_1.r + Distance_Field_Facial_Shadow_Map_1.g) * 0.5), ALessThanB=Distance_Field_Facial_Shadow_Map_Channel_1(Input = Distance_Field_Facial_Shadow_Map_1.rgba), EqualsThreshold=0.0);
 
 		#Region "Distance Field Facial Shadow"
-		SdfLeft =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=SampledFacialShadowSdfRight,
-				False=SampledFacialShadowSdfLeft,
-				Group="02 - Distance Field Facial Shadow",
-				SortPriority=32,
-				ParameterName="Flip Left Right"
-			);
-		SdfRight =
-			UE.Expression(
-				Class="StaticSwitchParameter",
-				OutputType="float",
-				True=SampledFacialShadowSdfLeft,
-				False=SampledFacialShadowSdfRight,
-				Group="02 - Distance Field Facial Shadow",
-				SortPriority=32,
-				ParameterName="Flip Left Right"
-			);
+		SdfLeft = UE.Expression(Class="If", OutputType="float", A=Flip_Left_Right_Flag, B=0.5, AGreaterThanB=SampledFacialShadowSdfRight, AEqualsB=SampledFacialShadowSdfRight, ALessThanB=SampledFacialShadowSdfLeft, EqualsThreshold=0.0);
+		SdfRight = UE.Expression(Class="If", OutputType="float", A=Flip_Left_Right_Flag, B=0.5, AGreaterThanB=SampledFacialShadowSdfLeft, AEqualsB=SampledFacialShadowSdfLeft, ALessThanB=SampledFacialShadowSdfRight, EqualsThreshold=0.0);
 		#EndRegion
 	}
 }
